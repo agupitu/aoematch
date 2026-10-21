@@ -14,8 +14,8 @@ COPY . .
 RUN npm run assets && npm run build
 
 ENV NODE_ENV=production
-ENV API_PORT=3001
 ENV SEED_DEMO=1
+# El puerto lo puede pisar el hosting con PORT.
 EXPOSE 3001
 
 CMD ["npm", "start"]

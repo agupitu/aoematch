@@ -1,5 +1,7 @@
 # AOEMatch
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/agupitu/aoematch)
+
 Plataforma para organizar torneos de **Age of Empires III: Definitive Edition**:
 inscripciones y pagos, armado automático de equipos, cruce de horarios, salas de
 chat por equipo y draft de mapa y civilizaciones en vivo.
@@ -175,9 +177,11 @@ descargan en cada instalación.
 Hay dos caminos, los dos arrancan con la base vacía y se siembran solos con
 `SEED_DEMO=1`:
 
-- **Render** — importá el repo y usá el `render.yaml` que ya está. Plan free: el
-  disco es efímero, así que cada deploy vuelve a sembrar la demo. Con un disco
-  pago, descomentá el bloque `disk` y apuntá `AOEMATCH_DB` ahí.
+- **Render** — el botón de arriba importa este repo y lee el `render.yaml` que ya
+  está. Plan free: el servicio se duerme tras 15 minutos sin visitas (el primer
+  acceso tarda ~1 minuto en despertar) y el disco es efímero, así que cada
+  deploy vuelve a sembrar la demo. Para un torneo de verdad hace falta un disco:
+  descomentá el bloque `disk` del `render.yaml` y apuntá `AOEMATCH_DB` ahí.
 - **Docker** — `docker build -t aoematch . && docker run -p 3001:3001 aoematch`.
   Sirve para cualquier hosting que corra contenedores (Fly, Railway, un VPS).
 
