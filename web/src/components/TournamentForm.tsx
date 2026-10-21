@@ -1,6 +1,15 @@
 import type { Civ, GameMap } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
-import { ETIQUETA_CIV, ETIQUETA_FORMATO, ETIQUETA_MAPA } from '../lib';
+import { bolsaDe, ETIQUETA_CIV, ETIQUETA_FORMATO, ETIQUETA_MAPA, monto } from '../lib';
+import { Tabs } from './ui';
+
+export type PremioBorrador = {
+  label: string;
+  kind: 'fijo' | 'porcentaje';
+  amount_cents: number;
+  percent: number;
+  extra: string;
+};
 
 export type Borrador = {
   name: string;
@@ -19,6 +28,7 @@ export type Borrador = {
   map_mode: string;
   map_bans: number;
   map_repeat: boolean;
+  first_map_id: number | null;
   civ_mode: string;
   civ_bans: number;
   civ_pattern: string;
@@ -33,6 +43,11 @@ export type Borrador = {
   allow_solo: boolean;
   reg_closes_at: string;
   starts_at: string;
+  prize_pool_mode: string;
+  prize_pool_cents: number;
+  prize_pool_pct: number;
+  prize_notes: string;
+  prizes: PremioBorrador[];
   map_ids: number[];
   civ_ids: number[];
 };
@@ -54,6 +69,7 @@ export const BORRADOR_INICIAL: Borrador = {
   map_mode: 'ban_hasta_uno',
   map_bans: 2,
   map_repeat: false,
+  first_map_id: null,
   civ_mode: 'snake',
   civ_bans: 0,
   civ_pattern: '',
@@ -68,15 +84,30 @@ export const BORRADOR_INICIAL: Borrador = {
   allow_solo: true,
   reg_closes_at: '',
   starts_at: '',
+  prize_pool_mode: 'ninguno',
+  prize_pool_cents: 0,
+  prize_pool_pct: 100,
+  prize_notes: '',
+  prizes: [],
   map_ids: [],
   civ_ids: [],
 };
+
+export type PestaniaForm =
+  | 'basico' | 'formato' | 'draft' | 'premios' | 'inscripcion' | 'mapas' | 'civs';
 
 /** Patrón serpiente sugerido: los bordes eligen de a uno y el medio de a dos. */
 export function patronSugerido(teamSize: number): string {
   if (teamSize <= 1) return '1-1';
   return ['1', ...Array.from({ length: teamSize - 1 }, () => '2'), '1'].join('-');
 }
+
+/** Reparto inicial cuando el organizador suma el primer puesto. */
+const PREMIOS_SUGERIDOS: PremioBorrador[] = [
+  { label: 'Campeón', kind: 'porcentaje', amount_cents: 0, percent: 60, extra: '' },
+  { label: 'Subcampeón', kind: 'porcentaje', amount_cents: 0, percent: 30, extra: '' },
+  { label: 'Tercer puesto', kind: 'porcentaje', amount_cents: 0, percent: 10, extra: '' },
+];
 
 function Campo({
   label,
@@ -128,335 +159,660 @@ export function TournamentForm({
   onChange,
   maps,
   civs,
+  tab,
+  onTab,
+  recaudadoCents = 0,
 }: {
   value: Borrador;
   onChange: (v: Borrador) => void;
   maps: GameMap[];
   civs: Civ[];
+  tab: PestaniaForm;
+  onTab: (t: PestaniaForm) => void;
+  /** Lo ya cobrado en inscripciones, para estimar la bolsa en vivo. */
+  recaudadoCents?: number;
 }) {
   const set = <K extends keyof Borrador>(k: K, v: Borrador[K]) => onChange({ ...value, [k]: v });
 
+  const pestanias: { id: PestaniaForm; label: string; count?: number }[] = [
+    { id: 'basico', label: 'Lo básico' },
+    { id: 'formato', label: 'Formato' },
+    { id: 'draft', label: 'Draft' },
+    { id: 'inscripcion', label: 'Inscripción' },
+    { id: 'premios', label: 'Premios', count: value.prizes.length || undefined },
+    { id: 'mapas', label: 'Mapas', count: value.map_ids.length },
+    { id: 'civs', label: 'Civilizaciones', count: value.civ_ids.length },
+  ];
+
   return (
-    <div className="space-y-6">
-      <section className="card p-5">
-        <h3 className="title mb-4 text-lg">Lo básico</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo label="Nombre">
-            <input className="field" value={value.name} onChange={(e) => set('name', e.target.value)} />
-          </Campo>
-          <Campo label="Estado">
-            <select className="field" value={value.status} onChange={(e) => set('status', e.target.value)}>
-              <option value="borrador">Borrador (no visible para inscribirse)</option>
-              <option value="inscripcion">Inscripciones abiertas</option>
-              <option value="armado">Armando equipos</option>
-              <option value="en_curso">En curso</option>
-              <option value="finalizado">Finalizado</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </Campo>
-          <Campo label="Descripción">
-            <textarea
-              className="field min-h-20"
-              value={value.description}
-              onChange={(e) => set('description', e.target.value)}
-            />
-          </Campo>
-          <Campo label="Reglamento" hint="Texto libre; se muestra en la pestaña de reglas.">
-            <textarea
-              className="field min-h-20"
-              value={value.rules_md}
-              onChange={(e) => set('rules_md', e.target.value)}
-            />
-          </Campo>
-          <Campo label="Cierre de inscripciones">
-            <input
-              className="field"
-              type="datetime-local"
-              value={value.reg_closes_at}
-              onChange={(e) => set('reg_closes_at', e.target.value)}
-            />
-          </Campo>
-          <Campo label="Arranque">
-            <input
-              className="field"
-              type="datetime-local"
-              value={value.starts_at}
-              onChange={(e) => set('starts_at', e.target.value)}
-            />
-          </Campo>
-        </div>
-      </section>
+    <div>
+      <Tabs value={tab} onChange={onTab} items={pestanias} />
 
-      <section className="card p-5">
-        <h3 className="title mb-4 text-lg">Formato</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Campo label="Estructura">
-            <select className="field" value={value.format} onChange={(e) => set('format', e.target.value)}>
-              {Object.entries(ETIQUETA_FORMATO).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo label="Jugadores por equipo">
-            <select
-              className="field"
-              value={value.team_size}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                onChange({ ...value, team_size: n, civ_pattern: '' });
-              }}
-            >
-              {[1, 2, 3, 4].map((n) => (
-                <option key={n} value={n}>
-                  {n}v{n}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo label="Máximo de equipos" hint="Vacío = sin tope.">
-            <input
-              className="field"
-              type="number"
-              min={2}
-              value={value.max_teams}
-              onChange={(e) => set('max_teams', e.target.value)}
-            />
-          </Campo>
-          <Campo label="Serie al mejor de">
-            <select className="field" value={value.best_of} onChange={(e) => set('best_of', Number(e.target.value))}>
-              {[1, 3, 5, 7].map((n) => (
-                <option key={n} value={n}>
-                  BO{n}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo label="Final al mejor de" hint="Vacío = igual que el resto.">
-            <select
-              className="field"
-              value={value.best_of_final}
-              onChange={(e) => set('best_of_final', e.target.value)}
-            >
-              <option value="">Igual</option>
-              {[3, 5, 7].map((n) => (
-                <option key={n} value={n}>
-                  BO{n}
-                </option>
-              ))}
-            </select>
-          </Campo>
+      <div className="mt-5">
+        {tab === 'basico' && (
+          <section className="card p-5">
+            <h3 className="title mb-4 text-lg">Lo básico</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo label="Nombre">
+                <input className="field" value={value.name} onChange={(e) => set('name', e.target.value)} />
+              </Campo>
+              <Campo label="Estado">
+                <select className="field" value={value.status} onChange={(e) => set('status', e.target.value)}>
+                  <option value="borrador">Borrador (no visible para inscribirse)</option>
+                  <option value="inscripcion">Inscripciones abiertas</option>
+                  <option value="armado">Armando equipos</option>
+                  <option value="en_curso">En curso</option>
+                  <option value="finalizado">Finalizado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </Campo>
+              <Campo label="Descripción">
+                <textarea
+                  className="field min-h-20"
+                  value={value.description}
+                  onChange={(e) => set('description', e.target.value)}
+                />
+              </Campo>
+              <Campo label="Reglamento" hint="Texto libre; se muestra en la pestaña de reglas.">
+                <textarea
+                  className="field min-h-20"
+                  value={value.rules_md}
+                  onChange={(e) => set('rules_md', e.target.value)}
+                />
+              </Campo>
+              <Campo label="Cierre de inscripciones">
+                <input
+                  className="field"
+                  type="datetime-local"
+                  value={value.reg_closes_at}
+                  onChange={(e) => set('reg_closes_at', e.target.value)}
+                />
+              </Campo>
+              <Campo label="Arranque">
+                <input
+                  className="field"
+                  type="datetime-local"
+                  value={value.starts_at}
+                  onChange={(e) => set('starts_at', e.target.value)}
+                />
+              </Campo>
+            </div>
+          </section>
+        )}
 
-          {value.format === 'grupos_playoff' && (
-            <>
-              <Campo label="Cantidad de grupos">
+        {tab === 'formato' && (
+          <section className="card p-5">
+            <h3 className="title mb-4 text-lg">Formato</h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Campo label="Estructura">
+                <select className="field" value={value.format} onChange={(e) => set('format', e.target.value)}>
+                  {Object.entries(ETIQUETA_FORMATO).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Jugadores por equipo">
+                <select
+                  className="field"
+                  value={value.team_size}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    onChange({ ...value, team_size: n, civ_pattern: '' });
+                  }}
+                >
+                  {[1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      {n}v{n}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Máximo de equipos" hint="Vacío = sin tope.">
                 <input
                   className="field"
                   type="number"
                   min={2}
-                  value={value.group_count}
-                  onChange={(e) => set('group_count', Number(e.target.value))}
+                  value={value.max_teams}
+                  onChange={(e) => set('max_teams', e.target.value)}
                 />
               </Campo>
-              <Campo label="Clasifican por grupo">
-                <input
+              <Campo label="Serie al mejor de">
+                <select
                   className="field"
-                  type="number"
-                  min={1}
-                  value={value.group_advance}
-                  onChange={(e) => set('group_advance', Number(e.target.value))}
-                />
+                  value={value.best_of}
+                  onChange={(e) => set('best_of', Number(e.target.value))}
+                >
+                  {[1, 3, 5, 7].map((n) => (
+                    <option key={n} value={n}>
+                      BO{n}
+                    </option>
+                  ))}
+                </select>
               </Campo>
-            </>
-          )}
+              <Campo label="Final al mejor de" hint="Vacío = igual que el resto.">
+                <select
+                  className="field"
+                  value={value.best_of_final}
+                  onChange={(e) => set('best_of_final', e.target.value)}
+                >
+                  <option value="">Igual</option>
+                  {[3, 5, 7].map((n) => (
+                    <option key={n} value={n}>
+                      BO{n}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
 
-          {value.format === 'suizo' && (
-            <Campo label="Rondas suizas">
-              <input
-                className="field"
-                type="number"
-                min={1}
-                value={value.swiss_rounds}
-                onChange={(e) => set('swiss_rounds', Number(e.target.value))}
-              />
-            </Campo>
-          )}
-        </div>
+              {value.format === 'grupos_playoff' && (
+                <>
+                  <Campo label="Cantidad de grupos">
+                    <input
+                      className="field"
+                      type="number"
+                      min={2}
+                      value={value.group_count}
+                      onChange={(e) => set('group_count', Number(e.target.value))}
+                    />
+                  </Campo>
+                  <Campo label="Clasifican por grupo">
+                    <input
+                      className="field"
+                      type="number"
+                      min={1}
+                      value={value.group_advance}
+                      onChange={(e) => set('group_advance', Number(e.target.value))}
+                    />
+                  </Campo>
+                </>
+              )}
 
-        {value.format === 'eliminacion_simple' && (
-          <div className="mt-4 max-w-md">
-            <Check
-              checked={value.third_place}
-              onChange={(v) => set('third_place', v)}
-              label="Jugar el partido por el tercer puesto"
-            />
-          </div>
+              {value.format === 'suizo' && (
+                <Campo label="Rondas suizas">
+                  <input
+                    className="field"
+                    type="number"
+                    min={1}
+                    value={value.swiss_rounds}
+                    onChange={(e) => set('swiss_rounds', Number(e.target.value))}
+                  />
+                </Campo>
+              )}
+            </div>
+
+            {value.format === 'eliminacion_simple' && (
+              <div className="mt-4 max-w-md">
+                <Check
+                  checked={value.third_place}
+                  onChange={(v) => set('third_place', v)}
+                  label="Jugar el partido por el tercer puesto"
+                />
+              </div>
+            )}
+          </section>
         )}
-      </section>
 
-      <section className="card p-5">
-        <h3 className="title mb-1 text-lg">Draft</h3>
-        <p className="mb-4 text-sm text-parch-400">
-          Cómo se decide el mapa y las civilizaciones en la sala del partido.
-        </p>
+        {tab === 'draft' && (
+          <section className="card p-5">
+            <h3 className="title mb-1 text-lg">Draft</h3>
+            <p className="mb-4 text-sm text-parch-400">
+              Cómo se decide el mapa y las civilizaciones en la sala del partido.
+            </p>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Campo label="Mapa">
-            <select className="field" value={value.map_mode} onChange={(e) => set('map_mode', e.target.value)}>
-              {Object.entries(ETIQUETA_MAPA).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          {value.map_mode === 'ban_pick' && (
-            <Campo label="Bans de mapa por equipo">
-              <input
-                className="field"
-                type="number"
-                min={0}
-                value={value.map_bans}
-                onChange={(e) => set('map_bans', Number(e.target.value))}
-              />
-            </Campo>
-          )}
-          <Campo label="Reloj por paso (segundos)" hint="0 = sin reloj. Al vencerse se elige al azar.">
-            <input
-              className="field"
-              type="number"
-              min={0}
-              step={5}
-              value={value.draft_timer_s}
-              onChange={(e) => set('draft_timer_s', Number(e.target.value))}
-            />
-          </Campo>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Campo label="Mapa">
+                <select className="field" value={value.map_mode} onChange={(e) => set('map_mode', e.target.value)}>
+                  {Object.entries(ETIQUETA_MAPA).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              {value.map_mode === 'ban_pick' && (
+                <Campo label="Bans de mapa por equipo">
+                  <input
+                    className="field"
+                    type="number"
+                    min={0}
+                    value={value.map_bans}
+                    onChange={(e) => set('map_bans', Number(e.target.value))}
+                  />
+                </Campo>
+              )}
+              <Campo
+                label={value.map_mode === 'fijo' ? 'Mapa de todas las partidas' : 'Mapa de la primera partida'}
+                hint={
+                  value.map_mode === 'fijo'
+                    ? 'Se juega siempre el mismo mapa.'
+                    : 'En series impares conviene fijarlo: nadie arranca con ventaja de mapa. De la partida 2 en adelante manda la regla de arriba.'
+                }
+              >
+                <select
+                  className="field"
+                  value={value.first_map_id ?? ''}
+                  onChange={(e) => set('first_map_id', e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Lo decide el draft</option>
+                  {maps
+                    .filter((m) => value.map_ids.includes(m.id))
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name_es}
+                      </option>
+                    ))}
+                </select>
+              </Campo>
 
-          <Campo label="Civilizaciones">
-            <select className="field" value={value.civ_mode} onChange={(e) => set('civ_mode', e.target.value)}>
-              {Object.entries(ETIQUETA_CIV).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          {value.civ_mode === 'snake' && (
-            <>
-              <Campo label="Bans de civ por equipo">
+              <Campo label="Reloj por paso (segundos)" hint="0 = sin reloj. Al vencerse se elige al azar.">
                 <input
                   className="field"
                   type="number"
                   min={0}
-                  value={value.civ_bans}
-                  onChange={(e) => set('civ_bans', Number(e.target.value))}
+                  step={5}
+                  value={value.draft_timer_s}
+                  onChange={(e) => set('draft_timer_s', Number(e.target.value))}
                 />
               </Campo>
-              <Campo
-                label="Orden de picks"
-                hint={`Vacío usa el sugerido: ${patronSugerido(value.team_size)}. La suma tiene que dar ${value.team_size * 2}.`}
-              >
+
+              <Campo label="Civilizaciones">
+                <select className="field" value={value.civ_mode} onChange={(e) => set('civ_mode', e.target.value)}>
+                  {Object.entries(ETIQUETA_CIV).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              {value.civ_mode === 'snake' && (
+                <>
+                  <Campo label="Bans de civ por equipo">
+                    <input
+                      className="field"
+                      type="number"
+                      min={0}
+                      value={value.civ_bans}
+                      onChange={(e) => set('civ_bans', Number(e.target.value))}
+                    />
+                  </Campo>
+                  <Campo
+                    label="Orden de picks"
+                    hint={`Vacío usa el sugerido: ${patronSugerido(value.team_size)}. La suma tiene que dar ${value.team_size * 2}.`}
+                  >
+                    <input
+                      className="field"
+                      value={value.civ_pattern}
+                      onChange={(e) => set('civ_pattern', e.target.value)}
+                      placeholder={patronSugerido(value.team_size)}
+                    />
+                  </Campo>
+                </>
+              )}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Check
+                checked={value.civ_repeat_team}
+                onChange={(v) => set('civ_repeat_team', v)}
+                label="Permitir la misma civ dos veces en un equipo"
+                hint="Apagado: cada jugador del equipo juega una civ distinta."
+              />
+              <Check
+                checked={value.civ_mirror}
+                onChange={(v) => set('civ_mirror', v)}
+                label="Permitir espejos entre equipos"
+                hint="Apagado: si un equipo toma España, el rival no puede."
+              />
+              <Check
+                checked={value.civ_repeat_series}
+                onChange={(v) => set('civ_repeat_series', v)}
+                label="Permitir repetir civ entre partidas de la serie"
+                hint="Apagado: en un BO3 cada equipo usa civs distintas en cada partida."
+              />
+              <Check
+                checked={value.map_repeat}
+                onChange={(v) => set('map_repeat', v)}
+                label="Permitir repetir mapa dentro de la serie"
+              />
+            </div>
+          </section>
+        )}
+
+        {tab === 'inscripcion' && (
+          <section className="card p-5">
+            <h3 className="title mb-4 text-lg">Inscripción</h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Campo label="Costo" hint="0 = gratis. Es por jugador.">
                 <input
                   className="field"
-                  value={value.civ_pattern}
-                  onChange={(e) => set('civ_pattern', e.target.value)}
-                  placeholder={patronSugerido(value.team_size)}
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={value.entry_fee_cents / 100}
+                  onChange={(e) => set('entry_fee_cents', Math.round(Number(e.target.value) * 100))}
                 />
               </Campo>
-            </>
-          )}
-        </div>
+              <Campo label="Moneda">
+                <select className="field" value={value.currency} onChange={(e) => set('currency', e.target.value)}>
+                  {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'MXN'].map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Link de pago" hint="Mercado Pago, PayPal, Ko-fi, lo que uses.">
+                <input
+                  className="field"
+                  value={value.payment_link}
+                  onChange={(e) => set('payment_link', e.target.value)}
+                  placeholder="https://…"
+                />
+              </Campo>
+              <Campo label="Instrucciones de pago">
+                <textarea
+                  className="field min-h-16"
+                  value={value.payment_notes}
+                  onChange={(e) => set('payment_notes', e.target.value)}
+                />
+              </Campo>
+            </div>
+            {value.team_size > 1 && (
+              <div className="mt-4 max-w-md">
+                <Check
+                  checked={value.allow_solo}
+                  onChange={(v) => set('allow_solo', v)}
+                  label="Aceptar jugadores sueltos"
+                  hint="El armador los reparte en equipos parejos de nivel y con horarios en común."
+                />
+              </div>
+            )}
+          </section>
+        )}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Check
-            checked={value.civ_repeat_team}
-            onChange={(v) => set('civ_repeat_team', v)}
-            label="Permitir la misma civ dos veces en un equipo"
-            hint="Apagado: cada jugador del equipo juega una civ distinta."
+        {tab === 'premios' && (
+          <Premios
+            value={value}
+            onChange={onChange}
+            recaudadoCents={recaudadoCents}
+            sugeridos={PREMIOS_SUGERIDOS}
           />
-          <Check
-            checked={value.civ_mirror}
-            onChange={(v) => set('civ_mirror', v)}
-            label="Permitir espejos entre equipos"
-            hint="Apagado: si un equipo toma España, el rival no puede."
-          />
-          <Check
-            checked={value.civ_repeat_series}
-            onChange={(v) => set('civ_repeat_series', v)}
-            label="Permitir repetir civ entre partidas de la serie"
-            hint="Apagado: en un BO3 cada equipo usa civs distintas en cada partida."
-          />
-          <Check
-            checked={value.map_repeat}
-            onChange={(v) => set('map_repeat', v)}
-            label="Permitir repetir mapa dentro de la serie"
-          />
-        </div>
-      </section>
+        )}
 
-      <section className="card p-5">
-        <h3 className="title mb-4 text-lg">Inscripción</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Campo label="Costo" hint="0 = gratis.">
+        {tab === 'mapas' && (
+          <section className="card p-5">
+            <h3 className="title mb-1 text-lg">Pool de mapas</h3>
+            <p className="mb-4 text-sm text-parch-400">
+              {value.map_mode === 'ban_hasta_uno'
+                ? `Con bans alternados hasta que queda uno, el draft tendrá ${Math.max(0, value.map_ids.length - 1)} bans.`
+                : 'Los mapas que van a estar disponibles en el draft.'}
+            </p>
+            <MapPicker maps={maps} value={value.map_ids} onChange={(v) => set('map_ids', v)} />
+          </section>
+        )}
+
+        {tab === 'civs' && (
+          <section className="card p-5">
+            <h3 className="title mb-4 text-lg">Civilizaciones habilitadas</h3>
+            <CivPicker civs={civs} value={value.civ_ids} onChange={(v) => set('civ_ids', v)} />
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ premios
+
+function Premios({
+  value,
+  onChange,
+  recaudadoCents,
+  sugeridos,
+}: {
+  value: Borrador;
+  onChange: (v: Borrador) => void;
+  recaudadoCents: number;
+  sugeridos: PremioBorrador[];
+}) {
+  const set = <K extends keyof Borrador>(k: K, v: Borrador[K]) => onChange({ ...value, [k]: v });
+  const premios = value.prizes;
+  const bolsa = bolsaDe(value.prize_pool_mode, value.prize_pool_cents, recaudadoCents, value.prize_pool_pct);
+
+  const valorDe = (p: PremioBorrador) =>
+    p.kind === 'fijo' ? p.amount_cents : Math.round((bolsa * p.percent) / 100);
+
+  const sumaPct = premios.filter((p) => p.kind === 'porcentaje').reduce((s, p) => s + (p.percent || 0), 0);
+  const repartido = premios.reduce((s, p) => s + valorDe(p), 0);
+
+  const editar = (i: number, cambio: Partial<PremioBorrador>) =>
+    set('prizes', premios.map((p, j) => (i === j ? { ...p, ...cambio } : p)));
+
+  const mover = (i: number, delta: number) => {
+    const j = i + delta;
+    if (j < 0 || j >= premios.length) return;
+    const copia = [...premios];
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+    set('prizes', copia);
+  };
+
+  const agregar = () =>
+    set('prizes', [
+      ...premios,
+      {
+        label: `${premios.length + 1}º puesto`,
+        kind: value.prize_pool_mode === 'fijo' ? 'fijo' : 'porcentaje',
+        amount_cents: 0,
+        percent: 0,
+        extra: '',
+      },
+    ]);
+
+  return (
+    <section className="card p-5">
+      <h3 className="title mb-1 text-lg">Premios</h3>
+      <p className="mb-4 text-sm text-parch-400">
+        De dónde sale la plata y cómo se reparte. Cada puesto puede llevar un monto fijo o un
+        porcentaje de la bolsa.
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Campo label="Bolsa de premios">
+          <select
+            className="field"
+            value={value.prize_pool_mode}
+            onChange={(e) => set('prize_pool_mode', e.target.value)}
+          >
+            <option value="ninguno">Sin premios en plata</option>
+            <option value="fijo">Monto fijo que pone la organización</option>
+            <option value="inscripciones">Lo recaudado en inscripciones</option>
+          </select>
+        </Campo>
+
+        {value.prize_pool_mode === 'fijo' && (
+          <Campo label={`Monto de la bolsa (${value.currency})`}>
             <input
               className="field"
               type="number"
               min={0}
-              step={100}
-              value={value.entry_fee_cents / 100}
-              onChange={(e) => set('entry_fee_cents', Math.round(Number(e.target.value) * 100))}
+              step={1000}
+              value={value.prize_pool_cents / 100}
+              onChange={(e) => set('prize_pool_cents', Math.round(Number(e.target.value) * 100))}
             />
           </Campo>
-          <Campo label="Moneda">
-            <select className="field" value={value.currency} onChange={(e) => set('currency', e.target.value)}>
-              {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'MXN'].map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </Campo>
-          <Campo label="Link de pago" hint="Mercado Pago, PayPal, Ko-fi, lo que uses.">
+        )}
+
+        {value.prize_pool_mode === 'inscripciones' && (
+          <Campo
+            label="% de lo recaudado que va a premios"
+            hint="El resto queda para la organización (servidores, casters, lo que sea)."
+          >
             <input
               className="field"
-              value={value.payment_link}
-              onChange={(e) => set('payment_link', e.target.value)}
-              placeholder="https://…"
+              type="number"
+              min={0}
+              max={100}
+              value={value.prize_pool_pct}
+              onChange={(e) => set('prize_pool_pct', Math.max(0, Math.min(100, Number(e.target.value))))}
             />
           </Campo>
-          <Campo label="Instrucciones de pago">
-            <textarea
-              className="field min-h-16"
-              value={value.payment_notes}
-              onChange={(e) => set('payment_notes', e.target.value)}
-            />
+        )}
+
+        {value.prize_pool_mode !== 'ninguno' && (
+          <Campo
+            label="Bolsa estimada"
+            hint={
+              value.prize_pool_mode === 'inscripciones'
+                ? `${value.prize_pool_pct}% de ${monto(recaudadoCents, value.currency)} cobrados hasta ahora.`
+                : 'Lo que anunciás que se reparte.'
+            }
+          >
+            <p className="font-display rounded-lg border border-gold-600/50 bg-gold-500/5 px-3 py-2 text-lg text-gold-400">
+              {monto(bolsa, value.currency)}
+            </p>
           </Campo>
+        )}
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <h4 className="label mb-0">Reparto</h4>
+          <span className="text-xs text-parch-400">
+            {premios.length} puesto{premios.length === 1 ? '' : 's'}
+            {sumaPct > 0 && ` · ${sumaPct}% de la bolsa asignado`}
+          </span>
+          <div className="ml-auto flex gap-2">
+            {premios.length === 0 && (
+              <button type="button" className="btn btn-ghost" onClick={() => set('prizes', sugeridos)}>
+                Usar 60 / 30 / 10
+              </button>
+            )}
+            <button type="button" className="btn btn-ghost" onClick={agregar}>
+              Agregar puesto
+            </button>
+          </div>
         </div>
-        {value.team_size > 1 && (
-          <div className="mt-4 max-w-md">
-            <Check
-              checked={value.allow_solo}
-              onChange={(v) => set('allow_solo', v)}
-              label="Aceptar jugadores sueltos"
-              hint="El armador los reparte en equipos parejos de nivel y con horarios en común."
-            />
+
+        {premios.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-ink-700 p-6 text-center text-sm text-parch-400">
+            Sin premios cargados. El torneo se puede jugar igual.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {premios.map((p, i) => (
+              <div
+                key={i}
+                className="grid items-end gap-2 rounded-lg border border-ink-700 p-3 sm:grid-cols-[2rem_minmax(0,1fr)_10rem_8rem_minmax(0,1fr)_auto]"
+              >
+                <span className="font-display pb-2 text-lg text-gold-400">{i + 1}º</span>
+
+                <Campo label="Puesto">
+                  <input
+                    className="field"
+                    value={p.label}
+                    placeholder={`${i + 1}º puesto`}
+                    onChange={(e) => editar(i, { label: e.target.value })}
+                  />
+                </Campo>
+
+                <Campo label="Tipo">
+                  <select
+                    className="field"
+                    value={p.kind}
+                    onChange={(e) => editar(i, { kind: e.target.value as PremioBorrador['kind'] })}
+                  >
+                    <option value="porcentaje">% de la bolsa</option>
+                    <option value="fijo">Monto fijo</option>
+                  </select>
+                </Campo>
+
+                <Campo label={p.kind === 'fijo' ? value.currency : '%'}>
+                  {p.kind === 'fijo' ? (
+                    <input
+                      className="field"
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={p.amount_cents / 100}
+                      onChange={(e) => editar(i, { amount_cents: Math.round(Number(e.target.value) * 100) })}
+                    />
+                  ) : (
+                    <input
+                      className="field"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={p.percent}
+                      onChange={(e) => editar(i, { percent: Math.max(0, Number(e.target.value)) })}
+                    />
+                  )}
+                </Campo>
+
+                <Campo label="Además" hint={bolsa > 0 || p.kind === 'fijo' ? `Se lleva ${monto(valorDe(p), value.currency)}` : undefined}>
+                  <input
+                    className="field"
+                    value={p.extra}
+                    placeholder="Cupo al próximo torneo, trofeo…"
+                    onChange={(e) => editar(i, { extra: e.target.value })}
+                  />
+                </Campo>
+
+                <div className="flex gap-1 pb-1">
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2"
+                    title="Subir"
+                    onClick={() => mover(i, -1)}
+                    disabled={i === 0}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost px-2"
+                    title="Bajar"
+                    onClick={() => mover(i, 1)}
+                    disabled={i === premios.length - 1}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger px-2"
+                    title="Quitar"
+                    onClick={() => set('prizes', premios.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm">
+              <span className="text-parch-400">
+                Reparte {monto(repartido, value.currency)}
+                {value.prize_pool_mode !== 'ninguno' && ` de ${monto(bolsa, value.currency)}`}
+              </span>
+              {sumaPct > 100 && (
+                <span className="text-blood-500">Los porcentajes suman {sumaPct}%: pasan de la bolsa.</span>
+              )}
+              {sumaPct > 0 && sumaPct < 100 && (
+                <span className="text-parch-400">Queda {100 - sumaPct}% de la bolsa sin asignar.</span>
+              )}
+            </div>
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="card p-5">
-        <h3 className="title mb-1 text-lg">Pool de mapas</h3>
-        <p className="mb-4 text-sm text-parch-400">
-          {value.map_mode === 'ban_hasta_uno'
-            ? `Con bans alternados hasta que queda uno, el draft tendrá ${Math.max(0, value.map_ids.length - 1)} bans.`
-            : 'Los mapas que van a estar disponibles en el draft.'}
-        </p>
-        <MapPicker maps={maps} value={value.map_ids} onChange={(v) => set('map_ids', v)} />
-      </section>
-
-      <section className="card p-5">
-        <h3 className="title mb-4 text-lg">Civilizaciones habilitadas</h3>
-        <CivPicker civs={civs} value={value.civ_ids} onChange={(v) => set('civ_ids', v)} />
-      </section>
-    </div>
+      <div className="mt-5 max-w-2xl">
+        <Campo label="Notas de premios" hint="Cómo y cuándo se paga, retenciones, lo que haga falta aclarar.">
+          <textarea
+            className="field min-h-16"
+            value={value.prize_notes}
+            onChange={(e) => set('prize_notes', e.target.value)}
+          />
+        </Campo>
+      </div>
+    </section>
   );
 }

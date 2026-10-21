@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Civ, GameMap } from '../types';
+import { coincide } from '../lib';
 
 function toggle(set: number[], id: number) {
   return set.includes(id) ? set.filter((x) => x !== id) : [...set, id];
@@ -15,10 +16,7 @@ export function MapPicker({
   onChange: (v: number[]) => void;
 }) {
   const [q, setQ] = useState('');
-  const filtrados = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return t ? maps.filter((m) => m.name_es.toLowerCase().includes(t)) : maps;
-  }, [maps, q]);
+  const filtrados = useMemo(() => maps.filter((m) => coincide(q, m.name_es, m.slug)), [maps, q]);
 
   return (
     <div>
@@ -70,14 +68,16 @@ export function CivPicker({
   value: number[];
   onChange: (v: number[]) => void;
 }) {
+  const [q, setQ] = useState('');
   const grupos = useMemo(() => {
     const m = new Map<string, Civ[]>();
     for (const c of civs) {
+      if (!coincide(q, c.name_es, c.name_en, c.slug)) continue;
       if (!m.has(c.grp)) m.set(c.grp, []);
       m.get(c.grp)!.push(c);
     }
     return [...m.entries()];
-  }, [civs]);
+  }, [civs, q]);
 
   const etiquetas: Record<string, string> = {
     europea: 'Europeas',
@@ -89,7 +89,13 @@ export function CivPicker({
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          className="field max-w-xs"
+          placeholder="Buscar civilización…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <span className="text-sm text-parch-400">{value.length} de {civs.length} habilitadas</span>
         <div className="ml-auto flex gap-2">
           <button type="button" className="btn btn-ghost" onClick={() => onChange(civs.map((c) => c.id))}>
@@ -101,6 +107,9 @@ export function CivPicker({
         </div>
       </div>
       <div className="space-y-4">
+        {grupos.length === 0 && (
+          <p className="text-sm text-parch-400">Ninguna civilización coincide con «{q}».</p>
+        )}
         {grupos.map(([grupo, lista]) => (
           <div key={grupo}>
             <div className="mb-1.5 flex items-center gap-2">

@@ -13,6 +13,23 @@ mkdirSync(dirname(DB_PATH), { recursive: true });
 export const db = new DatabaseSync(DB_PATH);
 db.exec(readFileSync(join(SRC_DIR, 'schema.sql'), 'utf8'));
 
+// schema.sql solo crea tablas que falten; las columnas agregadas después van acá
+// para que una base vieja siga funcionando sin borrarla.
+const COLUMNAS_AGREGADAS = [
+  ['tournaments', 'prize_pool_mode', "TEXT NOT NULL DEFAULT 'ninguno'"],
+  ['tournaments', 'prize_pool_cents', 'INTEGER NOT NULL DEFAULT 0'],
+  ['tournaments', 'prize_pool_pct', 'INTEGER NOT NULL DEFAULT 100'],
+  ['tournaments', 'prize_notes', 'TEXT'],
+  ['tournaments', 'first_map_id', 'INTEGER REFERENCES maps(id)'],
+  ['users', 'google_sub', 'TEXT'],
+  ['users', 'google_email', 'TEXT'],
+];
+
+for (const [tabla, columna, definicion] of COLUMNAS_AGREGADAS) {
+  const existe = db.prepare('SELECT 1 FROM pragma_table_info(?) WHERE name = ?').get(tabla, columna);
+  if (!existe) db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${definicion}`);
+}
+
 /** Una fila, o undefined. */
 export function get(sql, ...params) {
   return db.prepare(sql).get(...params);

@@ -28,18 +28,32 @@ Variables de entorno (ver `.env.example`):
 
 | Variable | Para qué |
 |---|---|
-| `PUBLIC_URL` | Origen que ve el navegador. En dev es el de Vite, que proxea la API. Lo usa el retorno de Steam. |
+| `PUBLIC_URL` | Origen que ve el navegador. Si no está, se deduce del pedido, así un deploy anda sin configurar nada. |
 | `API_PORT` / `--port` | Puerto del backend (3001 por defecto). |
-| `STEAM_API_KEY` | Opcional. Con una clave de Steam se traen nombre y avatar al vincular. Sin clave la vinculación igual funciona. |
+| `STEAM_API_KEY` | Opcional. Con una clave de Steam se traen nombre y avatar al vincular. Sin clave el login igual funciona. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credenciales OAuth para el ingreso con Google. Sin ellas el botón queda deshabilitado. |
+| `DEV_LOGIN` | `1` habilita el login por email de las cuentas de prueba, `0` lo apaga. Por defecto está prendido fuera de producción. |
+| `SEED_DEMO` | `1` siembra la demo la primera vez que arranca con la base vacía (útil en un deploy nuevo). |
 | `AOEMATCH_DB` | Ruta del archivo SQLite (`server/data/aoematch.db` por defecto). |
+
+### Ingreso con Google
+
+En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) creá unas
+credenciales OAuth de tipo *aplicación web* y agregá como URI de redirección
+`https://TU-DOMINIO/api/auth/google/return` (en local,
+`http://localhost:5173/api/auth/google/return`). Después cargá el id y el secreto en
+las variables de arriba.
 
 ## Qué hace
 
 ### Torneos
-El organizador define formato (**eliminación simple, doble, liga, grupos +
-playoff o suizo**), tamaño de equipo (1v1 a 4v4), largo de las series, pool de
-mapas, civilizaciones habilitadas, costo de inscripción y link de pago. Todo es
-editable después desde la pestaña **Configuración**.
+El formulario de creación está dividido en pestañas —**lo básico, formato,
+draft, inscripción, premios, mapas y civilizaciones**— y es el mismo que después
+aparece en **Configuración**. Ahí se define el formato (**eliminación simple,
+doble, liga, grupos + playoff o suizo**), el tamaño de equipo (1v1 a 4v4), el
+largo de las series, el pool de mapas, las civilizaciones habilitadas, el costo
+de inscripción con su link de pago y el reparto de premios. Los buscadores de
+mapas y civilizaciones ignoran tildes y mayúsculas: `decan` encuentra `Decán`.
 
 Las llaves se generan con siembra clásica (1-8, 4-5, 2-7, 3-6), byes
 automáticos y avance del ganador —y del perdedor, en doble eliminación— al
@@ -49,6 +63,14 @@ partido siguiente.
 Cada jugador se anota solo o con equipo. El organizador ve la lista con elo,
 zona horaria y estado, y marca a mano quién pagó. No hay cobro automático: se
 guarda el link de pago y el organizador confirma.
+
+### Premios
+La bolsa puede ser un **monto fijo** que pone la organización o salir de **lo
+recaudado en inscripciones** (con un porcentaje configurable: el resto queda
+para la organización). Cada puesto se carga con nombre, monto fijo o porcentaje
+de la bolsa, y un premio extra no monetario. La ficha del torneo muestra el
+reparto ya resuelto en plata y, cuando la bolsa sale de las inscripciones, cómo
+va creciendo con cada pago confirmado.
 
 ### Armador de equipos
 Para los que se anotan sueltos. Reparte en serpiente por rating y después
@@ -80,8 +102,12 @@ El plan de pasos se arma al abrir el draft y los dos equipos ven la misma
 secuencia. Hay reloj por paso; si se vence, el servidor elige al azar entre lo
 legal.
 
+El organizador puede **fijar el mapa de la primera partida**: en series impares
+es lo habitual, así nadie arranca con ventaja de mapa. De la partida 2 en
+adelante se aplica la regla elegida.
+
 **Mapa**
-- `fijo` — lo define el organizador.
+- `fijo` — el mismo mapa en todas las partidas.
 - `aleatorio` — sale del pool.
 - `ban_hasta_uno` — bans alternados hasta que queda uno (el más usado).
 - `ban_pick` — cada equipo banea N y después uno elige.
@@ -116,10 +142,10 @@ juegos es *doble serpiente*: `A-BB-AA-B` repetido, con un ban global de civs
 antes de empezar. Se puede escribir hoy mismo como patrón sin tocar código.
 
 ### Cuentas
-Email y contraseña, o **login con Steam** (OpenID 2.0, sin dependencias). La
-cuenta de Steam se puede vincular a una cuenta existente o crear una nueva. Hay
-campos para Discord, gamertag de Xbox, id de perfil del leaderboard y elo 1v1 /
-equipos.
+Se entra con **Steam** (OpenID 2.0, sin dependencias) o con **Google** (OAuth 2.0).
+No hay registro ni contraseñas: la primera vez se crea el perfil solo, y las dos
+cuentas se pueden vincular entre sí. Hay campos para Discord, gamertag de Xbox,
+id de perfil del leaderboard y elo 1v1 / equipos.
 
 ## Cómo está armado
 
@@ -143,6 +169,20 @@ Las banderas de las 24 civilizaciones y los 174 minimapas se bajan de
 [freefoodparty.com](https://freefoodparty.com) con `npm run assets` y quedan en
 `server/public/assets/`. No están versionados: son material del juego y se
 descargan en cada instalación.
+
+## Publicarlo
+
+Hay dos caminos, los dos arrancan con la base vacía y se siembran solos con
+`SEED_DEMO=1`:
+
+- **Render** — importá el repo y usá el `render.yaml` que ya está. Plan free: el
+  disco es efímero, así que cada deploy vuelve a sembrar la demo. Con un disco
+  pago, descomentá el bloque `disk` y apuntá `AOEMATCH_DB` ahí.
+- **Docker** — `docker build -t aoematch . && docker run -p 3001:3001 aoematch`.
+  Sirve para cualquier hosting que corra contenedores (Fly, Railway, un VPS).
+
+El build descarga las imágenes del juego con `npm run assets`, así que la
+primera compilación tarda un par de minutos.
 
 ## Ideas para seguir
 

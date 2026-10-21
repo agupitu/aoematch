@@ -72,6 +72,7 @@ router.get('/', (req, res) => {
   const filas = all(
     `SELECT t.*, u.display_name AS organizer_name,
             (SELECT COUNT(*) FROM registrations r WHERE r.tournament_id = t.id AND r.status != 'retirada') AS inscriptos,
+            (SELECT COUNT(*) FROM registrations r WHERE r.tournament_id = t.id AND r.status != 'retirada' AND r.paid = 1) AS pagos,
             (SELECT COUNT(*) FROM teams te WHERE te.tournament_id = t.id) AS equipos
        FROM tournaments t JOIN users u ON u.id = t.organizer_id
       ${estado ? 'WHERE t.status = ?' : ''}
@@ -86,10 +87,17 @@ router.get('/', (req, res) => {
 const CAMPOS_EDITABLES = [
   'name', 'description', 'rules_md', 'banner_url', 'status', 'format', 'team_size',
   'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance', 'swiss_rounds',
-  'third_place', 'map_mode', 'map_bans', 'map_repeat', 'civ_mode', 'civ_bans', 'civ_pattern',
+  'third_place', 'map_mode', 'map_bans', 'map_repeat', 'first_map_id', 'civ_mode', 'civ_bans', 'civ_pattern',
   'civ_repeat_series', 'civ_repeat_team', 'civ_mirror', 'draft_timer_s', 'entry_fee_cents',
   'currency', 'payment_link', 'payment_notes', 'allow_solo', 'reg_opens_at', 'reg_closes_at',
-  'starts_at',
+  'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes',
+];
+
+const CAMPOS_NUMERICOS = [
+  'team_size', 'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance',
+  'swiss_rounds', 'third_place', 'map_bans', 'map_repeat', 'civ_bans', 'civ_repeat_series',
+  'civ_repeat_team', 'civ_mirror', 'draft_timer_s', 'entry_fee_cents', 'allow_solo',
+  'prize_pool_cents', 'prize_pool_pct', 'first_map_id',
 ];
 
 router.post('/', requireAuth, (req, res) => {
@@ -106,6 +114,7 @@ router.post('/', requireAuth, (req, res) => {
   aplicarCampos(id, body);
   run("INSERT INTO chat_rooms (tournament_id, kind, name) VALUES (?, 'torneo', 'General')", id);
 
+  if (Array.isArray(body.prizes)) setPremios(id, body.prizes);
   if (Array.isArray(body.map_ids)) setPool(id, 'tournament_maps', 'map_id', body.map_ids);
   if (Array.isArray(body.civ_ids)) setPool(id, 'tournament_civs', 'civ_id', body.civ_ids);
   else {
@@ -122,11 +131,11 @@ function aplicarCampos(id, body) {
   for (const c of CAMPOS_EDITABLES) {
     if (body[c] === undefined) continue;
     let v = body[c];
-    if (['team_size', 'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance',
-         'swiss_rounds', 'third_place', 'map_bans', 'map_repeat', 'civ_bans', 'civ_repeat_series',
-         'civ_repeat_team', 'civ_mirror', 'draft_timer_s', 'entry_fee_cents', 'allow_solo'].includes(c)) {
+    if (CAMPOS_NUMERICOS.includes(c)) {
       v = v === null || v === '' ? null : Number(v);
       if (v !== null && !Number.isFinite(v)) continue;
+      // Solo estas dos columnas admiten NULL; las demás tienen NOT NULL.
+      if (v === null && !['max_teams', 'best_of_final', 'first_map_id'].includes(c)) continue;
       if (typeof body[c] === 'boolean') v = body[c] ? 1 : 0;
     } else if (v === '') {
       v = null;
@@ -135,6 +144,65 @@ function aplicarCampos(id, body) {
     vals.push(v);
   }
   if (sets.length) run(`UPDATE tournaments SET ${sets.join(', ')} WHERE id = ?`, ...vals, id);
+}
+
+/** Reemplaza la lista de premios del torneo. */
+function setPremios(tournamentId, premios) {
+  run('DELETE FROM tournament_prizes WHERE tournament_id = ?', tournamentId);
+  premios.slice(0, 20).forEach((p, i) => {
+    const etiqueta = String(p.label ?? '').trim() || `${i + 1}º puesto`;
+    const kind = p.kind === 'fijo' ? 'fijo' : 'porcentaje';
+    run(
+      `INSERT INTO tournament_prizes (tournament_id, position, label, kind, amount_cents, percent, extra)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      tournamentId,
+      i + 1,
+      etiqueta.slice(0, 60),
+      kind,
+      kind === 'fijo' ? Math.max(0, Math.round(Number(p.amount_cents) || 0)) : 0,
+      kind === 'porcentaje' ? Math.max(0, Number(p.percent) || 0) : 0,
+      p.extra ? String(p.extra).slice(0, 200) : null
+    );
+  });
+}
+
+/**
+ * Bolsa de premios y cuánto le toca a cada puesto. La bolsa puede ser un monto
+ * declarado por el organizador o salir de lo que se recaudó en inscripciones.
+ */
+function premiosDe(t) {
+  const pagas = get(
+    `SELECT COUNT(*) AS n FROM registrations
+      WHERE tournament_id = ? AND status != 'retirada' AND paid = 1`,
+    t.id
+  ).n;
+  const recaudado = pagas * t.entry_fee_cents;
+  const bolsa =
+    t.prize_pool_mode === 'fijo'
+      ? t.prize_pool_cents
+      : t.prize_pool_mode === 'inscripciones'
+        ? Math.round((recaudado * t.prize_pool_pct) / 100)
+        : 0;
+
+  const filas = all(
+    'SELECT * FROM tournament_prizes WHERE tournament_id = ? ORDER BY position',
+    t.id
+  ).map((p) => ({
+    ...p,
+    value_cents: p.kind === 'fijo' ? p.amount_cents : Math.round((bolsa * p.percent) / 100),
+  }));
+
+  return {
+    prizes: filas,
+    prize_pool: {
+      mode: t.prize_pool_mode,
+      total_cents: bolsa,
+      collected_cents: recaudado,
+      paid_count: pagas,
+      assigned_cents: filas.reduce((s, p) => s + p.value_cents, 0),
+      assigned_pct: filas.filter((p) => p.kind === 'porcentaje').reduce((s, p) => s + p.percent, 0),
+    },
+  };
 }
 
 function setPool(tournamentId, tabla, columna, ids) {
@@ -191,6 +259,8 @@ function detalle(t, user) {
     ...t,
     organizer: get('SELECT id, display_name FROM users WHERE id = ?', t.organizer_id),
     civ_pattern_efectivo: t.civ_pattern || patronPorDefecto(t.team_size),
+    first_map: t.first_map_id ? get('SELECT * FROM maps WHERE id = ?', t.first_map_id) : null,
+    ...premiosDe(t),
     maps: all(
       'SELECT m.* FROM tournament_maps tm JOIN maps m ON m.id = tm.map_id WHERE tm.tournament_id = ? ORDER BY m.name_es',
       t.id
@@ -222,6 +292,7 @@ router.get('/:id', (req, res) => {
 
 router.patch('/:id', requireAuth, requiereStaff, (req, res) => {
   aplicarCampos(req.torneo.id, req.body || {});
+  if (Array.isArray(req.body?.prizes)) setPremios(req.torneo.id, req.body.prizes);
   if (Array.isArray(req.body?.map_ids)) setPool(req.torneo.id, 'tournament_maps', 'map_id', req.body.map_ids);
   if (Array.isArray(req.body?.civ_ids)) setPool(req.torneo.id, 'tournament_civs', 'civ_id', req.body.civ_ids);
   res.json(detalle(get('SELECT * FROM tournaments WHERE id = ?', req.torneo.id), req.user));

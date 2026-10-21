@@ -146,8 +146,20 @@ function resolverBye(matchId) {
   const m = get('SELECT * FROM matches WHERE id = ?', matchId);
   if (!m || m.status !== 'pendiente') return;
   const a = m.team_a_id, b = m.team_b_id;
-  if (a && !b) cerrarMatch(matchId, a, m.best_of, 0, true);
-  else if (!a && b) cerrarMatch(matchId, b, m.best_of, 0, true);
+  if ((a && b) || (!a && !b)) return;
+
+  // Solo es bye si el lugar vacío no espera a nadie. Si otro partido manda su
+  // ganador (o su perdedor) a ese lugar, todavía falta jugarlo.
+  const vacio = a ? 'b' : 'a';
+  const esperando = get(
+    `SELECT 1 FROM matches
+      WHERE (next_match_id = ? AND COALESCE(next_slot, 'a') = ?)
+         OR (loser_match_id = ? AND COALESCE(loser_slot, 'a') = ?)`,
+    matchId, vacio, matchId, vacio
+  );
+  if (esperando) return;
+
+  cerrarMatch(matchId, a || b, a ? m.best_of : 0, a ? 0 : m.best_of, true);
 }
 
 // --------------------------------------------------------- eliminación doble

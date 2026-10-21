@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
   timezone      TEXT NOT NULL DEFAULT 'UTC',
   discord       TEXT,
   steam_id64    TEXT UNIQUE,
+  google_sub    TEXT UNIQUE,      -- id de la cuenta de Google
+  google_email  TEXT,
   steam_name    TEXT,
   steam_avatar  TEXT,
   xbox_tag      TEXT,
@@ -96,6 +98,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
                  -- fijo | aleatorio | ban_hasta_uno | ban_pick
   map_bans       INTEGER NOT NULL DEFAULT 1,     -- bans por equipo en ban_pick
   map_repeat     INTEGER NOT NULL DEFAULT 0,     -- repetir mapa dentro de la serie
+  first_map_id   INTEGER REFERENCES maps(id),    -- mapa fijo de la partida 1 (NULL = lo decide el draft)
 
   -- draft de civilizaciones
   civ_mode       TEXT NOT NULL DEFAULT 'snake',
@@ -117,6 +120,13 @@ CREATE TABLE IF NOT EXISTS tournaments (
   reg_closes_at   TEXT,
   starts_at       TEXT,
 
+  -- premios
+  prize_pool_mode  TEXT NOT NULL DEFAULT 'ninguno',
+                   -- ninguno | fijo | inscripciones (la bolsa sale de lo recaudado)
+  prize_pool_cents INTEGER NOT NULL DEFAULT 0,    -- bolsa declarada, si el modo es 'fijo'
+  prize_pool_pct   INTEGER NOT NULL DEFAULT 100,  -- % de lo recaudado que va a la bolsa
+  prize_notes      TEXT,
+
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -131,6 +141,20 @@ CREATE TABLE IF NOT EXISTS tournament_civs (
   civ_id        INTEGER NOT NULL REFERENCES civs(id),
   PRIMARY KEY (tournament_id, civ_id)
 );
+
+-- Reparto de la bolsa. Cada fila es un puesto: monto fijo o porcentaje de la
+-- bolsa. `extra` guarda premios no monetarios (cupo, trofeo, lo que sea).
+CREATE TABLE IF NOT EXISTS tournament_prizes (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  position      INTEGER NOT NULL,                     -- 1 = campeón
+  label         TEXT NOT NULL,
+  kind          TEXT NOT NULL DEFAULT 'porcentaje',   -- fijo | porcentaje
+  amount_cents  INTEGER NOT NULL DEFAULT 0,
+  percent       REAL NOT NULL DEFAULT 0,
+  extra         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_prizes_tournament ON tournament_prizes(tournament_id, position);
 
 CREATE TABLE IF NOT EXISTS tournament_admins (
   tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,

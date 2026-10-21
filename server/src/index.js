@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
-import { SERVER_DIR, ROOT_DIR } from './db.js';
+import { SERVER_DIR, ROOT_DIR, get } from './db.js';
 import { attachUser } from './auth.js';
 import { montarWebSocket } from './realtime.js';
 import { iniciarRelojes } from './draft.js';
-import { cargarCatalogo } from './seed.js';
+import { cargarCatalogo, sembrarDemo } from './seed.js';
 
 import { router as authRouter } from './routes/auth.js';
 import { router as catalogRouter } from './routes/catalog.js';
@@ -27,8 +27,20 @@ const PORT =
 
 cargarCatalogo();
 
+// En un deploy nuevo la base arranca vacía. Con SEED_DEMO=1 se siembra la demo
+// una sola vez, así la URL muestra algo apenas levanta.
+if (process.env.SEED_DEMO === '1' && !get('SELECT 1 FROM tournaments LIMIT 1')) {
+  try {
+    sembrarDemo();
+  } catch (err) {
+    console.error('No se pudo sembrar la demo:', err.message);
+  }
+}
+
 const app = express();
 app.disable('x-powered-by');
+// Detrás del proxy del hosting, para leer bien protocolo y host.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(attachUser);

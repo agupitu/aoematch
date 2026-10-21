@@ -53,14 +53,17 @@ function shuffle(arr, rnd = Math.random) {
  *   - slot: índice del jugador dentro del equipo al que va la civ
  *   - auto: lo resuelve el servidor (aleatorio)
  */
-export function construirPasos({ torneo, mapPoolSize, firstSide = 'a' }) {
+export function construirPasos({ torneo, mapPoolSize, firstSide = 'a', mapaFijo = null }) {
   const steps = [];
   const other = (s) => (s === 'a' ? 'b' : 'a');
   const teamSize = torneo.team_size;
 
   // --- fase de mapa
   let side = firstSide;
-  if (torneo.map_mode === 'aleatorio') {
+  if (mapaFijo) {
+    // Mapa decidido por el organizador: un solo paso, sin bans ni picks.
+    steps.push({ kind: 'pick_mapa', side: null, slot: null, auto: true, map_id: mapaFijo });
+  } else if (torneo.map_mode === 'aleatorio' || torneo.map_mode === 'fijo') {
     steps.push({ kind: 'pick_mapa', side: null, slot: null, auto: true });
   } else if (torneo.map_mode === 'ban_hasta_uno') {
     const bans = Math.max(0, mapPoolSize - 1);
@@ -77,11 +80,11 @@ export function construirPasos({ torneo, mapPoolSize, firstSide = 'a' }) {
     }
     steps.push({ kind: 'pick_mapa', side: firstSide, slot: null, auto: false });
   }
-  // 'fijo' no agrega pasos: el mapa lo define el organizador.
 
   // --- fase de civilizaciones
-  // Quien NO eligió mapa arranca el draft de civs (contrapick).
-  const civFirst = torneo.map_mode === 'ban_pick' ? other(firstSide) : firstSide;
+  // Quien NO eligió mapa arranca el draft de civs (contrapick). Con mapa fijo
+  // nadie eligió, así que arranca el mismo lado que abre la partida.
+  const civFirst = torneo.map_mode === 'ban_pick' && !mapaFijo ? other(firstSide) : firstSide;
 
   if (torneo.civ_mode === 'aleatorio') {
     for (const s of [civFirst, other(civFirst)]) {
@@ -174,10 +177,20 @@ export function crearDraft(matchId, gameNo = 1) {
     firstSide = match.score_a < match.score_b ? 'a' : match.score_b < match.score_a ? 'b' : 'a';
   }
 
+  // El organizador puede fijar el mapa de la primera partida (lo habitual en
+  // series impares, para que nadie arranque con ventaja). Con map_mode 'fijo'
+  // vale para todas las partidas de la serie.
+  const fijaEstaPartida = torneo.map_mode === 'fijo' || gameNo === 1;
+  const mapaFijo =
+    torneo.first_map_id && fijaEstaPartida && mapas.some((m) => m.id === torneo.first_map_id)
+      ? torneo.first_map_id
+      : null;
+
   const steps = construirPasos({
     torneo,
     mapPoolSize: Math.max(1, disponibles.length),
     firstSide,
+    mapaFijo,
   });
 
   const firstTeamId = firstSide === 'a' ? match.team_a_id : match.team_b_id;
@@ -498,6 +511,7 @@ function resolverAutomaticos(draftId) {
 
 function elegirAutomatico(st, step) {
   if (step.kind === 'pick_mapa') {
+    if (step.map_id && st.pools.maps.some((m) => m.id === step.map_id)) return step.map_id;
     const bloq = mapasBloqueados(st);
     const libres = st.pools.maps.filter((m) => !bloq.has(m.id));
     const pool = libres.length ? libres : st.pools.maps;

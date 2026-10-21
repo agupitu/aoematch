@@ -7,7 +7,6 @@ type Ctx = {
   cargando: boolean;
   refrescar: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  registrar: (datos: { email: string; password: string; display_name: string; timezone: string }) => Promise<void>;
   logout: () => Promise<void>;
   actualizar: (campos: Partial<User>) => Promise<void>;
 };
@@ -37,10 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refrescar,
     login: async (email, password) => {
       const r = await api.post<{ user: User }>('/api/auth/login', { email, password });
-      setUser(r.user);
-    },
-    registrar: async (datos) => {
-      const r = await api.post<{ user: User }>('/api/auth/register', datos);
       setUser(r.user);
     },
     logout: async () => {

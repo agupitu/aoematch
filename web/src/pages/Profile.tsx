@@ -212,6 +212,38 @@ export function Profile() {
       </section>
 
       <section className="card p-5">
+        <h2 className="title mb-1 text-lg">Google</h2>
+        {user.google_sub ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge tone="good">Vinculada</Badge>
+            <span className="text-sm text-parch-200">{user.google_email ?? 'cuenta de Google'}</span>
+            <button
+              className="btn btn-ghost ml-auto"
+              onClick={async () => {
+                try {
+                  await api.post('/api/auth/google/unlink');
+                  location.reload();
+                } catch (err) {
+                  setError((err as Error).message);
+                }
+              }}
+            >
+              Desvincular
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-parch-400">
+              Vincular Google te deja entrar sin depender de Steam.
+            </p>
+            <a href="/api/auth/google" className="btn btn-ghost ml-auto">
+              Vincular Google
+            </a>
+          </div>
+        )}
+      </section>
+
+      <section className="card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="title text-lg">Cuándo podés jugar</h2>

@@ -5,12 +5,13 @@ import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
 import { Bracket, MatchCard } from '../components/Bracket';
 import { AvailabilityGrid } from '../components/AvailabilityGrid';
-import { TournamentForm, type Borrador } from '../components/TournamentForm';
+import { MatchCalendar } from '../components/MatchCalendar';
+import { TournamentForm, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
 import { useSocket } from '../ws';
 import {
   ETIQUETA_CIV, ETIQUETA_ESTADO, ETIQUETA_FORMATO, ETIQUETA_MAPA,
-  fechaCorta, horas, plata, rangoSemana, offsetZona, zonaDelNavegador,
+  fechaCorta, horas, monto, plata, rangoSemana, offsetZona, zonaDelNavegador,
 } from '../lib';
 import type { ChatMessage, Civ, GameMap, Registration, StandingRow, Team, Tournament, Window } from '../types';
 
@@ -246,10 +247,18 @@ function Resumen({ t }: { t: Tournament }) {
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       <div className="space-y-5 lg:col-span-2">
+        <Premios t={t} />
+
         <section className="card p-5">
           <h3 className="title mb-3 text-lg">Reglas del draft</h3>
           <dl className="grid gap-3 sm:grid-cols-2">
             <Dato k="Mapa" v={ETIQUETA_MAPA[t.map_mode]} />
+            {t.first_map && (
+              <Dato
+                k={t.map_mode === 'fijo' ? 'Mapa fijo' : 'Mapa de la partida 1'}
+                v={t.first_map.name_es}
+              />
+            )}
             <Dato
               k="Civilizaciones"
               v={`${ETIQUETA_CIV[t.civ_mode]}${t.civ_mode === 'snake' ? ` (${t.civ_pattern_efectivo})` : ''}`}
@@ -304,6 +313,12 @@ function Resumen({ t }: { t: Tournament }) {
             <Dato k="Sueltos" v={String(activos.filter((r) => !r.team_id).length)} />
             <Dato k="Inscripción" v={plata(t.entry_fee_cents, t.currency)} />
             {t.entry_fee_cents > 0 && <Dato k="Pagaron" v={`${pagos} de ${activos.length}`} />}
+            {(t.prizes.length > 0 || t.prize_pool.total_cents > 0) && (
+              <Dato
+                k="Premios"
+                v={monto(Math.max(t.prize_pool.total_cents, t.prize_pool.assigned_cents), t.currency)}
+              />
+            )}
             <Dato k="Cierre de inscripción" v={fechaCorta(t.reg_closes_at)} />
             <Dato k="Arranca" v={fechaCorta(t.starts_at)} />
           </dl>
@@ -316,6 +331,56 @@ function Resumen({ t }: { t: Tournament }) {
         )}
       </aside>
     </div>
+  );
+}
+
+function Premios({ t }: { t: Tournament }) {
+  if (!t.prizes.length && !t.prize_pool.total_cents) return null;
+  const enJuego = Math.max(t.prize_pool.total_cents, t.prize_pool.assigned_cents);
+
+  return (
+    <section className="card p-5">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
+        <h3 className="title text-lg">Premios</h3>
+        <span className="font-display text-2xl text-gold-400">{monto(enJuego, t.currency)}</span>
+        <span className="text-xs text-parch-400">
+          {t.prize_pool_mode === 'inscripciones'
+            ? `${t.prize_pool_pct}% de lo recaudado · ${t.prize_pool.paid_count} inscripciones pagas`
+            : t.prize_pool_mode === 'fijo'
+              ? 'bolsa fija de la organización'
+              : 'premios cargados a mano'}
+        </span>
+      </div>
+
+      {t.prizes.length === 0 ? (
+        <p className="text-sm text-parch-400">Todavía no se publicó el reparto.</p>
+      ) : (
+        <ol className="space-y-2">
+          {t.prizes.map((p) => (
+            <li
+              key={p.id}
+              className="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-ink-700 px-3 py-2"
+            >
+              <span className="font-display text-gold-400">{p.position}º</span>
+              <span className="text-sm text-parch-100">{p.label}</span>
+              <span className="ml-auto text-sm text-parch-200">
+                {monto(p.value_cents, t.currency)}
+                {p.kind === 'porcentaje' && <span className="text-parch-400"> · {p.percent}%</span>}
+              </span>
+              {p.extra && <span className="w-full text-xs text-parch-400">{p.extra}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {t.prize_pool_mode === 'inscripciones' && (
+        <p className="mt-3 text-xs text-parch-400">
+          La bolsa crece con cada inscripción paga: hoy son {monto(t.prize_pool.collected_cents, t.currency)}{' '}
+          recaudados.
+        </p>
+      )}
+      {t.prize_notes && <p className="mt-2 text-xs text-parch-400">{t.prize_notes}</p>}
+    </section>
   );
 }
 
@@ -738,6 +803,14 @@ function Horarios({ t }: { t: Tournament }) {
   return (
     <div className="space-y-5">
       <section className="card p-5">
+        <h3 className="title mb-1 text-lg">Partidos</h3>
+        <p className="mb-4 text-sm text-parch-400">
+          Lo que está agendado y lo que ya se jugó, con el resultado.
+        </p>
+        <MatchCalendar matches={t.matches} tz={tz} />
+      </section>
+
+      <section className="card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="title text-lg">Cuándo puede jugar la mayoría</h3>
@@ -815,6 +888,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const [maps, setMaps] = useState<GameMap[]>([]);
   const [civs, setCivs] = useState<Civ[]>([]);
   const [form, setForm] = useState<Borrador | null>(null);
+  const [tabForm, setTabForm] = useState<PestaniaForm>('basico');
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
 
@@ -843,6 +917,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       map_mode: t.map_mode,
       map_bans: t.map_bans,
       map_repeat: !!t.map_repeat,
+      first_map_id: t.first_map_id,
       civ_mode: t.civ_mode,
       civ_bans: t.civ_bans,
       civ_pattern: t.civ_pattern ?? '',
@@ -857,6 +932,17 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       allow_solo: !!t.allow_solo,
       reg_closes_at: t.reg_closes_at?.slice(0, 16) ?? '',
       starts_at: t.starts_at?.slice(0, 16) ?? '',
+      prize_pool_mode: t.prize_pool_mode,
+      prize_pool_cents: t.prize_pool_cents,
+      prize_pool_pct: t.prize_pool_pct,
+      prize_notes: t.prize_notes ?? '',
+      prizes: t.prizes.map((p) => ({
+        label: p.label,
+        kind: p.kind,
+        amount_cents: p.amount_cents,
+        percent: p.percent,
+        extra: p.extra ?? '',
+      })),
       map_ids: t.maps.map((m) => m.id),
       civ_ids: t.civs.map((c) => c.id),
     });
@@ -880,6 +966,8 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
         civ_pattern: form.civ_pattern.trim() || null,
         reg_closes_at: form.reg_closes_at || null,
         starts_at: form.starts_at || null,
+        prizes: form.prizes,
+        first_map_id: form.first_map_id,
       });
       setMensaje('Guardado.');
       setTimeout(() => setMensaje(''), 2500);
@@ -891,7 +979,15 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
   return (
     <div>
-      <TournamentForm value={form} onChange={setForm} maps={maps} civs={civs} />
+      <TournamentForm
+        value={form}
+        onChange={setForm}
+        maps={maps}
+        civs={civs}
+        tab={tabForm}
+        onTab={setTabForm}
+        recaudadoCents={t.prize_pool.collected_cents}
+      />
       <div className="sticky bottom-0 mt-6 flex items-center gap-3 border-t border-ink-700 bg-ink-950/90 py-4 backdrop-blur">
         <button className="btn btn-primary" onClick={guardar}>
           Guardar cambios

@@ -6,6 +6,8 @@ export type User = {
   discord: string | null;
   steam_id64: string | null;
   steam_name: string | null;
+  google_sub: string | null;
+  google_email: string | null;
   xbox_tag: string | null;
   aoe3_profile: string | null;
   rating_1v1: number | null;
@@ -96,6 +98,27 @@ export type StandingRow = {
   pts: number;
 };
 
+export type Prize = {
+  id: number;
+  position: number;
+  label: string;
+  kind: 'fijo' | 'porcentaje';
+  amount_cents: number;
+  percent: number;
+  extra: string | null;
+  /** Lo que le toca a este puesto una vez resuelta la bolsa. */
+  value_cents: number;
+};
+
+export type PrizePool = {
+  mode: string;
+  total_cents: number;
+  collected_cents: number;
+  paid_count: number;
+  assigned_cents: number;
+  assigned_pct: number;
+};
+
 export type Stage = {
   id: number;
   name: string;
@@ -125,6 +148,8 @@ export type Tournament = {
   map_mode: string;
   map_bans: number;
   map_repeat: number;
+  first_map_id: number | null;
+  first_map: GameMap | null;
   civ_mode: string;
   civ_bans: number;
   civ_pattern: string | null;
@@ -141,6 +166,12 @@ export type Tournament = {
   reg_opens_at: string | null;
   reg_closes_at: string | null;
   starts_at: string | null;
+  prize_pool_mode: string;
+  prize_pool_cents: number;
+  prize_pool_pct: number;
+  prize_notes: string | null;
+  prizes: Prize[];
+  prize_pool: PrizePool;
   organizer: { id: number; display_name: string };
   maps: GameMap[];
   civs: Civ[];

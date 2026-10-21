@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Badge, Empty, Spinner } from '../components/ui';
-import { ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, plata } from '../lib';
+import { bolsaDe, ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, monto, plata } from '../lib';
 import type { Tournament } from '../types';
 
-type Fila = Tournament & { organizer_name: string; inscriptos: number; equipos: number };
+type Fila = Tournament & { organizer_name: string; inscriptos: number; pagos: number; equipos: number };
 
 const TONO: Record<string, 'gold' | 'good' | 'neutral' | 'info'> = {
   inscripcion: 'gold',
@@ -58,7 +58,14 @@ export function Home() {
         </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {lista.map((t) => (
+          {lista.map((t) => {
+            const bolsa = bolsaDe(
+              t.prize_pool_mode,
+              t.prize_pool_cents,
+              t.pagos * t.entry_fee_cents,
+              t.prize_pool_pct
+            );
+            return (
             <Link
               key={t.id}
               to={`/t/${t.slug}`}
@@ -90,6 +97,12 @@ export function Home() {
                   <dt className="inline">Inscripción: </dt>
                   <dd className="inline text-parch-200">{plata(t.entry_fee_cents, t.currency)}</dd>
                 </div>
+                {bolsa > 0 && (
+                  <div>
+                    <dt className="inline">Premios: </dt>
+                    <dd className="inline text-gold-400">{monto(bolsa, t.currency)}</dd>
+                  </div>
+                )}
                 {t.starts_at && (
                   <div className="col-span-2">
                     <dt className="inline">Arranca: </dt>
@@ -98,7 +111,8 @@ export function Home() {
                 )}
               </dl>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

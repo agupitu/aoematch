@@ -51,6 +51,8 @@ export function publicUser(u) {
     discord: u.discord,
     steam_id64: u.steam_id64,
     steam_name: u.steam_name,
+    google_sub: u.google_sub,
+    google_email: u.google_email,
     xbox_tag: u.xbox_tag,
     aoe3_profile: u.aoe3_profile,
     rating_1v1: u.rating_1v1,

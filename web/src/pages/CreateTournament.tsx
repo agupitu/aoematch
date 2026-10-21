@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Alerta, Spinner } from '../components/ui';
-import { BORRADOR_INICIAL, TournamentForm, type Borrador } from '../components/TournamentForm';
+import {
+  BORRADOR_INICIAL, TournamentForm, type Borrador, type PestaniaForm,
+} from '../components/TournamentForm';
 import type { Civ, GameMap, Tournament } from '../types';
 
 /** Pool competitivo típico, por si querés arrancar con algo cargado. */
 const SUGERIDOS = [
-  'yucatan', 'andes', 'deccan', 'saguenay', 'grandes-llanuras', 'arabia',
+  'yucatan', 'andes', 'decan', 'saguenay', 'grandes-llanuras', 'arabia',
   'rio-amarillo', 'bayou', 'carolina',
 ];
 
@@ -18,6 +20,7 @@ export function CreateTournament() {
   const [maps, setMaps] = useState<GameMap[]>([]);
   const [civs, setCivs] = useState<Civ[]>([]);
   const [form, setForm] = useState<Borrador>(BORRADOR_INICIAL);
+  const [tab, setTab] = useState<PestaniaForm>('basico');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
 
@@ -47,9 +50,16 @@ export function CreateTournament() {
 
   const crear = async () => {
     setError('');
-    if (!form.name.trim()) return setError('Ponele un nombre al torneo.');
-    if (form.map_ids.length < 1) return setError('Elegí al menos un mapa.');
+    if (!form.name.trim()) {
+      setTab('basico');
+      return setError('Ponele un nombre al torneo.');
+    }
+    if (form.map_ids.length < 1) {
+      setTab('mapas');
+      return setError('Elegí al menos un mapa.');
+    }
     if (form.civ_ids.length < form.team_size * 2) {
+      setTab('civs');
       return setError(`Con ${form.team_size}v${form.team_size} necesitás al menos ${form.team_size * 2} civilizaciones.`);
     }
     setEnviando(true);
@@ -67,6 +77,8 @@ export function CreateTournament() {
         civ_pattern: form.civ_pattern.trim() || null,
         reg_closes_at: form.reg_closes_at || null,
         starts_at: form.starts_at || null,
+        prizes: form.prizes,
+        first_map_id: form.first_map_id,
       });
       navigate(`/t/${t.slug}`);
     } catch (err) {
@@ -82,7 +94,7 @@ export function CreateTournament() {
         Todo esto se puede cambiar después desde la pestaña de configuración.
       </p>
 
-      <TournamentForm value={form} onChange={setForm} maps={maps} civs={civs} />
+      <TournamentForm value={form} onChange={setForm} maps={maps} civs={civs} tab={tab} onTab={setTab} />
 
       <div className="sticky bottom-0 mt-6 flex items-center gap-3 border-t border-ink-700 bg-ink-950/90 py-4 backdrop-blur">
         <button className="btn btn-primary" onClick={crear} disabled={enviando}>

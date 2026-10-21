@@ -28,6 +28,18 @@ export function zonaDelNavegador(): string {
 
 export const mod = (n: number, m: number) => ((n % m) + m) % m;
 
+/** Minúsculas y sin tildes, para que "decan" encuentre "Decán". */
+export function normalizar(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/** ¿Alguno de los campos contiene la búsqueda, ignorando tildes y mayúsculas? */
+export function coincide(busqueda: string, ...campos: (string | null | undefined)[]): boolean {
+  const q = normalizar(busqueda.trim());
+  if (!q) return true;
+  return campos.some((c) => c && normalizar(c).includes(q));
+}
+
 /** Convierte un minuto de la semana UTC al minuto de la semana en zona local. */
 export const utcALocal = (min: number, offset: number) => mod(min + offset, MINUTOS_SEMANA);
 export const localAUtc = (min: number, offset: number) => mod(min - offset, MINUTOS_SEMANA);
@@ -50,19 +62,42 @@ export function fechaCorta(iso: string | null, tz?: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('es-AR', {
     timeZone: tz,
-    weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+    weekday: 'short', day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
 
 export function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-export function plata(centavos: number, moneda: string): string {
-  if (!centavos) return 'Gratis';
+/** Siempre con símbolo: 0 se muestra como $ 0. */
+export function monto(centavos: number, moneda: string): string {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: moneda, maximumFractionDigits: 0 })
     .format(centavos / 100);
 }
+
+export function plata(centavos: number, moneda: string): string {
+  return centavos ? monto(centavos, moneda) : 'Gratis';
+}
+
+/** Bolsa que se reparte, según de dónde sale la plata. */
+export function bolsaDe(
+  modo: string,
+  bolsaFijaCents: number,
+  recaudadoCents: number,
+  porcentaje: number
+): number {
+  if (modo === 'fijo') return bolsaFijaCents;
+  if (modo === 'inscripciones') return Math.round((recaudadoCents * porcentaje) / 100);
+  return 0;
+}
+
+export const ETIQUETA_POZO: Record<string, string> = {
+  ninguno: 'Sin bolsa en plata',
+  fijo: 'Monto fijo de la organización',
+  inscripciones: 'Lo recaudado en inscripciones',
+};
 
 export const ETIQUETA_FORMATO: Record<string, string> = {
   eliminacion_simple: 'Eliminación simple',

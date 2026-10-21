@@ -1,0 +1,38 @@
+# Deploy en Render con un clic: https://render.com/deploy
+services:
+  - type: web
+    name: aoematch
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run assets && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # node:sqlite necesita Node 23.4+ para andar sin flag experimental.
+      - key: NODE_VERSION
+        value: 24.9.0
+      - key: NODE_ENV
+        value: production
+      # Siembra el torneo de muestra la primera vez que arranca con base vacía.
+      - key: SEED_DEMO
+        value: "1"
+      # Sin login por email: solo Steam y Google.
+      - key: DEV_LOGIN
+        value: "0"
+      # Opcionales: se cargan a mano en el panel de Render.
+      - key: STEAM_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Dónde guarda la base. En el plan free el disco es efímero: cada deploy
+      # arranca de cero y se vuelve a sembrar la demo. Con un disco pago,
+      # descomentá el bloque de abajo y apuntá la base ahí.
+      - key: AOEMATCH_DB
+        value: /tmp/aoematch.db
+# disk:
+#   name: datos
+#   mountPath: /var/data
+#   sizeGB: 1
