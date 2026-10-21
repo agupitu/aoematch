@@ -9,7 +9,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: API, changeOrigin: true },
+      // xfwd agrega x-forwarded-host: el backend necesita saber que el
+      // navegador habla con :5173 para armar los retornos de Steam y Google.
+      '/api': { target: API, changeOrigin: true, xfwd: true },
       '/assets': { target: API, changeOrigin: true },
       '/ws': { target: API, ws: true },
     },

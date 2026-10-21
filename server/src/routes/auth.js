@@ -13,9 +13,11 @@ export const router = Router();
 // así un deploy funciona sin configurar nada.
 function origen(req) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL;
-  const host = req.get('host');
+  // Detrás del proxy de Vite (dev) o del hosting (producción) el Host llega
+  // reescrito, así que miramos primero el x-forwarded-host.
+  const host = req.headers['x-forwarded-host']?.split(',')[0].trim() || req.get('host');
   if (!host) return 'http://localhost:5173';
-  const proto = req.headers['x-forwarded-proto']?.split(',')[0] || req.protocol || 'http';
+  const proto = req.headers['x-forwarded-proto']?.split(',')[0].trim() || req.protocol || 'http';
   return `${proto}://${host}`;
 }
 
@@ -127,7 +129,6 @@ router.get('/steam', (req, res) => {
 });
 
 router.get('/steam/return', async (req, res) => {
-  const APP_URL = origen(req);
   try {
     const params = new URLSearchParams(req.query);
     params.set('openid.mode', 'check_authentication');
@@ -139,12 +140,12 @@ router.get('/steam/return', async (req, res) => {
     });
     const texto = await verif.text();
     if (!/is_valid\s*:\s*true/.test(texto)) {
-      return res.redirect(`${APP_URL}/entrar?steam=error`);
+      return res.redirect('/entrar?steam=error');
     }
 
     const claimed = String(req.query['openid.claimed_id'] || '');
     const steamId = claimed.match(/\/id\/(\d{17})$/)?.[1];
-    if (!steamId) return res.redirect(`${APP_URL}/entrar?steam=error`);
+    if (!steamId) return res.redirect('/entrar?steam=error');
 
     const perfil = await perfilSteam(steamId);
     const { estado } = entrarCon({
@@ -159,11 +160,11 @@ router.get('/steam/return', async (req, res) => {
         valores: [perfil?.personaname ?? null, perfil?.avatarfull ?? null],
       },
     });
-    if (estado === 'ocupado') return res.redirect(`${APP_URL}/perfil?steam=ocupado`);
-    res.redirect(`${APP_URL}/perfil?steam=ok`);
+    if (estado === 'ocupado') return res.redirect('/perfil?steam=ocupado');
+    res.redirect('/perfil?steam=ok');
   } catch (err) {
     console.error('steam', err);
-    res.redirect(`${APP_URL}/entrar?steam=error`);
+    res.redirect('/entrar?steam=error');
   }
 });
 
@@ -194,9 +195,8 @@ async function perfilSteam(steamId) {
 const OAUTH_COOKIE = 'aoem_oauth';
 
 router.get('/google', (req, res) => {
-  const APP_URL = origen(req);
   const API_URL = origen(req);
-  if (!GOOGLE_ID || !GOOGLE_SECRET) return res.redirect(`${APP_URL}/entrar?google=sin_config`);
+  if (!GOOGLE_ID || !GOOGLE_SECRET) return res.redirect('/entrar?google=sin_config');
   const state = randomBytes(16).toString('hex');
   res.cookie(OAUTH_COOKIE, state, {
     httpOnly: true,
@@ -217,18 +217,17 @@ router.get('/google', (req, res) => {
 });
 
 router.get('/google/return', async (req, res) => {
-  const APP_URL = origen(req);
   const API_URL = origen(req);
   try {
-    if (!GOOGLE_ID || !GOOGLE_SECRET) return res.redirect(`${APP_URL}/entrar?google=sin_config`);
+    if (!GOOGLE_ID || !GOOGLE_SECRET) return res.redirect('/entrar?google=sin_config');
 
     const esperado = req.cookies?.[OAUTH_COOKIE];
     res.clearCookie(OAUTH_COOKIE, { path: '/' });
     if (!esperado || esperado !== String(req.query.state || '')) {
-      return res.redirect(`${APP_URL}/entrar?google=error`);
+      return res.redirect('/entrar?google=error');
     }
     const code = String(req.query.code || '');
-    if (!code) return res.redirect(`${APP_URL}/entrar?google=error`);
+    if (!code) return res.redirect('/entrar?google=error');
 
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -241,13 +240,13 @@ router.get('/google/return', async (req, res) => {
         grant_type: 'authorization_code',
       }).toString(),
     });
-    if (!r.ok) return res.redirect(`${APP_URL}/entrar?google=error`);
+    if (!r.ok) return res.redirect('/entrar?google=error');
 
     // El id_token llega del propio Google por TLS en este intercambio
     // servidor-a-servidor, así que alcanza con leer sus claims.
     const { id_token } = await r.json();
     const claims = JSON.parse(Buffer.from(String(id_token).split('.')[1], 'base64url').toString('utf8'));
-    if (!claims?.sub) return res.redirect(`${APP_URL}/entrar?google=error`);
+    if (!claims?.sub) return res.redirect('/entrar?google=error');
 
     const { estado } = entrarCon({
       req,
@@ -261,11 +260,11 @@ router.get('/google/return', async (req, res) => {
         valores: [claims.email ?? null],
       },
     });
-    if (estado === 'ocupado') return res.redirect(`${APP_URL}/perfil?google=ocupado`);
-    res.redirect(`${APP_URL}/perfil?google=ok`);
+    if (estado === 'ocupado') return res.redirect('/perfil?google=ocupado');
+    res.redirect('/perfil?google=ok');
   } catch (err) {
     console.error('google', err);
-    res.redirect(`${APP_URL}/entrar?google=error`);
+    res.redirect('/entrar?google=error');
   }
 });
 
