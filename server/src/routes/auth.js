@@ -34,10 +34,15 @@ router.get('/providers', (_req, res) => {
   res.json({ steam: true, google: !!(GOOGLE_ID && GOOGLE_SECRET), dev_login: DEV_LOGIN });
 });
 
-/** Inicia sesión con una cuenta ya existente, o la crea a partir del proveedor. */
-function entrarCon({ req, res, columna, valor, datos }) {
+/**
+ * Inicia sesión con una cuenta ya existente, o la crea a partir del proveedor.
+ * Con `vincular` la pega a la sesión abierta (es lo que hace el botón del
+ * perfil); sin eso, entrar siempre lleva a la cuenta del proveedor, aunque
+ * haya otra sesión abierta en el navegador.
+ */
+function entrarCon({ req, res, columna, valor, datos, vincular = false }) {
   const existente = get(`SELECT * FROM users WHERE ${columna} = ?`, valor);
-  let user = req.user;
+  let user = vincular ? req.user : null;
 
   if (user) {
     if (existente && existente.id !== user.id) return { estado: 'ocupado', user };
@@ -116,7 +121,7 @@ const STEAM_OPENID = 'https://steamcommunity.com/openid/login';
 
 router.get('/steam', (req, res) => {
   const API_URL = origen(req);
-  const returnTo = `${API_URL}/api/auth/steam/return`;
+  const returnTo = `${API_URL}/api/auth/steam/return${req.query.link ? '?link=1' : ''}`;
   const params = new URLSearchParams({
     'openid.ns': 'http://specs.openid.net/auth/2.0',
     'openid.mode': 'checkid_setup',
@@ -151,6 +156,7 @@ router.get('/steam/return', async (req, res) => {
     const { estado } = entrarCon({
       req,
       res,
+      vincular: req.query.link === '1',
       columna: 'steam_id64',
       valor: steamId,
       datos: {
@@ -197,7 +203,7 @@ const OAUTH_COOKIE = 'aoem_oauth';
 router.get('/google', (req, res) => {
   const API_URL = origen(req);
   if (!GOOGLE_ID || !GOOGLE_SECRET) return res.redirect('/entrar?google=sin_config');
-  const state = randomBytes(16).toString('hex');
+  const state = randomBytes(16).toString('hex') + (req.query.link ? '.link' : '');
   res.cookie(OAUTH_COOKIE, state, {
     httpOnly: true,
     sameSite: 'lax',
@@ -251,6 +257,7 @@ router.get('/google/return', async (req, res) => {
     const { estado } = entrarCon({
       req,
       res,
+      vincular: esperado.endsWith('.link'),
       columna: 'google_sub',
       valor: String(claims.sub),
       datos: {

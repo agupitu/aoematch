@@ -204,7 +204,7 @@ export function Profile() {
             <p className="hint text-sm">
               Vinculá Steam para que los organizadores confirmen tu identidad y tus partidas.
             </p>
-            <a href="/api/auth/steam" className="btn btn-primary ml-auto">
+            <a href="/api/auth/steam?link=1" className="btn btn-primary ml-auto">
               Vincular Steam
             </a>
           </div>
@@ -236,7 +236,7 @@ export function Profile() {
             <p className="hint text-sm">
               Vincular Google te deja entrar sin depender de Steam.
             </p>
-            <a href="/api/auth/google" className="btn btn-ghost ml-auto">
+            <a href="/api/auth/google?link=1" className="btn btn-ghost ml-auto">
               Vincular Google
             </a>
           </div>
