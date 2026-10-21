@@ -1,0 +1,154 @@
+# AOEMatch
+
+Plataforma para organizar torneos de **Age of Empires III: Definitive Edition**:
+inscripciones y pagos, armado automático de equipos, cruce de horarios, salas de
+chat por equipo y draft de mapa y civilizaciones en vivo.
+
+## Arrancar
+
+```bash
+npm install          # instala raíz, server y web
+npm run assets       # descarga banderas y minimapas (una sola vez)
+npm run seed         # datos de demostración
+npm run dev          # API en :3001 y la web en :5173
+```
+
+Abrí <http://localhost:5173>. La demo deja tres torneos y 24 jugadores con
+horarios cargados. Usuario organizador: `kaiser@demo.aoematch` / `demo1234`
+(todos los jugadores de la demo usan la misma contraseña).
+
+Para producción:
+
+```bash
+npm run build        # compila la web
+npm start            # un solo proceso sirve API + web en :3001
+```
+
+Variables de entorno (ver `.env.example`):
+
+| Variable | Para qué |
+|---|---|
+| `PUBLIC_URL` | Origen que ve el navegador. En dev es el de Vite, que proxea la API. Lo usa el retorno de Steam. |
+| `API_PORT` / `--port` | Puerto del backend (3001 por defecto). |
+| `STEAM_API_KEY` | Opcional. Con una clave de Steam se traen nombre y avatar al vincular. Sin clave la vinculación igual funciona. |
+| `AOEMATCH_DB` | Ruta del archivo SQLite (`server/data/aoematch.db` por defecto). |
+
+## Qué hace
+
+### Torneos
+El organizador define formato (**eliminación simple, doble, liga, grupos +
+playoff o suizo**), tamaño de equipo (1v1 a 4v4), largo de las series, pool de
+mapas, civilizaciones habilitadas, costo de inscripción y link de pago. Todo es
+editable después desde la pestaña **Configuración**.
+
+Las llaves se generan con siembra clásica (1-8, 4-5, 2-7, 3-6), byes
+automáticos y avance del ganador —y del perdedor, en doble eliminación— al
+partido siguiente.
+
+### Inscripciones y pagos
+Cada jugador se anota solo o con equipo. El organizador ve la lista con elo,
+zona horaria y estado, y marca a mano quién pagó. No hay cobro automático: se
+guarda el link de pago y el organizador confirma.
+
+### Armador de equipos
+Para los que se anotan sueltos. Reparte en serpiente por rating y después
+mejora con intercambios, optimizando dos cosas a la vez: equipos parejos de
+nivel y **horarios en común entre los compañeros**. Un control deslizante
+decide cuánto pesa cada criterio. La propuesta se puede regenerar las veces que
+haga falta y recién después se confirma.
+
+### Horarios
+Cada jugador pinta su semana en una grilla de bloques de 30 minutos. Se guarda
+en UTC y se muestra en la zona de cada uno.
+
+Con eso la app calcula:
+
+- el **mapa de calor** del torneo (cuántos pueden en cada franja),
+- las **mejores ventanas** para un partido concreto, con la próxima fecha real,
+- y las ventanas en las que *falta uno solo*, diciendo quién.
+
+Desde la sala del partido, el capitán agenda con un clic sobre la ventana.
+
+### Sala del partido
+Pantalla partida: a la izquierda el chat con dos pestañas —**sala del partido**
+(la ven los dos equipos) y **mi equipo** (privada, para armar estrategia)—, a la
+derecha el tablero de draft. Todo en vivo por WebSocket: mensajes, presencia y
+cada paso del draft.
+
+### Draft
+El plan de pasos se arma al abrir el draft y los dos equipos ven la misma
+secuencia. Hay reloj por paso; si se vence, el servidor elige al azar entre lo
+legal.
+
+**Mapa**
+- `fijo` — lo define el organizador.
+- `aleatorio` — sale del pool.
+- `ban_hasta_uno` — bans alternados hasta que queda uno (el más usado).
+- `ban_pick` — cada equipo banea N y después uno elige.
+
+**Civilizaciones**
+- `libre` — se declaran después.
+- `aleatorio` — sorteo.
+- `snake` — bans opcionales y después draft en serpiente.
+- `ciega` — los dos equipos eligen a la vez y se revela al final.
+
+El patrón de la serpiente es configurable (`1-2-2-1`, etc.). Por defecto los
+bordes eligen de a uno y el medio de a dos: `1-1` en 1v1, `1-2-1` en 2v2,
+`1-2-2-1` en 3v3, `1-2-2-2-1` en 4v4.
+
+Reglas que se activan por torneo:
+
+- repetir o no la misma civ dentro de un equipo,
+- permitir o no espejos entre equipos,
+- repetir o no civs entre partidas de la misma serie,
+- repetir o no el mapa dentro de la serie.
+
+Dos detalles que ya vienen puestos porque hacen el draft más justo:
+
+1. **Contrapick de mapa.** En `ban_pick`, el equipo que *no* eligió el mapa
+   arranca el draft de civs. Quien se queda con la ventaja del mapa cede la
+   ventaja del primer pick.
+2. **En la partida 2 en adelante arranca el que va perdiendo.** Compensa la
+   serie sin tocar las reglas.
+
+Si más adelante querés algo todavía más parejo, la variante estándar en otros
+juegos es *doble serpiente*: `A-BB-AA-B` repetido, con un ban global de civs
+antes de empezar. Se puede escribir hoy mismo como patrón sin tocar código.
+
+### Cuentas
+Email y contraseña, o **login con Steam** (OpenID 2.0, sin dependencias). La
+cuenta de Steam se puede vincular a una cuenta existente o crear una nueva. Hay
+campos para Discord, gamertag de Xbox, id de perfil del leaderboard y elo 1v1 /
+equipos.
+
+## Cómo está armado
+
+```
+server/           API Express + WebSocket, SQLite (node:sqlite, sin dependencias nativas)
+  src/schema.sql  esquema completo
+  src/draft.js    motor de draft (plan de pasos, reglas, relojes)
+  src/brackets.js llaves, grupos, suizo y avance de resultados
+  src/teambuilder.js  armador de equipos
+  src/availability.js cruce de horarios
+  src/realtime.js salas de chat y empuje del draft
+web/              Vite + React + TypeScript + Tailwind
+tools/            descarga de assets
+```
+
+La base es un único archivo SQLite; no hace falta levantar nada más.
+
+## Assets
+
+Las banderas de las 24 civilizaciones y los 174 minimapas se bajan de
+[freefoodparty.com](https://freefoodparty.com) con `npm run assets` y quedan en
+`server/public/assets/`. No están versionados: son material del juego y se
+descargan en cada instalación.
+
+## Ideas para seguir
+
+- Parsear replays (`.age3Yrec`) para autocompletar resultado, mapa y civs.
+- Traer elo real desde el leaderboard oficial en vez de cargarlo a mano.
+- Webhook de Discord: avisar draft abierto, partido agendado y resultados.
+- Cobro real con Mercado Pago / PayPal en vez de marcar el pago a mano.
+- Veto de horarios por equipo (no solo por jugador) y recordatorios por mail.
+- Página pública de un equipo con historial de civs y mapas jugados.

@@ -1,0 +1,1046 @@
+[
+  {
+    "id": 1,
+    "slug": "acropolis",
+    "name_es": "Acrópolis",
+    "img": "/assets/maps/acropolis.png"
+  },
+  {
+    "id": 2,
+    "slug": "alaska",
+    "name_es": "Alaska",
+    "img": "/assets/maps/alaska.png"
+  },
+  {
+    "id": 3,
+    "slug": "alpes",
+    "name_es": "Alpes",
+    "img": "/assets/maps/alpes.png"
+  },
+  {
+    "id": 4,
+    "slug": "amazonas",
+    "name_es": "Amazonas",
+    "img": "/assets/maps/amazonas.png"
+  },
+  {
+    "id": 5,
+    "slug": "anatolia",
+    "name_es": "Anatolia",
+    "img": "/assets/maps/anatolia.png"
+  },
+  {
+    "id": 6,
+    "slug": "andes",
+    "name_es": "Andes",
+    "img": "/assets/maps/andes.png"
+  },
+  {
+    "id": 7,
+    "slug": "arabia",
+    "name_es": "Arabia",
+    "img": "/assets/maps/arabia.png"
+  },
+  {
+    "id": 8,
+    "slug": "araucania",
+    "name_es": "Araucanía",
+    "img": "/assets/maps/araucania.png"
+  },
+  {
+    "id": 9,
+    "slug": "archipielago",
+    "name_es": "Archipiélago",
+    "img": "/assets/maps/archipielago.png"
+  },
+  {
+    "id": 10,
+    "slug": "artico",
+    "name_es": "Ártico",
+    "img": "/assets/maps/artico.png"
+  },
+  {
+    "id": 11,
+    "slug": "asia-central",
+    "name_es": "Asia central",
+    "img": "/assets/maps/asia-central.png"
+  },
+  {
+    "id": 12,
+    "slug": "atlas",
+    "name_es": "Atlas",
+    "img": "/assets/maps/atlas.png"
+  },
+  {
+    "id": 13,
+    "slug": "bahia",
+    "name_es": "Bahía",
+    "img": "/assets/maps/bahia.png"
+  },
+  {
+    "id": 14,
+    "slug": "bahia-de-hudson",
+    "name_es": "Bahía de Hudson",
+    "img": "/assets/maps/bahia-de-hudson.png"
+  },
+  {
+    "id": 15,
+    "slug": "baja-california",
+    "name_es": "Baja California",
+    "img": "/assets/maps/baja-california.png"
+  },
+  {
+    "id": 16,
+    "slug": "bayou",
+    "name_es": "Bayou",
+    "img": "/assets/maps/bayou.png"
+  },
+  {
+    "id": 17,
+    "slug": "bengala",
+    "name_es": "Bengala",
+    "img": "/assets/maps/bengala.png"
+  },
+  {
+    "id": 18,
+    "slug": "bohemia",
+    "name_es": "Bohemia",
+    "img": "/assets/maps/bohemia.png"
+  },
+  {
+    "id": 19,
+    "slug": "borneo",
+    "name_es": "Borneo",
+    "img": "/assets/maps/borneo.png"
+  },
+  {
+    "id": 20,
+    "slug": "budapest",
+    "name_es": "Budapest",
+    "img": "/assets/maps/budapest.png"
+  },
+  {
+    "id": 21,
+    "slug": "california",
+    "name_es": "California",
+    "img": "/assets/maps/california.png"
+  },
+  {
+    "id": 22,
+    "slug": "caribe",
+    "name_es": "Caribe",
+    "img": "/assets/maps/caribe.png"
+  },
+  {
+    "id": 23,
+    "slug": "carolina",
+    "name_es": "Carolina",
+    "img": "/assets/maps/carolina.png"
+  },
+  {
+    "id": 24,
+    "slug": "carpatos",
+    "name_es": "Cárpatos",
+    "img": "/assets/maps/carpatos.png"
+  },
+  {
+    "id": 25,
+    "slug": "caucaso",
+    "name_es": "Cáucaso",
+    "img": "/assets/maps/caucaso.png"
+  },
+  {
+    "id": 26,
+    "slug": "ceilan",
+    "name_es": "Ceilán",
+    "img": "/assets/maps/ceilan.png"
+  },
+  {
+    "id": 27,
+    "slug": "colorado",
+    "name_es": "Colorado",
+    "img": "/assets/maps/colorado.png"
+  },
+  {
+    "id": 28,
+    "slug": "corcega-y-cerdena",
+    "name_es": "Córcega y Cerdeña",
+    "img": "/assets/maps/corcega-y-cerdena.png"
+  },
+  {
+    "id": 29,
+    "slug": "cordillera-de-las-cascadas",
+    "name_es": "Cordillera de las Cascadas",
+    "img": "/assets/maps/cordillera-de-las-cascadas.png"
+  },
+  {
+    "id": 30,
+    "slug": "corea",
+    "name_es": "Corea",
+    "img": "/assets/maps/corea.png"
+  },
+  {
+    "id": 31,
+    "slug": "costa-de-la-pimienta",
+    "name_es": "Costa de la pimienta",
+    "img": "/assets/maps/costa-de-la-pimienta.png"
+  },
+  {
+    "id": 32,
+    "slug": "costa-de-marfil",
+    "name_es": "Costa de Marfil",
+    "img": "/assets/maps/costa-de-marfil.png"
+  },
+  {
+    "id": 33,
+    "slug": "costa-de-oro",
+    "name_es": "Costa de oro",
+    "img": "/assets/maps/costa-de-oro.png"
+  },
+  {
+    "id": 34,
+    "slug": "costa-de-oro-fuerte",
+    "name_es": "Costa de oro - Fuerte",
+    "img": "/assets/maps/costa-de-oro-fuerte.png"
+  },
+  {
+    "id": 35,
+    "slug": "costa-swahili",
+    "name_es": "Costa swahili",
+    "img": "/assets/maps/costa-swahili.png"
+  },
+  {
+    "id": 36,
+    "slug": "cuenca-del-congo",
+    "name_es": "Cuenca del Congo",
+    "img": "/assets/maps/cuenca-del-congo.png"
+  },
+  {
+    "id": 37,
+    "slug": "cuenca-del-dnieper",
+    "name_es": "Cuenca del Dniéper",
+    "img": "/assets/maps/cuenca-del-dnieper.png"
+  },
+  {
+    "id": 38,
+    "slug": "cuenca-del-vistula",
+    "name_es": "Cuenca del Vístula",
+    "img": "/assets/maps/cuenca-del-vistula.png"
+  },
+  {
+    "id": 39,
+    "slug": "cuerno",
+    "name_es": "Cuerno",
+    "img": "/assets/maps/cuerno.png"
+  },
+  {
+    "id": 40,
+    "slug": "curlandia",
+    "name_es": "Curlandia",
+    "img": "/assets/maps/curlandia.png"
+  },
+  {
+    "id": 41,
+    "slug": "dakota",
+    "name_es": "Dakota",
+    "img": "/assets/maps/dakota.png"
+  },
+  {
+    "id": 42,
+    "slug": "darfur",
+    "name_es": "Darfur",
+    "img": "/assets/maps/darfur.png"
+  },
+  {
+    "id": 43,
+    "slug": "decan",
+    "name_es": "Decán",
+    "img": "/assets/maps/decan.png"
+  },
+  {
+    "id": 44,
+    "slug": "delta-del-niger",
+    "name_es": "Delta del Níger",
+    "img": "/assets/maps/delta-del-niger.png"
+  },
+  {
+    "id": 45,
+    "slug": "desconocido",
+    "name_es": "Desconocido",
+    "img": "/assets/maps/desconocido.png"
+  },
+  {
+    "id": 46,
+    "slug": "desconocido-perdido",
+    "name_es": "Desconocido - Perdido",
+    "img": "/assets/maps/desconocido-perdido.png"
+  },
+  {
+    "id": 47,
+    "slug": "desconocido-supervivencia",
+    "name_es": "Desconocido - Supervivencia",
+    "img": "/assets/maps/desconocido-supervivencia.png"
+  },
+  {
+    "id": 48,
+    "slug": "desierto-pintado",
+    "name_es": "Desierto Pintado",
+    "img": "/assets/maps/desierto-pintado.png"
+  },
+  {
+    "id": 49,
+    "slug": "dunas",
+    "name_es": "Dunas",
+    "img": "/assets/maps/dunas.png"
+  },
+  {
+    "id": 50,
+    "slug": "dunas-el-ojo",
+    "name_es": "Dunas - El Ojo",
+    "img": "/assets/maps/dunas-el-ojo.png"
+  },
+  {
+    "id": 51,
+    "slug": "el-diluvio",
+    "name_es": "El Diluvio",
+    "img": "/assets/maps/el-diluvio.png"
+  },
+  {
+    "id": 52,
+    "slug": "escandinavia",
+    "name_es": "Escandinavia",
+    "img": "/assets/maps/escandinavia.png"
+  },
+  {
+    "id": 53,
+    "slug": "escocia",
+    "name_es": "Escocia",
+    "img": "/assets/maps/escocia.png"
+  },
+  {
+    "id": 54,
+    "slug": "espana",
+    "name_es": "España",
+    "img": "/assets/maps/espana.png"
+  },
+  {
+    "id": 55,
+    "slug": "espanola",
+    "name_es": "Española",
+    "img": "/assets/maps/espanola.png"
+  },
+  {
+    "id": 56,
+    "slug": "estepa-euroasiatica",
+    "name_es": "Estepa euroasiática",
+    "img": "/assets/maps/estepa-euroasiatica.png"
+  },
+  {
+    "id": 57,
+    "slug": "estepa-euroasiatica-perdido",
+    "name_es": "Estepa euroasiática - Perdido",
+    "img": "/assets/maps/estepa-euroasiatica-perdido.png"
+  },
+  {
+    "id": 58,
+    "slug": "estepa-euroasiatica-supervivencia",
+    "name_es": "Estepa euroasiática - Supervivencia",
+    "img": "/assets/maps/estepa-euroasiatica-supervivencia.png"
+  },
+  {
+    "id": 59,
+    "slug": "estrecho-de-bering",
+    "name_es": "Estrecho de Bering",
+    "img": "/assets/maps/estrecho-de-bering.png"
+  },
+  {
+    "id": 60,
+    "slug": "estrechos-daneses",
+    "name_es": "Estrechos daneses",
+    "img": "/assets/maps/estrechos-daneses.png"
+  },
+  {
+    "id": 61,
+    "slug": "finlandia",
+    "name_es": "Finlandia",
+    "img": "/assets/maps/finlandia.png"
+  },
+  {
+    "id": 62,
+    "slug": "florida",
+    "name_es": "Florida",
+    "img": "/assets/maps/florida.png"
+  },
+  {
+    "id": 63,
+    "slug": "francia",
+    "name_es": "Francia",
+    "img": "/assets/maps/francia.png"
+  },
+  {
+    "id": 64,
+    "slug": "francia-comercio",
+    "name_es": "Francia - Comercio",
+    "img": "/assets/maps/francia-comercio.png"
+  },
+  {
+    "id": 65,
+    "slug": "frontera-de-texas",
+    "name_es": "Frontera de Texas",
+    "img": "/assets/maps/frontera-de-texas.png"
+  },
+  {
+    "id": 66,
+    "slug": "gales",
+    "name_es": "Gales",
+    "img": "/assets/maps/gales.png"
+  },
+  {
+    "id": 67,
+    "slug": "gotland",
+    "name_es": "Gotland",
+    "img": "/assets/maps/gotland.png"
+  },
+  {
+    "id": 68,
+    "slug": "gran-chaco",
+    "name_es": "Gran Chaco",
+    "img": "/assets/maps/gran-chaco.png"
+  },
+  {
+    "id": 69,
+    "slug": "gran-rift",
+    "name_es": "Gran Rift",
+    "img": "/assets/maps/gran-rift.png"
+  },
+  {
+    "id": 70,
+    "slug": "grandes-lagos",
+    "name_es": "Grandes Lagos",
+    "img": "/assets/maps/grandes-lagos.png"
+  },
+  {
+    "id": 71,
+    "slug": "grandes-llanuras",
+    "name_es": "Grandes Llanuras",
+    "img": "/assets/maps/grandes-llanuras.png"
+  },
+  {
+    "id": 72,
+    "slug": "groenlandia",
+    "name_es": "Groenlandia",
+    "img": "/assets/maps/groenlandia.png"
+  },
+  {
+    "id": 73,
+    "slug": "guayanas",
+    "name_es": "Guayanas",
+    "img": "/assets/maps/guayanas.png"
+  },
+  {
+    "id": 74,
+    "slug": "guerra-de-livonia",
+    "name_es": "Guerra de Livonia",
+    "img": "/assets/maps/guerra-de-livonia.png"
+  },
+  {
+    "id": 75,
+    "slug": "guerra-de-los-siete-anos",
+    "name_es": "Guerra de los Siete Años",
+    "img": "/assets/maps/guerra-de-los-siete-anos.png"
+  },
+  {
+    "id": 76,
+    "slug": "guerras-de-los-tres-reinos",
+    "name_es": "Guerras de los Tres Reinos",
+    "img": "/assets/maps/guerras-de-los-tres-reinos.png"
+  },
+  {
+    "id": 77,
+    "slug": "guerras-sueco-danesas",
+    "name_es": "Guerras sueco-danesas",
+    "img": "/assets/maps/guerras-sueco-danesas.png"
+  },
+  {
+    "id": 78,
+    "slug": "heligoland",
+    "name_es": "Heligoland",
+    "img": "/assets/maps/heligoland.png"
+  },
+  {
+    "id": 79,
+    "slug": "himalaya",
+    "name_es": "Himalaya",
+    "img": "/assets/maps/himalaya.png"
+  },
+  {
+    "id": 80,
+    "slug": "himalaya-superior",
+    "name_es": "Himalaya Superior",
+    "img": "/assets/maps/himalaya-superior.png"
+  },
+  {
+    "id": 81,
+    "slug": "hokkaido",
+    "name_es": "Hokkaido",
+    "img": "/assets/maps/hokkaido.png"
+  },
+  {
+    "id": 82,
+    "slug": "honshu",
+    "name_es": "Honshu",
+    "img": "/assets/maps/honshu.png"
+  },
+  {
+    "id": 83,
+    "slug": "indochina",
+    "name_es": "Indochina",
+    "img": "/assets/maps/indochina.png"
+  },
+  {
+    "id": 84,
+    "slug": "indonesia",
+    "name_es": "Indonesia",
+    "img": "/assets/maps/indonesia.png"
+  },
+  {
+    "id": 85,
+    "slug": "inglaterra",
+    "name_es": "Inglaterra",
+    "img": "/assets/maps/inglaterra.png"
+  },
+  {
+    "id": 86,
+    "slug": "irlanda",
+    "name_es": "Irlanda",
+    "img": "/assets/maps/irlanda.png"
+  },
+  {
+    "id": 87,
+    "slug": "islandia",
+    "name_es": "Islandia",
+    "img": "/assets/maps/islandia.png"
+  },
+  {
+    "id": 88,
+    "slug": "islas-feroe",
+    "name_es": "Islas Feroe",
+    "img": "/assets/maps/islas-feroe.png"
+  },
+  {
+    "id": 89,
+    "slug": "islas-virgenes",
+    "name_es": "Islas Vírgenes",
+    "img": "/assets/maps/islas-virgenes.png"
+  },
+  {
+    "id": 90,
+    "slug": "italia",
+    "name_es": "Italia",
+    "img": "/assets/maps/italia.png"
+  },
+  {
+    "id": 91,
+    "slug": "kamchatka",
+    "name_es": "Kamchatka",
+    "img": "/assets/maps/kamchatka.png"
+  },
+  {
+    "id": 92,
+    "slug": "la-gran-guerra-del-norte",
+    "name_es": "La gran guerra del Norte",
+    "img": "/assets/maps/la-gran-guerra-del-norte.png"
+  },
+  {
+    "id": 93,
+    "slug": "la-gran-guerra-turca",
+    "name_es": "La Gran Guerra Turca",
+    "img": "/assets/maps/la-gran-guerra-turca.png"
+  },
+  {
+    "id": 94,
+    "slug": "la-guerra-de-flandes",
+    "name_es": "La guerra de Flandes",
+    "img": "/assets/maps/la-guerra-de-flandes.png"
+  },
+  {
+    "id": 95,
+    "slug": "la-guerra-de-los-treinta-anos",
+    "name_es": "La guerra de los Treinta Años",
+    "img": "/assets/maps/la-guerra-de-los-treinta-anos.png"
+  },
+  {
+    "id": 96,
+    "slug": "labrador",
+    "name_es": "Labrador",
+    "img": "/assets/maps/labrador.png"
+  },
+  {
+    "id": 97,
+    "slug": "lago-chad",
+    "name_es": "Lago Chad",
+    "img": "/assets/maps/lago-chad.png"
+  },
+  {
+    "id": 98,
+    "slug": "lago-victoria",
+    "name_es": "Lago Victoria",
+    "img": "/assets/maps/lago-victoria.png"
+  },
+  {
+    "id": 99,
+    "slug": "lagos-de-carelia",
+    "name_es": "Lagos de Carelia",
+    "img": "/assets/maps/lagos-de-carelia.png"
+  },
+  {
+    "id": 100,
+    "slug": "lagos-suecos",
+    "name_es": "Lagos suecos",
+    "img": "/assets/maps/lagos-suecos.png"
+  },
+  {
+    "id": 101,
+    "slug": "las-guerras-italianas",
+    "name_es": "Las guerras italianas",
+    "img": "/assets/maps/las-guerras-italianas.png"
+  },
+  {
+    "id": 102,
+    "slug": "las-guerras-napoleonicas",
+    "name_es": "Las guerras napoleónicas",
+    "img": "/assets/maps/las-guerras-napoleonicas.png"
+  },
+  {
+    "id": 103,
+    "slug": "las-guerras-ruso-turcas",
+    "name_es": "Las guerras ruso-turcas",
+    "img": "/assets/maps/las-guerras-ruso-turcas.png"
+  },
+  {
+    "id": 104,
+    "slug": "lituania",
+    "name_es": "Lituania",
+    "img": "/assets/maps/lituania.png"
+  },
+  {
+    "id": 105,
+    "slug": "llanura-central",
+    "name_es": "Llanura Central",
+    "img": "/assets/maps/llanura-central.png"
+  },
+  {
+    "id": 106,
+    "slug": "llanuras-hungaras",
+    "name_es": "Llanuras húngaras",
+    "img": "/assets/maps/llanuras-hungaras.png"
+  },
+  {
+    "id": 107,
+    "slug": "malasia",
+    "name_es": "Malasia",
+    "img": "/assets/maps/malasia.png"
+  },
+  {
+    "id": 108,
+    "slug": "malta",
+    "name_es": "Malta",
+    "img": "/assets/maps/malta.png"
+  },
+  {
+    "id": 109,
+    "slug": "manchuria",
+    "name_es": "Manchuria",
+    "img": "/assets/maps/manchuria.png"
+  },
+  {
+    "id": 110,
+    "slug": "mar-baltico",
+    "name_es": "Mar Báltico",
+    "img": "/assets/maps/mar-baltico.png"
+  },
+  {
+    "id": 111,
+    "slug": "mar-caspio",
+    "name_es": "Mar Caspio",
+    "img": "/assets/maps/mar-caspio.png"
+  },
+  {
+    "id": 112,
+    "slug": "mar-de-noruega",
+    "name_es": "Mar de Noruega",
+    "img": "/assets/maps/mar-de-noruega.png"
+  },
+  {
+    "id": 113,
+    "slug": "mar-del-norte",
+    "name_es": "Mar del Norte",
+    "img": "/assets/maps/mar-del-norte.png"
+  },
+  {
+    "id": 114,
+    "slug": "mar-negro",
+    "name_es": "Mar Negro",
+    "img": "/assets/maps/mar-negro.png"
+  },
+  {
+    "id": 115,
+    "slug": "media-luna-fertil",
+    "name_es": "Media Luna Fértil",
+    "img": "/assets/maps/media-luna-fertil.png"
+  },
+  {
+    "id": 116,
+    "slug": "mediterraneo",
+    "name_es": "Mediterráneo",
+    "img": "/assets/maps/mediterraneo.png"
+  },
+  {
+    "id": 117,
+    "slug": "mexico",
+    "name_es": "México",
+    "img": "/assets/maps/mexico.png"
+  },
+  {
+    "id": 118,
+    "slug": "minas-gerais",
+    "name_es": "Minas Gerais",
+    "img": "/assets/maps/minas-gerais.png"
+  },
+  {
+    "id": 119,
+    "slug": "mongolia",
+    "name_es": "Mongolia",
+    "img": "/assets/maps/mongolia.png"
+  },
+  {
+    "id": 120,
+    "slug": "montanas",
+    "name_es": "Montañas",
+    "img": "/assets/maps/montanas.png"
+  },
+  {
+    "id": 121,
+    "slug": "montanas-de-los-balcanes",
+    "name_es": "Montañas de los Balcanes",
+    "img": "/assets/maps/montanas-de-los-balcanes.png"
+  },
+  {
+    "id": 122,
+    "slug": "moscovia",
+    "name_es": "Moscovia",
+    "img": "/assets/maps/moscovia.png"
+  },
+  {
+    "id": 123,
+    "slug": "nueva-escocia",
+    "name_es": "Nueva Escocia",
+    "img": "/assets/maps/nueva-escocia.png"
+  },
+  {
+    "id": 124,
+    "slug": "nueva-inglaterra",
+    "name_es": "Nueva Inglaterra",
+    "img": "/assets/maps/nueva-inglaterra.png"
+  },
+  {
+    "id": 125,
+    "slug": "nunavut",
+    "name_es": "Nunavut",
+    "img": "/assets/maps/nunavut.png"
+  },
+  {
+    "id": 126,
+    "slug": "oasis-de-siwa",
+    "name_es": "Oasis de Siwa",
+    "img": "/assets/maps/oasis-de-siwa.png"
+  },
+  {
+    "id": 127,
+    "slug": "orinoco",
+    "name_es": "Orinoco",
+    "img": "/assets/maps/orinoco.png"
+  },
+  {
+    "id": 128,
+    "slug": "ozarks",
+    "name_es": "Ozarks",
+    "img": "/assets/maps/ozarks.png"
+  },
+  {
+    "id": 129,
+    "slug": "paisaje-altoandino",
+    "name_es": "Paisaje altoandino",
+    "img": "/assets/maps/paisaje-altoandino.png"
+  },
+  {
+    "id": 130,
+    "slug": "paises-bajos",
+    "name_es": "Países Bajos",
+    "img": "/assets/maps/paises-bajos.png"
+  },
+  {
+    "id": 131,
+    "slug": "pampa",
+    "name_es": "Pampa",
+    "img": "/assets/maps/pampa.png"
+  },
+  {
+    "id": 132,
+    "slug": "panama",
+    "name_es": "Panamá",
+    "img": "/assets/maps/panama.png"
+  },
+  {
+    "id": 133,
+    "slug": "pantanos-de-pinsk",
+    "name_es": "Pantanos de Pinsk",
+    "img": "/assets/maps/pantanos-de-pinsk.png"
+  },
+  {
+    "id": 134,
+    "slug": "paso-del-noroeste",
+    "name_es": "Paso del noroeste",
+    "img": "/assets/maps/paso-del-noroeste.png"
+  },
+  {
+    "id": 135,
+    "slug": "patagonia",
+    "name_es": "Patagonia",
+    "img": "/assets/maps/patagonia.png"
+  },
+  {
+    "id": 136,
+    "slug": "pirineos",
+    "name_es": "Pirineos",
+    "img": "/assets/maps/pirineos.png"
+  },
+  {
+    "id": 137,
+    "slug": "plymouth",
+    "name_es": "Plymouth",
+    "img": "/assets/maps/plymouth.png"
+  },
+  {
+    "id": 138,
+    "slug": "pomerania",
+    "name_es": "Pomerania",
+    "img": "/assets/maps/pomerania.png"
+  },
+  {
+    "id": 139,
+    "slug": "portugal",
+    "name_es": "Portugal",
+    "img": "/assets/maps/portugal.png"
+  },
+  {
+    "id": 140,
+    "slug": "punyab",
+    "name_es": "Punyab",
+    "img": "/assets/maps/punyab.png"
+  },
+  {
+    "id": 141,
+    "slug": "quebec",
+    "name_es": "Quebec",
+    "img": "/assets/maps/quebec.png"
+  },
+  {
+    "id": 142,
+    "slug": "rin",
+    "name_es": "Rin",
+    "img": "/assets/maps/rin.png"
+  },
+  {
+    "id": 143,
+    "slug": "rio-amarillo",
+    "name_es": "Río Amarillo",
+    "img": "/assets/maps/rio-amarillo.png"
+  },
+  {
+    "id": 144,
+    "slug": "rio-niger",
+    "name_es": "Río Níger",
+    "img": "/assets/maps/rio-niger.png"
+  },
+  {
+    "id": 145,
+    "slug": "rios-paralelos",
+    "name_es": "Ríos paralelos",
+    "img": "/assets/maps/rios-paralelos.png"
+  },
+  {
+    "id": 146,
+    "slug": "rocosas",
+    "name_es": "Rocosas",
+    "img": "/assets/maps/rocosas.png"
+  },
+  {
+    "id": 147,
+    "slug": "ruta-de-la-seda",
+    "name_es": "Ruta de la Seda",
+    "img": "/assets/maps/ruta-de-la-seda.png"
+  },
+  {
+    "id": 148,
+    "slug": "rutas-en-el-sahara",
+    "name_es": "Rutas en el Sáhara",
+    "img": "/assets/maps/rutas-en-el-sahara.png"
+  },
+  {
+    "id": 149,
+    "slug": "rutas-en-el-sahara-perdido",
+    "name_es": "Rutas en el Sáhara - Perdido",
+    "img": "/assets/maps/rutas-en-el-sahara-perdido.png"
+  },
+  {
+    "id": 150,
+    "slug": "sabana",
+    "name_es": "Sabana",
+    "img": "/assets/maps/sabana.png"
+  },
+  {
+    "id": 151,
+    "slug": "saguenay",
+    "name_es": "Saguenay",
+    "img": "/assets/maps/saguenay.png"
+  },
+  {
+    "id": 152,
+    "slug": "sahel",
+    "name_es": "Sahel",
+    "img": "/assets/maps/sahel.png"
+  },
+  {
+    "id": 153,
+    "slug": "sajonia",
+    "name_es": "Sajonia",
+    "img": "/assets/maps/sajonia.png"
+  },
+  {
+    "id": 154,
+    "slug": "sapmi",
+    "name_es": "Sápmi",
+    "img": "/assets/maps/sapmi.png"
+  },
+  {
+    "id": 155,
+    "slug": "selva-negra",
+    "name_es": "Selva Negra",
+    "img": "/assets/maps/selva-negra.png"
+  },
+  {
+    "id": 156,
+    "slug": "selva-negra-arena",
+    "name_es": "Selva Negra - Arena",
+    "img": "/assets/maps/selva-negra-arena.png"
+  },
+  {
+    "id": 157,
+    "slug": "selva-negra-forest-nothing",
+    "name_es": "Selva Negra - Forest Nothing",
+    "img": "/assets/maps/selva-negra-forest-nothing.png"
+  },
+  {
+    "id": 158,
+    "slug": "shetland",
+    "name_es": "Shetland",
+    "img": "/assets/maps/shetland.png"
+  },
+  {
+    "id": 159,
+    "slug": "siberia",
+    "name_es": "Siberia",
+    "img": "/assets/maps/siberia.png"
+  },
+  {
+    "id": 160,
+    "slug": "sierras-pampeanas",
+    "name_es": "Sierras Pampeanas",
+    "img": "/assets/maps/sierras-pampeanas.png"
+  },
+  {
+    "id": 161,
+    "slug": "sonora",
+    "name_es": "Sonora",
+    "img": "/assets/maps/sonora.png"
+  },
+  {
+    "id": 162,
+    "slug": "sudd",
+    "name_es": "Sudd",
+    "img": "/assets/maps/sudd.png"
+  },
+  {
+    "id": 163,
+    "slug": "sur-de-noruega",
+    "name_es": "Sur de Noruega",
+    "img": "/assets/maps/sur-de-noruega.png"
+  },
+  {
+    "id": 164,
+    "slug": "svalbard",
+    "name_es": "Svalbard",
+    "img": "/assets/maps/svalbard.png"
+  },
+  {
+    "id": 165,
+    "slug": "tassili",
+    "name_es": "Tassili",
+    "img": "/assets/maps/tassili.png"
+  },
+  {
+    "id": 166,
+    "slug": "territorios-articos",
+    "name_es": "Territorios árticos",
+    "img": "/assets/maps/territorios-articos.png"
+  },
+  {
+    "id": 167,
+    "slug": "texas",
+    "name_es": "Texas",
+    "img": "/assets/maps/texas.png"
+  },
+  {
+    "id": 168,
+    "slug": "territorios-del-noroeste",
+    "name_es": "Territorios del Noroeste",
+    "img": "/assets/maps/territorios-del-noroeste.png"
+  },
+  {
+    "id": 169,
+    "slug": "tripolitania",
+    "name_es": "Tripolitania",
+    "img": "/assets/maps/tripolitania.png"
+  },
+  {
+    "id": 170,
+    "slug": "valaquia",
+    "name_es": "Valaquia",
+    "img": "/assets/maps/valaquia.png"
+  },
+  {
+    "id": 171,
+    "slug": "valle-del-nilo",
+    "name_es": "Valle del Nilo",
+    "img": "/assets/maps/valle-del-nilo.png"
+  },
+  {
+    "id": 172,
+    "slug": "yamal",
+    "name_es": "Yamal",
+    "img": "/assets/maps/yamal.png"
+  },
+  {
+    "id": 173,
+    "slug": "yucatan",
+    "name_es": "Yucatán",
+    "img": "/assets/maps/yucatan.png"
+  },
+  {
+    "id": 174,
+    "slug": "yukon",
+    "name_es": "Yukón",
+    "img": "/assets/maps/yukon.png"
+  }
+]

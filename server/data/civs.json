@@ -1,0 +1,194 @@
+[
+  {
+    "id": 1,
+    "slug": "aztecs",
+    "name_es": "Aztecas",
+    "name_en": "Aztecs",
+    "group": "americana",
+    "flag": "/assets/flags/Flag_Aztec.png"
+  },
+  {
+    "id": 2,
+    "slug": "british",
+    "name_es": "Británicos",
+    "name_en": "British",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_British.png"
+  },
+  {
+    "id": 3,
+    "slug": "chinese",
+    "name_es": "Chinos",
+    "name_en": "Chinese",
+    "group": "asiatica",
+    "flag": "/assets/flags/Flag_Chinese.png"
+  },
+  {
+    "id": 4,
+    "slug": "danes",
+    "name_es": "Daneses",
+    "name_en": "Danes",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Danes.png"
+  },
+  {
+    "id": 5,
+    "slug": "dutch",
+    "name_es": "Holandeses",
+    "name_en": "Dutch",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Dutch.png"
+  },
+  {
+    "id": 6,
+    "slug": "ethiopians",
+    "name_es": "Etíopes",
+    "name_en": "Ethiopians",
+    "group": "africana",
+    "flag": "/assets/flags/Flag_Ethiopian.png"
+  },
+  {
+    "id": 7,
+    "slug": "french",
+    "name_es": "Franceses",
+    "name_en": "French",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_French.png"
+  },
+  {
+    "id": 8,
+    "slug": "germans",
+    "name_es": "Alemanes",
+    "name_en": "Germans",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_German.png"
+  },
+  {
+    "id": 9,
+    "slug": "haudenosaunee",
+    "name_es": "Haudenosaunee",
+    "name_en": "Haudenosaunee",
+    "group": "nativa",
+    "flag": "/assets/flags/Flag_Iroquois.png"
+  },
+  {
+    "id": 10,
+    "slug": "hausa",
+    "name_es": "Hausas",
+    "name_en": "Hausa",
+    "group": "africana",
+    "flag": "/assets/flags/Flag_Hausa.png"
+  },
+  {
+    "id": 11,
+    "slug": "inca",
+    "name_es": "Incas",
+    "name_en": "Inca",
+    "group": "nativa",
+    "flag": "/assets/flags/Flag_Incan.png"
+  },
+  {
+    "id": 12,
+    "slug": "indians",
+    "name_es": "Indios",
+    "name_en": "Indians",
+    "group": "asiatica",
+    "flag": "/assets/flags/Flag_Indian.png"
+  },
+  {
+    "id": 13,
+    "slug": "italians",
+    "name_es": "Italianos",
+    "name_en": "Italians",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Italian.png"
+  },
+  {
+    "id": 14,
+    "slug": "japanese",
+    "name_es": "Japoneses",
+    "name_en": "Japanese",
+    "group": "asiatica",
+    "flag": "/assets/flags/Flag_Japanese.png"
+  },
+  {
+    "id": 15,
+    "slug": "lakota",
+    "name_es": "Lakotas",
+    "name_en": "Lakota",
+    "group": "nativa",
+    "flag": "/assets/flags/Flag_Sioux.png"
+  },
+  {
+    "id": 16,
+    "slug": "maltese",
+    "name_es": "Malteses",
+    "name_en": "Maltese",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Maltese.png"
+  },
+  {
+    "id": 17,
+    "slug": "mexicans",
+    "name_es": "Mexicanos",
+    "name_en": "Mexicans",
+    "group": "americana",
+    "flag": "/assets/flags/Flag_Mexican.png"
+  },
+  {
+    "id": 18,
+    "slug": "ottomans",
+    "name_es": "Otomanos",
+    "name_en": "Ottomans",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Ottoman.png"
+  },
+  {
+    "id": 19,
+    "slug": "poles",
+    "name_es": "Polacos",
+    "name_en": "Poles",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Poles.png"
+  },
+  {
+    "id": 20,
+    "slug": "portuguese",
+    "name_es": "Portugueses",
+    "name_en": "Portuguese",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Portuguese.png"
+  },
+  {
+    "id": 21,
+    "slug": "russians",
+    "name_es": "Rusos",
+    "name_en": "Russians",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Russian.png"
+  },
+  {
+    "id": 22,
+    "slug": "spanish",
+    "name_es": "Españoles",
+    "name_en": "Spanish",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Spanish.png"
+  },
+  {
+    "id": 23,
+    "slug": "swedes",
+    "name_es": "Suecos",
+    "name_en": "Swedes",
+    "group": "europea",
+    "flag": "/assets/flags/Flag_Swedish.png"
+  },
+  {
+    "id": 24,
+    "slug": "usa",
+    "name_es": "Estados Unidos",
+    "name_en": "United States",
+    "group": "americana",
+    "flag": "/assets/flags/Flag_American.png"
+  }
+]

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+server/public/assets/flags/
+server/public/assets/maps/
+.env
+.DS_Store
+*.tsbuildinfo
