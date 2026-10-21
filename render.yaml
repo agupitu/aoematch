@@ -5,13 +5,14 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm install && npm run assets && npm run build
+    # Si freefoodparty no responde, el deploy sigue sin las imágenes del juego.
+    buildCommand: npm install && (npm run assets || echo 'assets incompletos') && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       # node:sqlite necesita Node 23.4+ para andar sin flag experimental.
       - key: NODE_VERSION
-        value: 24.9.0
+        value: "24"
       - key: NODE_ENV
         value: production
       # Siembra el torneo de muestra la primera vez que arranca con base vacía.
