@@ -43,8 +43,7 @@ Variables de entorno (ver `.env.example`):
 En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) creá unas
 credenciales OAuth de tipo *aplicación web* y agregá como URI de redirección
 `https://TU-DOMINIO/api/auth/google/return` (en local,
-`http://localhost:5173/api/auth/google/return`). Después poné el id y el secreto en
-un archivo `.env` en la raíz del proyecto:
+`http://localhost:5173/api/auth/google/return`). Después poné el id y el secreto en `local.env`, en la raíz del proyecto:
 
 ```bash
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
@@ -52,8 +51,8 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 ```
 
 El server lo carga solo (`--env-file-if-exists`), tanto en `npm run dev` como en
-`npm start`. El `.env` no se versiona. En un hosting, las mismas variables se
-cargan desde su panel.
+`npm start`; también lee un `.env` si preferís ese nombre. Ninguno de los dos se
+versiona. En un hosting, las mismas variables se cargan desde su panel.
 
 ## Qué hace
 

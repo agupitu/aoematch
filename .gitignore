@@ -6,5 +6,6 @@ server/data/*.db-wal
 server/public/assets/flags/
 server/public/assets/maps/
 .env
+local.env
 .DS_Store
 *.tsbuildinfo
