@@ -45,7 +45,7 @@ export function Login() {
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <h1 className="title mb-1 text-2xl">Entrar</h1>
-      <p className="mb-6 text-sm text-parch-400">
+      <p className="hint mb-6 text-sm">
         Entrás con tu cuenta de Steam o de Google. No hay registro ni contraseñas: la primera vez
         se te crea el perfil solo.
       </p>
@@ -71,7 +71,7 @@ export function Login() {
         )}
       </div>
 
-      <p className="mt-5 text-xs text-parch-400">
+      <p className="hint mt-5 text-xs">
         Con Steam queda vinculada tu cuenta de Age of Empires III y se traen tu nombre y avatar.
       </p>
 

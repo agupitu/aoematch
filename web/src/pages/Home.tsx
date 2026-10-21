@@ -29,7 +29,7 @@ export function Home() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="title text-3xl">Torneos</h1>
-          <p className="mt-1 text-sm text-parch-400">
+          <p className="hint mt-1 text-sm">
             Inscripciones, armado de equipos, horarios en común y draft de mapa y civilizaciones.
           </p>
         </div>
@@ -76,7 +76,7 @@ export function Home() {
                 <Badge tone={TONO[t.status] ?? 'neutral'}>{ETIQUETA_ESTADO[t.status] ?? t.status}</Badge>
               </div>
 
-              {t.description && <p className="line-clamp-2 text-sm text-parch-400">{t.description}</p>}
+              {t.description && <p className="hint line-clamp-2 text-sm">{t.description}</p>}
 
               <dl className="mt-auto grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-parch-400">
                 <div>

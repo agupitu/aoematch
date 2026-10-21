@@ -201,7 +201,7 @@ export function Profile() {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-parch-400">
+            <p className="hint text-sm">
               Vinculá Steam para que los organizadores confirmen tu identidad y tus partidas.
             </p>
             <a href="/api/auth/steam" className="btn btn-primary ml-auto">
@@ -233,7 +233,7 @@ export function Profile() {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-parch-400">
+            <p className="hint text-sm">
               Vincular Google te deja entrar sin depender de Steam.
             </p>
             <a href="/api/auth/google" className="btn btn-ghost ml-auto">
@@ -247,7 +247,7 @@ export function Profile() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="title text-lg">Cuándo podés jugar</h2>
-            <p className="text-sm text-parch-400">
+            <p className="hint text-sm">
               Pintá tus franjas de la semana. Con esto el sistema cruza horarios y propone cuándo jugar cada
               partido. Total marcado: <span className="text-parch-200">{horas(totalMin)}</span>
             </p>

@@ -90,7 +90,7 @@ export function CreateTournament() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="title mb-1 text-2xl">Crear torneo</h1>
-      <p className="mb-6 text-sm text-parch-400">
+      <p className="hint mb-6 text-sm">
         Todo esto se puede cambiar después desde la pestaña de configuración.
       </p>
 

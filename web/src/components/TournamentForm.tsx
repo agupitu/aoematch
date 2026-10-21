@@ -122,7 +122,7 @@ function Campo({
     <div>
       <label className="label">{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-parch-400">{hint}</p>}
+      {hint && <p className="hint mt-1 text-xs">{hint}</p>}
     </div>
   );
 }
@@ -148,7 +148,7 @@ function Check({
       />
       <span>
         <span className="block text-sm text-parch-100">{label}</span>
-        {hint && <span className="block text-xs text-parch-400">{hint}</span>}
+        {hint && <span className="hint block text-xs">{hint}</span>}
       </span>
     </label>
   );
@@ -357,7 +357,7 @@ export function TournamentForm({
         {tab === 'draft' && (
           <section className="card p-5">
             <h3 className="title mb-1 text-lg">Draft</h3>
-            <p className="mb-4 text-sm text-parch-400">
+            <p className="hint mb-4 text-sm">
               Cómo se decide el mapa y las civilizaciones en la sala del partido.
             </p>
 
@@ -542,7 +542,7 @@ export function TournamentForm({
         {tab === 'mapas' && (
           <section className="card p-5">
             <h3 className="title mb-1 text-lg">Pool de mapas</h3>
-            <p className="mb-4 text-sm text-parch-400">
+            <p className="hint mb-4 text-sm">
               {value.map_mode === 'ban_hasta_uno'
                 ? `Con bans alternados hasta que queda uno, el draft tendrá ${Math.max(0, value.map_ids.length - 1)} bans.`
                 : 'Los mapas que van a estar disponibles en el draft.'}
@@ -611,7 +611,7 @@ function Premios({
   return (
     <section className="card p-5">
       <h3 className="title mb-1 text-lg">Premios</h3>
-      <p className="mb-4 text-sm text-parch-400">
+      <p className="hint mb-4 text-sm">
         De dónde sale la plata y cómo se reparte. Cada puesto puede llevar un monto fijo o un
         porcentaje de la bolsa.
       </p>
@@ -694,7 +694,7 @@ function Premios({
         </div>
 
         {premios.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-ink-700 p-6 text-center text-sm text-parch-400">
+          <p className="hint rounded-lg border border-dashed border-ink-700 p-6 text-center text-sm">
             Sin premios cargados. El torneo se puede jugar igual.
           </p>
         ) : (

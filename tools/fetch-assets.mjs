@@ -17,7 +17,7 @@ const DATA_DIR = join(ROOT, 'server/data');
 
 /** [slug, nombre ES, nombre EN, archivo de bandera, grupo] */
 const CIVS = [
-  ['aztecs', 'Aztecas', 'Aztecs', 'Flag_Aztec.png', 'americana'],
+  ['aztecs', 'Aztecas', 'Aztecs', 'Flag_Aztec.png', 'nativa'],
   ['british', 'Británicos', 'British', 'Flag_British.png', 'europea'],
   ['chinese', 'Chinos', 'Chinese', 'Flag_Chinese.png', 'asiatica'],
   ['danes', 'Daneses', 'Danes', 'Flag_Danes.png', 'europea'],

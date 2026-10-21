@@ -9,9 +9,7 @@
   --color-ink-600: #3a4453;
   --color-parch-100: #f3e7cd;
   --color-parch-200: #e3d3ae;
-  /* Texto secundario: blanco al 50%, para que las descripciones no compitan
-     con el dorado de los títulos y los datos. */
-  --color-parch-400: rgb(255 255 255 / 0.5);
+  --color-parch-400: #c6a96b;
   --color-gold-400: #d9b25f;
   --color-gold-500: #c2973f;
   --color-gold-600: #9a762c;
@@ -82,7 +80,13 @@ body {
 }
 
 @utility label {
-  @apply mb-1 block text-xs font-medium tracking-wide text-white/65 uppercase;
+  @apply mb-1 block text-xs font-medium tracking-wide text-parch-400 uppercase;
+}
+
+/* Texto explicativo: blanco al 50%, para que no compita con el dorado de
+   títulos, etiquetas y datos. */
+@utility hint {
+  @apply text-white/50;
 }
 
 @utility title {

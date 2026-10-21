@@ -70,7 +70,7 @@ export function TournamentPage() {
           </div>
           <AccionesInscripcion t={t} user={user} onDone={cargar} />
         </div>
-        {t.description && <p className="mt-3 max-w-3xl text-sm text-parch-200">{t.description}</p>}
+        {t.description && <p className="hint mt-3 max-w-3xl text-sm">{t.description}</p>}
       </header>
 
       <Tabs value={tab} onChange={setTab} items={tabs} />
@@ -804,7 +804,7 @@ function Horarios({ t }: { t: Tournament }) {
     <div className="space-y-5">
       <section className="card p-5">
         <h3 className="title mb-1 text-lg">Partidos</h3>
-        <p className="mb-4 text-sm text-parch-400">
+        <p className="hint mb-4 text-sm">
           Lo que está agendado y lo que ya se jugó, con el resultado.
         </p>
         <MatchCalendar matches={t.matches} tz={tz} />
@@ -814,7 +814,7 @@ function Horarios({ t }: { t: Tournament }) {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="title text-lg">Cuándo puede jugar la mayoría</h3>
-            <p className="text-sm text-parch-400">
+            <p className="hint text-sm">
               Cruce de la disponibilidad de los {ids.length} inscriptos, en tu zona ({tz}).
             </p>
           </div>
