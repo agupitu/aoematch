@@ -6,7 +6,9 @@ services:
     plan: free
     region: oregon
     # Si freefoodparty no responde, el deploy sigue sin las imágenes del juego.
-    buildCommand: npm install && (npm run assets || echo 'assets incompletos') && npm run build
+    # NODE_ENV=production hace que npm omita las devDependencies, y la web se compila
+    # con typescript y vite (que son devDependencies): hay que incluirlas en el build.
+    buildCommand: NPM_CONFIG_INCLUDE=dev npm install && (npm run assets || echo 'assets incompletos') && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
