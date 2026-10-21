@@ -21,8 +21,8 @@ function Nav() {
     <header className="sticky top-0 z-40 border-b border-ink-700 bg-ink-950/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
         <Link to="/" className="title flex items-center gap-2 text-lg text-gold-400">
-          <img src="/assets/flags/Flag_Random.webp" alt="" className="h-6 w-9 rounded-[3px] object-cover" />
-          AOEMatch
+          <img src="/logo.webp" alt="" className="h-8 w-8 rounded-[3px] object-cover" />
+          AoE III Draft
         </Link>
         <nav className="ml-4 flex items-center gap-1">
           <NavLink to="/" end className={link}>

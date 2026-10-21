@@ -72,5 +72,5 @@ montarWebSocket(server);
 iniciarRelojes();
 
 server.listen(PORT, () => {
-  console.log(`AOEMatch API escuchando en http://localhost:${PORT}`);
+  console.log(`AoE III Draft API escuchando en http://localhost:${PORT}`);
 });

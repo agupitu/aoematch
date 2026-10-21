@@ -385,7 +385,7 @@ function sembrarMockup(rnd, organizador) {
 
   const t = crearTorneo({
     slug: 'copa-aoematch-mockup',
-    name: 'Copa AOEMatch 2v2',
+    name: 'Copa AoE III Draft 2v2',
     description:
       'Torneo de muestra con todo funcionando: llaves, drafts ya jugados, horarios y premios. Entrá a cualquier partido para ver el draft.',
     rules_md: REGLAS_MOCK,
