@@ -11,3 +11,5 @@ web/public/assets/maps/
 local.env
 .DS_Store
 *.tsbuildinfo
+functions/.secret.local
+functions/.env.local

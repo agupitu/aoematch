@@ -1,11 +1,30 @@
 rules_version = '2';
 
-// Por ahora el cliente no lee ni escribe nada directo: la API usa el Admin SDK,
-// que no pasa por estas reglas. Las reglas de verdad son la tarea T06.
+// El cliente lee directo solo dos cosas: los mensajes del chat y el aviso de
+// cambios de cada partido. Todo lo demás pasa por la API, que usa el Admin SDK
+// y no pasa por estas reglas. Nadie escribe desde el cliente.
+// Modelo completo: docs/firestore-modelo.md.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Avisos de cambios de cada partido: solo contadores, sin datos de nadie.
+    match /live/{matchId} {
+      allow read: if true;
+    }
+
+    // Mensajes de chat. La sala dice quién los lee: la general del torneo y la
+    // del partido son públicas; la de equipo, solo para los uid de `readers`
+    // (miembros y staff del torneo).
+    match /rooms/{roomId}/messages/{mensaje} {
+      allow read: if puedeLeerSala(roomId);
+    }
+
+    function puedeLeerSala(roomId) {
+      let ruta = /databases/$(database)/documents/rooms/$(roomId);
+      return exists(ruta) && (
+        get(ruta).data.public_read == true ||
+        (request.auth != null && request.auth.uid in get(ruta).data.readers)
+      );
     }
   }
 }

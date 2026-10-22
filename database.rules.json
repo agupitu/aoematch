@@ -1,6 +1,19 @@
 {
   "rules": {
     ".read": false,
-    ".write": false
+    ".write": false,
+    "presence": {
+      "$room": {
+        ".read": true,
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['display_name', 'at']) && newData.child('display_name').isString() && newData.child('display_name').val().length <= 60",
+          "display_name": { ".validate": true },
+          "avatar_url": { ".validate": "newData.isString() && newData.val().length <= 500" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    }
   }
 }

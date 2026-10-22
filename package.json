@@ -18,7 +18,9 @@
     "reset": "npm --prefix functions run reset"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "concurrently": "^9.1.2",
+    "firebase": "^13.1.0",
     "firebase-tools": "^15.34.1"
   }
 }

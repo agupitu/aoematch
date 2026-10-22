@@ -4,76 +4,20 @@
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { cuentaConEmail, cuentaConGoogle, levantarApi, vaciarAuth } from './apoyo.js';
 
-const AUTH = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-const PROYECTO = process.env.GCLOUD_PROJECT;
-// Nunca contra un proyecto real: estas pruebas borran las cuentas.
-if (!AUTH || !process.env.FIRESTORE_EMULATOR_HOST) {
-  throw new Error('Faltan los emuladores: corré las pruebas con `npm test` desde la raíz.');
-}
-
-// La API todavía abre SQLite al cargar: que use una base descartable.
-const BASE_SQLITE = join(tmpdir(), `aoe3draft-auth-test-${process.pid}.db`);
-process.env.AOEMATCH_DB = BASE_SQLITE;
-
-const { app } = await import('../src/app.js');
-const { db } = await import('../src/db.js');
-const { firestore } = await import('../src/data/base.js');
 const { leerUsuario } = await import('../src/data/usuarios.js');
 
 let api;
-let servidor;
 
 before(async () => {
-  const r = await fetch(`http://${AUTH}/emulator/v1/projects/${PROYECTO}/accounts`, { method: 'DELETE' });
-  assert.ok(r.ok, `no se pudo vaciar el emulador de Auth: ${r.status}`);
-  servidor = app.listen(0);
-  await new Promise((ok) => servidor.once('listening', ok));
-  api = `http://127.0.0.1:${servidor.address().port}/api`;
+  await vaciarAuth();
+  api = await levantarApi();
 });
 
-after(async () => {
-  await new Promise((ok) => servidor.close(ok));
-  await firestore.terminate();
-  db.close();
-  for (const sufijo of ['', '-wal', '-shm']) rmSync(BASE_SQLITE + sufijo, { force: true });
-});
+after(() => api.cerrar());
 
-const identitytoolkit = (metodo) => `http://${AUTH}/identitytoolkit.googleapis.com/v1/accounts:${metodo}?key=demo`;
-
-async function pedirToken(metodo, cuerpo) {
-  const r = await fetch(identitytoolkit(metodo), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...cuerpo, returnSecureToken: true }),
-  });
-  const datos = await r.json();
-  assert.ok(r.ok, JSON.stringify(datos));
-  return { uid: datos.localId, token: datos.idToken };
-}
-
-/** Cuenta de email y contraseña, como las de demo. */
-const cuentaConEmail = (email) => pedirToken('signUp', { email, password: 'demo1234' });
-
-/** Cuenta de Google: el emulador acepta un id_token sin firmar. */
-function cuentaConGoogle(claims) {
-  const idToken = encodeURIComponent(JSON.stringify({ email_verified: true, ...claims }));
-  return pedirToken('signInWithIdp', {
-    postBody: `id_token=${idToken}&providerId=google.com`,
-    requestUri: 'http://localhost',
-  });
-}
-
-async function pedir(metodo, ruta, { token, body } = {}) {
-  const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (body) headers['Content-Type'] = 'application/json';
-  const r = await fetch(api + ruta, { method: metodo, headers, body: body && JSON.stringify(body) });
-  return { status: r.status, datos: await r.json() };
-}
+const pedir = (...args) => api.pedir(...args);
 
 describe('sesión con Firebase Auth', () => {
   it('sin token no hay usuario y lo que pide sesión da 401', async () => {

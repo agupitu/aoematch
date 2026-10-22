@@ -10,7 +10,7 @@ import { WebSocketServer } from 'ws';
 import { all, get, run } from './db.js';
 import { bus } from './bus.js';
 import { userForToken, publicUser, COOKIE } from './auth.js';
-import { estadoDraft } from './draft.js';
+import { estadoDraft } from './draft-sqlite.js';
 
 /** room id -> Set<ws> */
 const salas = new Map();

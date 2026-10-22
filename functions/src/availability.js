@@ -2,17 +2,17 @@
 //
 // La semana se modela como 336 bloques de 30 minutos en UTC, empezando el
 // lunes a las 00:00. El cliente traduce a la zona horaria de cada jugador.
-
-import { all } from './db.js';
+//
+// Todo trabaja sobre usuarios ya leídos: docs de users con su id y su
+// `availability` ([{ start_min, end_min }], docs/firestore-modelo.md).
 
 export const BLOQUE_MIN = 30;
 export const BLOQUES_SEMANA = (7 * 24 * 60) / BLOQUE_MIN; // 336
 
 /** Array de 336 booleanos con los bloques libres del usuario. */
-export function mascaraUsuario(userId) {
+export function mascaraUsuario(usuario) {
   const mask = new Array(BLOQUES_SEMANA).fill(false);
-  const filas = all('SELECT start_min, end_min FROM availability WHERE user_id = ?', userId);
-  for (const { start_min, end_min } of filas) {
+  for (const { start_min, end_min } of usuario?.availability ?? []) {
     const desde = Math.max(0, Math.floor(start_min / BLOQUE_MIN));
     const hasta = Math.min(BLOQUES_SEMANA, Math.ceil(end_min / BLOQUE_MIN));
     for (let i = desde; i < hasta; i++) mask[i] = true;
@@ -20,15 +20,16 @@ export function mascaraUsuario(userId) {
   return mask;
 }
 
-export function mascaras(userIds) {
+/** Map id -> máscara. */
+export function mascaras(usuarios) {
   const out = new Map();
-  for (const id of userIds) out.set(id, mascaraUsuario(id));
+  for (const u of usuarios) out.set(u.id, mascaraUsuario(u));
   return out;
 }
 
 /** Cuántos de los usuarios están libres en cada bloque. */
-export function conteo(userIds) {
-  const ms = mascaras(userIds);
+export function conteo(usuarios) {
+  const ms = mascaras(usuarios);
   const c = new Array(BLOQUES_SEMANA).fill(0);
   for (const mask of ms.values()) {
     for (let i = 0; i < BLOQUES_SEMANA; i++) if (mask[i]) c[i]++;
@@ -37,11 +38,11 @@ export function conteo(userIds) {
 }
 
 /** Minutos de semana en los que todos coinciden. */
-export function minutosEnComun(userIds) {
-  if (!userIds.length) return 0;
-  const c = conteo(userIds);
+export function minutosEnComun(usuarios) {
+  if (!usuarios.length) return 0;
+  const c = conteo(usuarios);
   let n = 0;
-  for (const v of c) if (v === userIds.length) n++;
+  for (const v of c) if (v === usuarios.length) n++;
   return n * BLOQUE_MIN;
 }
 
@@ -50,12 +51,12 @@ export function minutosEnComun(userIds) {
  * Devuelve [{ start_min, end_min, count, missing: [userId] }] ordenado por
  * cantidad de gente y luego por horario.
  */
-export function ventanas(userIds, { duracionMin = 60, minimo = null, limite = 20 } = {}) {
-  if (!userIds.length) return [];
-  const req = minimo ?? userIds.length;
+export function ventanas(usuarios, { duracionMin = 60, minimo = null, limite = 20 } = {}) {
+  if (!usuarios.length) return [];
+  const req = minimo ?? usuarios.length;
   const largo = Math.max(1, Math.ceil(duracionMin / BLOQUE_MIN));
-  const ms = mascaras(userIds);
-  const c = conteo(userIds);
+  const ms = mascaras(usuarios);
+  const c = conteo(usuarios);
 
   const out = [];
   for (let i = 0; i + largo <= BLOQUES_SEMANA; i++) {
@@ -71,7 +72,7 @@ export function ventanas(userIds, { duracionMin = 60, minimo = null, limite = 20
     out.push({
       start_min: i * BLOQUE_MIN,
       end_min: (i + largo) * BLOQUE_MIN,
-      count: userIds.length - faltan.length,
+      count: usuarios.length - faltan.length,
       missing: faltan,
     });
   }

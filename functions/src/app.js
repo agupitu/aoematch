@@ -7,6 +7,7 @@ import { cargarCatalogo } from './seed.js';
 import { router as authRouter } from './routes/auth.js';
 import { router as catalogRouter } from './routes/catalog.js';
 import { router as tournamentsRouter } from './routes/tournaments.js';
+import { router as tournamentsSqliteRouter } from './routes/tournaments-sqlite.js';
 import { router as matchesRouter } from './routes/matches.js';
 
 // La API completa, sin listen: la monta la función `api` de index.js detrás de
@@ -26,6 +27,8 @@ app.use(attachUser);
 app.use('/api/auth', authRouter);
 app.use('/api', catalogRouter);
 app.use('/api/tournaments', tournamentsRouter);
+// Lo que todavía no pasó a Firestore (hasta T17–T20).
+app.use('/api/tournaments', tournamentsSqliteRouter);
 app.use('/api/matches', matchesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));

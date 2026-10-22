@@ -8,7 +8,7 @@
 import { all, get, run, tx } from './db.js';
 import { hashPassword } from './auth.js';
 import { generarLlaves, cerrarMatch } from './brackets.js';
-import { crearDraft, marcarListo, aplicarAccion, estadoDraft, civsBloqueadas } from './draft.js';
+import { crearDraft, marcarListo, aplicarAccion, estadoDraft, civsBloqueadas } from './draft-sqlite.js';
 import { civs, maps } from './catalogo.js';
 
 /**

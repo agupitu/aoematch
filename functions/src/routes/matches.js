@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { all, get, run } from '../db.js';
+import { all, get, run, usuariosConHorario } from '../db.js';
 import { requireAuth } from '../auth.js';
-import { esStaff } from './tournaments.js';
+import { esStaff } from './tournaments-sqlite.js';
 import { cerrarMatch } from '../brackets.js';
-import { crearDraft, estadoDraft, aplicarAccion, marcarListo, emitir } from '../draft.js';
+import { crearDraft, estadoDraft, aplicarAccion, marcarListo, emitir } from '../draft-sqlite.js';
 import { equipoDelUsuario, avisoSistema, historial } from '../realtime.js';
 import { publish } from '../bus.js';
 import { ventanas, proximaFecha } from '../availability.js';
@@ -214,8 +214,9 @@ router.get('/:id/schedule', (req, res) => {
   if (!ids.length) return res.json({ users: [], windows: [] });
 
   const duracion = Math.max(30, parseInt(req.query.duration, 10) || 90);
-  const vs = ventanas(ids, { duracionMin: duracion, limite: 15 });
-  const casi = vs.length ? [] : ventanas(ids, { duracionMin: duracion, minimo: ids.length - 1, limite: 10 });
+  const jugadores = usuariosConHorario(ids);
+  const vs = ventanas(jugadores, { duracionMin: duracion, limite: 15 });
+  const casi = vs.length ? [] : ventanas(jugadores, { duracionMin: duracion, minimo: ids.length - 1, limite: 10 });
 
   res.json({
     users: [...roster(m.team_a_id), ...roster(m.team_b_id)],

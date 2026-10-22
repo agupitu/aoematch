@@ -5,7 +5,7 @@
 // tengan horarios en común. Primero reparto en serpiente por rating y después
 // afino con intercambios mientras el puntaje mejore.
 
-import { all, get, run, tx } from './db.js';
+import { all, get, run, tx, usuariosConHorario } from './db.js';
 import { mascaraUsuario, BLOQUES_SEMANA, BLOQUE_MIN } from './availability.js';
 
 const RATING_BASE = 1000;
@@ -67,7 +67,7 @@ export function proponerEquipos(tournamentId, { pesoSolape = 1.5, iteraciones = 
 
   const cache = new Map();
   for (const u of sueltos) {
-    cache.set(u.id, mascaraUsuario(u.id));
+    cache.set(u.id, mascaraUsuario(usuariosConHorario([u.id])[0]));
     u._rating = ratingDe(u, torneo);
   }
 

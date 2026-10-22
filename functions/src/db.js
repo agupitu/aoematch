@@ -60,6 +60,17 @@ export function tx(fn) {
   }
 }
 
+/**
+ * Usuarios con su horario semanal sacado de la tabla `availability`, con la
+ * forma que espera availability.js. Para las rutas que siguen en SQLite.
+ */
+export function usuariosConHorario(userIds) {
+  return userIds.map((id) => ({
+    id,
+    availability: all('SELECT start_min, end_min FROM availability WHERE user_id = ?', id),
+  }));
+}
+
 /** `?, ?, ?` para una lista de n elementos. */
 export function marks(n) {
   return Array.from({ length: n }, () => '?').join(', ');
