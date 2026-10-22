@@ -1,7 +1,9 @@
-// Levanta los emuladores de Firebase (auth, firestore, database, functions,
-// hosting, tasks y la UI en :4000).
+// Emuladores de Firebase.
 //
-//   npm run emuladores
+//   npm run emuladores   -> levanta todos (auth, firestore, database, functions,
+//                           hosting, tasks) con la UI en :4000
+//   npm test             -> levanta auth y firestore, corre las pruebas de
+//                           functions/ y los apaga
 //
 // Firestore y Realtime Database corren en Java. Si local.env trae
 // JAVA_HOME_EMULADORES (la carpeta de un JDK 11+), se pone primero en el PATH;
@@ -24,12 +26,20 @@ if (java && existsSync(java)) {
 // de Java arrancando a la vez, en Windows a veces no alcanza.
 env.FUNCTIONS_DISCOVERY_TIMEOUT ??= '30';
 
-const DATOS = './.emulator-data';
-const args = ['emulators:start', '--export-on-exit', DATOS];
-if (existsSync(DATOS)) args.push('--import', DATOS);
+const [modo, ...extra] = process.argv.slice(2);
+let args;
+if (modo === 'test') {
+  // Base vacía y aparte: las pruebas no usan ni tocan .emulator-data.
+  args = ['emulators:exec', '--only', 'auth,firestore', '"npm --prefix functions test"'];
+} else {
+  const DATOS = './.emulator-data';
+  args = ['emulators:start', '--export-on-exit', DATOS];
+  if (existsSync(DATOS)) args.push('--import', DATOS);
+  if (modo) extra.unshift(modo);
+}
 
 // Con shell (hace falta en Windows para el firebase.cmd de node_modules/.bin)
 // el comando va armado en un solo string.
-const comando = ['firebase', ...args, ...process.argv.slice(2)].join(' ');
+const comando = ['firebase', ...args, ...extra].join(' ');
 const hijo = spawn(comando, { env, stdio: 'inherit', shell: true });
 hijo.on('exit', (code) => process.exit(code ?? 0));

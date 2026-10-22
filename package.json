@@ -12,6 +12,7 @@
     "assets": "node tools/fetch-assets.mjs",
     "dev": "concurrently -n firebase,web -c cyan,magenta \"npm run emuladores\" \"npm --prefix web run dev\"",
     "emuladores": "node --env-file-if-exists=local.env tools/emuladores.mjs",
+    "test": "node --env-file-if-exists=local.env tools/emuladores.mjs test",
     "build": "npm --prefix web run build",
     "seed": "npm --prefix functions run seed",
     "reset": "npm --prefix functions run reset"

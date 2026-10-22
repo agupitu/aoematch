@@ -9,7 +9,8 @@
   },
   "scripts": {
     "seed": "node src/seed.js",
-    "reset": "node src/seed.js --reset"
+    "reset": "node src/seed.js --reset",
+    "test": "node --test"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
