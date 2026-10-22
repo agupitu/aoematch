@@ -11,8 +11,8 @@ directo el chat y un documento de aviso por partido. Firebase Auth reemplaza las
 Google nativo y Steam con token propio. El WebSocket se reemplaza por escuchas de Firestore (chat,
 avisos de cambio) y Realtime Database (presencia). El reloj del draft pasa a Cloud Tasks.
 
-**Estado.** 29 tareas pendientes, 124 h en total (unos 21 días de 6 h para una persona sola).
-T02, T03, T04 y T05 están hechas en la rama `feat/firebase`. No hay datos para migrar: la base de Render
+**Estado.** 28 tareas pendientes, 120 h en total (unos 20 días de 6 h para una persona sola).
+T02, T03, T04, T05 y T08 están hechas en la rama `feat/firebase`. No hay datos para migrar: la base de Render
 se borra en cada apagado.
 
 ## Lo que ya está
@@ -33,6 +33,13 @@ se borra en cada apagado.
 |---|---|---|
 | T05 | Capa de datos sobre Firestore: un módulo por entidad (usuarios y Steam, torneos y etapas, inscripciones, equipos, partidos, drafts, salas y mensajes), `enTransaccion` con efectos que corren después del commit, `borrarTorneo` en cascada y los dos índices compuestos. 28 pruebas con `node:test` contra el emulador: `npm test`. | `functions/src/data/`, `functions/test/data.test.js`, `firestore.indexes.json` |
 | T05 | Las rutas todavía no la usan: siguen sobre SQLite y cada una pasa a `data/` en su tarea (T15 a T23). `db.js`, `schema.sql`, `cargarCatalogo()` y las tablas `civs` y `maps` se borran en T33, cuando no quede SQL. | — |
+
+**Fase 2 · Autenticación**
+
+| ID | Qué quedó | Dónde |
+|---|---|---|
+| T08 | `attachUser` valida `Authorization: Bearer <idToken>` con `verifyIdToken` y deja en `req.user` el doc `users/{uid}`; la primera vez lo crea con nombre, foto y email (o `google_sub` y `google_email` si entró con Google). Un token vencido o trucho cuenta como anónimo. `GET` y `PATCH /api/auth/me` leen y escriben Firestore. 7 pruebas en `npm test`. | `functions/src/auth.js`, `functions/src/routes/auth.js`, `functions/test/auth.test.js` |
+| T08 | Puente: sin token válido, el usuario sale de la cookie y de SQLite como antes (`req.usuarioFirebase` dice de cuál salió), así la web sigue entrando hasta que pase a Firebase (T09 a T12). `/login`, `/logout`, las sesiones por cookie, `bcryptjs` y `cookie-parser` se borran en T33. | — |
 
 **Lógica que se reutiliza**
 
@@ -61,58 +68,55 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | T06 | `firestore.rules` y `database.rules.json` con pruebas | 5 | S | 1 d | — | 0 |
 | T07 | Ids de texto en `web/src/types.ts` y páginas | 2 | J | 4 h | — | 0 |
 | **Fase 2 · Autenticación** |||||||
-| T08 | Middleware de ID token, `/api/auth/me` y alta de usuario | 5 | S | 4 h | — | 0 |
 | T09 | `web/src/firebase.ts`, `auth.tsx` y `api.ts` con token Bearer | 3 | S | 4 h | — | 0 |
 | T10 | Google con `signInWithPopup`, `linkWithPopup` y desvincular | 3 | S | 2 h | T09 | 1 |
-| T11 | Steam con `createCustomToken` | 5 | S | 1 d | T08, T09 | 1 |
+| T11 | Steam con `createCustomToken` | 5 | S | 1 d | T09 | 1 |
 | T12 | Login de prueba por email solo en el emulador | 2 | J | 1 h | T09 | 1 |
-| T13 | Buscador de usuarios sobre Firestore | 2 | J | 1 h | T08, decisión D4 | 1 |
+| T13 | Buscador de usuarios sobre Firestore | 2 | J | 1 h | decisión D4 | 0 |
 | T14 | Botones y mensajes de `Login.tsx` y `Profile.tsx` | 2 | J | 2 h | T10, T11 | 2 |
 | **Fase 3 · API sobre Firestore** |||||||
-| T15 | Horarios y cruce (`availability.js`, `routes/catalog.js`) | 3 | S | 4 h | T08 | 1 |
-| T16 | Torneos: listado, alta, detalle, edición y borrado | 4 | S | 1 d | T08 | 1 |
-| T17 | Inscripciones y equipos con transacciones | 4 | S | 1 d | T16 | 2 |
-| T18 | Generación de llaves (`brackets.js`) | 4 | S | 2 d | T16 | 2 |
-| T19 | `cerrarMatch`, tablas, suizo y playoffs | 5 | S | 4 h | T18 | 3 |
-| T20 | Armador de equipos (`teambuilder.js`) | 3 | S | 4 h | T15, T17 | 3 |
+| T15 | Horarios y cruce (`availability.js`, `routes/catalog.js`) | 3 | S | 4 h | — | 0 |
+| T16 | Torneos: listado, alta, detalle, edición y borrado | 4 | S | 1 d | — | 0 |
+| T17 | Inscripciones y equipos con transacciones | 4 | S | 1 d | T16 | 1 |
+| T18 | Generación de llaves (`brackets.js`) | 4 | S | 2 d | T16 | 1 |
+| T19 | `cerrarMatch`, tablas, suizo y playoffs | 5 | S | 4 h | T18 | 2 |
+| T20 | Armador de equipos (`teambuilder.js`) | 3 | S | 4 h | T15, T17 | 2 |
 | T21 | Motor de draft: núcleo sin I/O + una transacción por acción | 5 | S | 2 d | — | 0 |
 | T22 | Reloj del draft con Cloud Tasks | 4 | S | 1 d? | T21 | 1 |
-| T23 | Rutas de partido (`routes/matches.js`) | 4 | S | 1 d | T19, T21, T25, T26 | 4 |
-| T24 | Seed de la demo con el Admin SDK | 3 | S | 1 d | T12, T17, T19, T20, T23, decisión D2 (solo producción) | 5 |
+| T23 | Rutas de partido (`routes/matches.js`) | 4 | S | 1 d | T19, T21, T25, T26 | 3 |
+| T24 | Seed de la demo con el Admin SDK | 3 | S | 1 d | T12, T17, T19, T20, T23, decisión D2 (solo producción) | 4 |
 | **Fase 4 · Tiempo real** |||||||
-| T25 | Chat: salas, mensajes por la API y avisos del sistema | 4 | S | 4 h | T06, T17 | 3 |
+| T25 | Chat: salas, mensajes por la API y avisos del sistema | 4 | S | 4 h | T06, T17 | 2 |
 | T26 | Aviso de cambios en `live/{matchId}` (reemplaza `bus.js`) | 3 | S | 2 h | — | 0 |
-| T27 | `web/src/live.ts` reemplaza `ws.ts` en `MatchRoom` y `TournamentPage` | 4 | S | 1 d | T09, T25, T26 | 4 |
+| T27 | `web/src/live.ts` reemplaza `ws.ts` en `MatchRoom` y `TournamentPage` | 4 | S | 1 d | T09, T25, T26 | 3 |
 | T28 | Presencia con Realtime Database | 3 | J | 2 h | T06, T09 | 1 |
 | **Fase 5 · Publicación y cierre** |||||||
 | T29 | Cabeceras de Hosting y opciones de funciones | 3 | S | 2 h | — | 0 |
 | T30 | Deploy automático con GitHub Actions | 3 | S | 4 h | T01, T29 | 1 |
 | T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 2 |
-| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T14, T22, T24, T27, T28, T30 | 6 |
-| T33 | Borrar Render, SQLite y WebSocket; actualizar README | 1 | J | 2 h | T32, decisión D5 | 6 |
+| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T14, T22, T24, T27, T28, T30 | 5 |
+| T33 | Borrar Render, SQLite, sesiones por cookie y WebSocket; actualizar README | 1 | J | 2 h | T32, decisión D5 | 5 |
 
-Las dependencias con T02, T03, T04 y T05 ya están cumplidas y no figuran en la tabla.
+Las dependencias con T02, T03, T04, T05 y T08 ya están cumplidas y no figuran en la tabla.
 
 ## Olas de ejecución
 
 ```
-Ola 0  ─ T21 ∥ T06 ∥ T08 ∥ T09 ∥ T26 ∥ T29 ∥ T01 ∥ T07      · 2 d    (T21 marca la ola; T01 y T07 junior)
-Ola 1  ─ T11 ∥ T16 ∥ T22 ∥ T15 ∥ T30 ∥ T10 ∥ T12 ∥ T13 ∥ T28 · 1 d    (T12, T13 y T28 junior)
-Ola 2  ─ T17 ∥ T18 ∥ T14 ∥ T31                            · 2 d    (T18 marca la ola; T14 y T31 junior)
-Ola 3  ─ T19 ∥ T20 ∥ T25                                  · 4 h
-Ola 4  ─ T23 ∥ T27                                        · 1 d
-Ola 5  ─ T24                                              · 1 d
-Ola 6  ─ T32  →  T33                                      · 6 h
+Ola 0  ─ T21 ∥ T06 ∥ T16 ∥ T15 ∥ T09 ∥ T26 ∥ T29 ∥ T01 ∥ T07 ∥ T13   · 2 d    (T21 marca la ola; T01, T07 y T13 junior)
+Ola 1  ─ T18 ∥ T17 ∥ T11 ∥ T22 ∥ T30 ∥ T10 ∥ T12 ∥ T28               · 2 d    (T18 marca la ola; T12 y T28 junior)
+Ola 2  ─ T19 ∥ T20 ∥ T25 ∥ T14 ∥ T31                                 · 4 h    (T14 y T31 junior)
+Ola 3  ─ T23 ∥ T27                                                   · 1 d
+Ola 4  ─ T24                                                         · 1 d
+Ola 5  ─ T32  →  T33                                                 · 6 h
 ```
 
-- **Camino crítico:** T08 → T16 → T18 → T19 → T23 → T24 → T32 → T33 = 44 h (unos 7 días).
-- **Equipo mínimo:** 2 seniors y 1 junior. Las olas 0 y 1 tienen mucho trabajo senior en paralelo
-  (30 h y 28 h): con dos seniors se estiran a unos 3 d y 2,5 d; un tercer senior las deja en 2 d y
-  1 d. Desde la ola 2 alcanzan dos (T17 ∥ T18) y lo demás está atado al camino crítico. El junior
-  tiene 18 h en total: no hace falta más de uno.
+- **Camino crítico:** T16 → T18 → T19 → T23 → T24 → T32 → T33 = 40 h (unos 7 días).
+- **Equipo mínimo:** 2 seniors y 1 junior. Las olas 0 y 1 tienen 36 h de trabajo senior cada una:
+  con dos seniors duran unos 3 d cada una y con tres, 2 d. Desde la ola 2 alcanzan dos y lo demás
+  está atado al camino crítico. El junior tiene 18 h en total: no hace falta más de uno.
 - **Una sola persona:** seguir las olas en orden y, dentro de cada ola, el orden de la tabla.
-- **Duración total:** unos 9 días si cada ola se hace en paralelo completo (52 h sumando las olas),
-  unos 11 con dos seniors, y unos 21 días con una sola persona (124 h, la suma de la columna Tiempo).
+- **Duración total:** unos 8 días si cada ola se hace en paralelo completo (46 h sumando las olas),
+  unos 10 con dos seniors, y unos 20 días con una sola persona (120 h, la suma de la columna Tiempo).
 
 ## Detalle de cada tarea
 
@@ -157,19 +161,6 @@ Ola 6  ─ T32  →  T33                                      · 6 h
 - [ ] Listo cuando `npm run build` compila sin errores de tipos.
 
 ### Fase 2 · Autenticación
-
-### T08 · Sesión con Firebase Auth en la API — dif. 5 · senior · 4 h
-
-- [ ] Nuevo `attachUser` en `functions/src/auth.js`: lee `Authorization: Bearer <idToken>`, lo
-      valida con `getAuth().verifyIdToken()` y deja en `req.user` el doc `users/{uid}`. Reemplaza la
-      cookie `aoem_session` y la tabla `sessions`. Nada de cookies: Hosting solo reenvía `__session`
-      a las funciones.
-- [ ] Primer ingreso: si no existe `users/{uid}`, crearlo con nombre, foto y email del token, como
-      hoy hace `entrarCon` al insertar.
-- [ ] `GET /api/auth/me` y `PATCH /api/auth/me` sobre el doc. `publicUser` igual que hoy.
-- [ ] `requireAuth` no cambia. Se borran `/login`, `/logout`, `createSession`, `hashPassword` y
-      `checkPassword`, y las dependencias `bcryptjs` y `cookie-parser` de `functions/package.json`
-      (T02 las dejó porque el código todavía las usaba). `is_admin` sigue siendo un campo del doc.
 
 ### T09 · Cliente de Firebase en la web — dif. 3 · senior · 4 h
 
@@ -443,7 +434,11 @@ Ola 6  ─ T32  →  T33                                      · 6 h
 
 - [ ] Antes hay que cerrar la decisión D5.
 - [ ] Borrar `render.yaml`, `Dockerfile`, `schema.sql`, `db.js`, `cargarCatalogo()` (con su llamada en
-      `app.js`) y la carpeta `server/` (solo quedó su `node_modules`). Antes, confirmar con
+      `app.js`) y la carpeta `server/` (solo quedó su `node_modules`).
+- [ ] Borrar el puente de sesión por cookie de T08: en `functions/src/auth.js`, `createSession`,
+      `destroySession`, `userForToken`, `setSessionCookie`, `hashPassword`, `checkPassword` y la rama de
+      cookie de `attachUser` (con `req.usuarioFirebase`); en `routes/auth.js`, `/login`, `/logout` y la
+      rama SQLite de `PATCH /me`; las dependencias `bcryptjs` y `cookie-parser`. Antes, confirmar con
       `grep -rn "from './db.js'\|from '../db.js'" functions/src` que no quede SQL. Revisar el `engines` de la raíz (`>=23.4.0` era por `node:sqlite`).
 - [ ] `README.md`: rehacer Arrancar (emuladores y Java), la tabla de variables, Ingreso con Google,
       Publicarlo y Cómo está armado.

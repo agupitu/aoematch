@@ -10,7 +10,7 @@
   "scripts": {
     "seed": "node src/seed.js",
     "reset": "node src/seed.js --reset",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -5,6 +5,7 @@ import {
   checkPassword, createSession, destroySession,
   publicUser, setSessionCookie, requireAuth, COOKIE,
 } from '../auth.js';
+import { actualizarUsuario, leerUsuario } from '../data/usuarios.js';
 
 export const router = Router();
 
@@ -94,24 +95,31 @@ router.get('/me', (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
-router.patch('/me', requireAuth, (req, res) => {
-  const campos = ['display_name', 'avatar_url', 'timezone', 'discord', 'xbox_tag', 'aoe3_profile'];
-  const sets = [];
-  const valores = [];
-  for (const c of campos) {
+router.patch('/me', requireAuth, async (req, res) => {
+  const cambios = {};
+  for (const c of ['display_name', 'avatar_url', 'timezone', 'discord', 'xbox_tag', 'aoe3_profile']) {
     if (req.body?.[c] !== undefined) {
-      sets.push(`${c} = ?`);
-      valores.push(req.body[c] === '' ? null : String(req.body[c]).slice(0, 200));
+      cambios[c] = req.body[c] === '' ? null : String(req.body[c]).slice(0, 200);
     }
   }
   for (const c of ['rating_1v1', 'rating_team']) {
     if (req.body?.[c] !== undefined) {
-      sets.push(`${c} = ?`);
       const n = parseInt(req.body[c], 10);
-      valores.push(Number.isFinite(n) ? n : null);
+      cambios[c] = Number.isFinite(n) ? n : null;
     }
   }
-  if (sets.length) run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, ...valores, req.user.id);
+  // El nombre no puede quedar vacío: en la tabla era NOT NULL.
+  if (cambios.display_name === null) delete cambios.display_name;
+  const claves = Object.keys(cambios);
+
+  if (req.usuarioFirebase) {
+    if (claves.length) await actualizarUsuario(req.user.id, cambios);
+    return res.json({ user: publicUser(await leerUsuario(req.user.id)) });
+  }
+  // Usuario de la sesión por cookie (hasta T33).
+  if (claves.length) {
+    run(`UPDATE users SET ${claves.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`, ...Object.values(cambios), req.user.id);
+  }
   res.json({ user: publicUser(get('SELECT * FROM users WHERE id = ?', req.user.id)) });
 });
 
