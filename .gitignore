@@ -1,10 +1,12 @@
 node_modules/
 dist/
-server/data/*.db
-server/data/*.db-shm
-server/data/*.db-wal
-server/public/assets/flags/
-server/public/assets/maps/
+functions/data/*.db
+functions/data/*.db-shm
+functions/data/*.db-wal
+web/public/assets/flags/
+web/public/assets/maps/
+.emulator-data/
+*-debug.log
 .env
 local.env
 .DS_Store

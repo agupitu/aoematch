@@ -5,34 +5,27 @@
 //   npm run seed          -> agrega la demo si la base está vacía
 //   npm run reset         -> borra todo y vuelve a sembrar
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { all, get, run, tx, SERVER_DIR } from './db.js';
+import { all, get, run, tx } from './db.js';
 import { hashPassword } from './auth.js';
 import { generarLlaves, cerrarMatch } from './brackets.js';
 import { crearDraft, marcarListo, aplicarAccion, estadoDraft, civsBloqueadas } from './draft.js';
+import { civs, maps } from './catalogo.js';
 
-/** Inserta civs y mapas desde server/data/*.json (idempotente). */
+/**
+ * Copia civs y mapas de catalogo.js a sus tablas (idempotente). Las consultas
+ * SQL todavía hacen JOIN con ellas; se va con SQLite (T05).
+ */
 export function cargarCatalogo() {
-  const civsPath = join(SERVER_DIR, 'data/civs.json');
-  const mapsPath = join(SERVER_DIR, 'data/maps.json');
-  if (!existsSync(civsPath) || !existsSync(mapsPath)) {
-    console.warn('Faltan server/data/civs.json y maps.json. Corré: npm run assets');
-    return;
-  }
-  const civs = JSON.parse(readFileSync(civsPath, 'utf8'));
-  const maps = JSON.parse(readFileSync(mapsPath, 'utf8'));
-
   tx(() => {
-    for (const c of civs) {
+    for (const c of civs()) {
       run(
         `INSERT INTO civs (id, slug, name_es, name_en, grp, flag) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET slug=excluded.slug, name_es=excluded.name_es,
            name_en=excluded.name_en, grp=excluded.grp, flag=excluded.flag`,
-        c.id, c.slug, c.name_es, c.name_en, c.group, c.flag
+        c.id, c.slug, c.name_es, c.name_en, c.grp, c.flag
       );
     }
-    for (const m of maps) {
+    for (const m of maps()) {
       run(
         `INSERT INTO maps (id, slug, name_es, img) VALUES (?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET slug=excluded.slug, name_es=excluded.name_es, img=excluded.img`,

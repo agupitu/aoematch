@@ -10,7 +10,9 @@ export const ROOT_DIR = join(SERVER_DIR, '..');
 const DB_PATH = process.env.AOEMATCH_DB || join(SERVER_DIR, 'data', 'aoematch.db');
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
-export const db = new DatabaseSync(DB_PATH);
+// En el emulador la base la abren a la vez el proceso que descubre las funciones
+// y el que atiende pedidos: sin espera, el segundo choca con "database is locked".
+export const db = new DatabaseSync(DB_PATH, { timeout: 5000 });
 db.exec(readFileSync(join(SRC_DIR, 'schema.sql'), 'utf8'));
 
 // schema.sql solo crea tablas que falten; las columnas agregadas después van acá

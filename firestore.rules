@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Por ahora el cliente no lee ni escribe nada directo: la API usa el Admin SDK,
+// que no pasa por estas reglas. Las reglas de verdad son la tarea T06.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

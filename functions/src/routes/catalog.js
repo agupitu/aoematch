@@ -2,15 +2,16 @@ import { Router } from 'express';
 import { all, get, run } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { ventanas, proximaFecha, BLOQUE_MIN } from '../availability.js';
+import { civs, maps } from '../catalogo.js';
 
 export const router = Router();
 
 router.get('/civs', (_req, res) => {
-  res.json(all('SELECT id, slug, name_es, name_en, grp, flag FROM civs ORDER BY name_es'));
+  res.json(civs());
 });
 
 router.get('/maps', (_req, res) => {
-  res.json(all('SELECT id, slug, name_es, img FROM maps ORDER BY name_es'));
+  res.json(maps());
 });
 
 // ------------------------------------------------------------ disponibilidad

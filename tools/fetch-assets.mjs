@@ -1,9 +1,11 @@
 // Descarga los assets de civilizaciones y mapas de AoE3 DE desde freefoodparty.com
-// y genera server/data/civs.json y server/data/maps.json.
+// y genera functions/data/civs.json y functions/data/maps.json (viajan con las
+// funciones; lo que está fuera de functions/ no se despliega).
 //
 //   node tools/fetch-assets.mjs
 //
-// Los PNG quedan en server/public/assets/{flags,maps} y se sirven desde el backend.
+// Los PNG quedan en web/public/assets/{flags,maps}: Vite los copia a dist y los
+// sirve Hosting.
 
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -11,9 +13,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://freefoodparty.com';
-const FLAG_DIR = join(ROOT, 'server/public/assets/flags');
-const MAP_DIR = join(ROOT, 'server/public/assets/maps');
-const DATA_DIR = join(ROOT, 'server/data');
+const FLAG_DIR = join(ROOT, 'web/public/assets/flags');
+const MAP_DIR = join(ROOT, 'web/public/assets/maps');
+const DATA_DIR = join(ROOT, 'functions/data');
 
 /** [slug, nombre ES, nombre EN, archivo de bandera, grupo] */
 const CIVS = [
