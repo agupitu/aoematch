@@ -58,6 +58,7 @@ Para el frontend (T07): todos los ids pasan a texto salvo civ y mapa. `PATCH
 | `display_name_lower` | texto | nuevo, para el buscador (T13) |
 | `steam_id64`, `steam_name`, `steam_avatar` | texto o null | `users` |
 | `google_sub`, `google_email` | texto o null | `users` |
+| `google_unlinked_at` | ms o ausente | nuevo: cuándo se desvinculó Google; un token emitido antes no la vuelve a anotar (T10) |
 | `email` | texto o null | `users`; solo lo tienen las cuentas de demo del emulador |
 | `rating_1v1`, `rating_team` | entero o null | `users` |
 | `is_admin` | entero `0/1` | `users` (`publicUser` lo devuelve como bool, igual que hoy) |

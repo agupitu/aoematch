@@ -1,25 +1,37 @@
-# Plan: migrar AoE III Draft a Firebase (plan Blaze)
+# Plan: AoE III Draft en Firebase plan Spark (sin servidor)
 
-**Objetivo.** Que la página quede siempre prendida y no pierda datos, con las mismas funciones de
-hoy: torneos, inscripciones, armador de equipos, llaves, horarios, chat por sala y equipo, draft en
-vivo con reloj, ingreso con Google y Steam.
+**Objetivo.** Que la página quede siempre prendida, gratis, en el plan Spark de Firebase: torneos,
+inscripciones, armador de equipos, llaves, horarios, chat por sala y equipo, draft de mapa y civs con
+pick ciego, links de las partidas e ingreso con Google. El creador del torneo carga los resultados y
+mueve las llaves.
 
-**Arquitectura.** Firebase Hosting sirve la web y las imágenes del juego. La API Express pasa entera
-a una sola Cloud Function (`api`) detrás de `/api/**`, así el frontend sigue llamando a las mismas
-rutas. Firestore reemplaza a SQLite: la API lee y escribe con el Admin SDK, y el cliente solo lee
-directo el chat y un documento de aviso por partido. Firebase Auth reemplaza las sesiones por cookie:
-Google nativo y Steam con token propio. El WebSocket se reemplaza por escuchas de Firestore (chat,
-avisos de cambio) y Realtime Database (presencia). El reloj del draft pasa a Cloud Tasks.
+**Arquitectura.** Spark no corre código de servidor: no hay Cloud Functions, Cloud Tasks ni Secret
+Manager. Firebase Hosting sirve la web y las imágenes. La web lee y escribe Firestore directo con el
+SDK de cliente, y `firestore.rules` decide quién escribe qué: es la única barrera de seguridad. La
+lógica pura que hoy está en `functions/src` (llaves, armador, horarios) pasa a la web y corre en el
+navegador de quien actúa: el del creador para llaves y resultados, el de cada jugador para su pick.
+Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verifica. El tiempo real son
+escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
+en el draft: se espera a que elijan todos.
 
-**Estado.** 21 tareas pendientes, 84 h en total (unos 14 días de 6 h para una persona sola).
-Hechas en la rama `feat/firebase`: T02, T03, T04, T05, T06, T08, T09, T15, T16, T21, T26 y T29.
-No hay datos para migrar: la base de Render se borra en cada apagado.
+**Estado.** 17 tareas pendientes, 66 h en total (unos 11 días de 6 h para una persona sola; unos 5
+días con dos seniors y un junior). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+anterior, y T34, T35 y T42 del plan Spark. No hay datos para migrar.
 
-**Cómo queda la rama mientras tanto.** Torneos, horarios y perfil ya leen y escriben Firestore;
-inscripciones, equipos, llaves, armador y partidos siguen en SQLite hasta T17 a T23. Por eso, en
-local, la lista de torneos arranca vacía (la demo de SQLite no se ve hasta el seed nuevo, T24) y lo
-que cruza las dos bases (inscribirse en un torneo nuevo, jugar un partido) no anda hasta que pasen
-esas tareas. `npm test` corre 100 pruebas contra los emuladores.
+**Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
+armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
+descartan la API Express como función (T02, T07–T09, T13–T17, T23), el ingreso con Steam por OpenID
+y token propio (T11), el motor de draft viejo (T21), el reloj con Cloud Tasks (T22), los avisos de
+`live/{matchId}` (T26) y la configuración de funciones de T29. Quién escribe qué deja de estar en
+las rutas y pasa a `firestore.rules`.
+
+**Pedido del 2026-10-26 que define el alcance.**
+- El creador del torneo (y sus admins) es el único que carga resultados y actualiza las llaves. Los
+  capitanes ya no reportan.
+- En cada partido (llave) y en cada fase se pueden dejar links de las partidas (YouTube u otra).
+- Draft: primero el mapa, que lo elige el equipo que perdió la partida anterior; el de la primera lo
+  fija el creador o sale al azar. Después, bans de civ si el creador los configuró. Después cada
+  jugador elige su civ sin ver las de nadie y se muestran todas cuando eligieron todos.
 
 ## Lo que ya está
 
@@ -40,6 +52,7 @@ esas tareas. `npm test` corre 100 pruebas contra los emuladores.
 | T05 | Capa de datos sobre Firestore: un módulo por entidad (usuarios y Steam, torneos y etapas, inscripciones, equipos, partidos, drafts, salas y mensajes), `enTransaccion` con efectos que corren después del commit, `borrarTorneo` en cascada y los dos índices compuestos. 28 pruebas con `node:test` contra el emulador: `npm test`. | `functions/src/data/`, `functions/test/data.test.js`, `firestore.indexes.json` |
 | T05 | Las rutas pasan a `data/` en su tarea (T15 a T23). `db.js`, `schema.sql`, `cargarCatalogo()` y las tablas `civs` y `maps` se borran en T33, cuando no quede SQL. | — |
 | T06 | Reglas: el cliente solo lee `live/*` y los mensajes de las salas (`public_read` o su uid en `readers`); nadie escribe desde el cliente. En Realtime Database cada uno escribe solo su `presence/{sala}/{uid}` con nombre, avatar y hora. 11 pruebas con `@firebase/rules-unit-testing`. | `firestore.rules`, `database.rules.json`, `functions/test/rules.test.js` |
+| T07 | Ids de usuarios, torneos, equipos, inscripciones, partidos, etapas, grupos, drafts y mensajes en texto en `web/src/types.ts`. Civ y mapa siguen en número. El `PATCH` de una inscripción manda `user_id` (es el id del doc). | `web/src/types.ts`, `web/src/pages/TournamentPage.tsx`, `web/src/pages/MatchRoom.tsx`, `web/src/components/DraftBoard.tsx`, `web/src/components/ChatPanel.tsx` |
 
 **Fase 2 · Autenticación**
 
@@ -47,7 +60,12 @@ esas tareas. `npm test` corre 100 pruebas contra los emuladores.
 |---|---|---|
 | T08 | `attachUser` valida `Authorization: Bearer <idToken>` con `verifyIdToken` y deja en `req.user` el doc `users/{uid}`; la primera vez lo crea con nombre, foto y email (o `google_sub` y `google_email` si entró con Google). Un token vencido o trucho cuenta como anónimo. `GET` y `PATCH /api/auth/me` leen y escriben Firestore. 7 pruebas en `npm test`. | `functions/src/auth.js`, `functions/src/routes/auth.js`, `functions/test/auth.test.js` |
 | T08 | Puente: sin token válido, el usuario sale de la cookie y de SQLite como antes (`req.usuarioFirebase` dice de cuál salió), así la web sigue entrando hasta que pase a Firebase (T09 a T12). `/login`, `/logout`, las sesiones por cookie, `bcryptjs` y `cookie-parser` se borran en T33. | — |
-| T09 | La web usa el SDK de Firebase (emuladores en dev, proyecto `demo-aoe3draft`). `api.ts` espera a que Firebase recupere la sesión y manda el token; `auth.tsx` sigue a `onIdTokenChanged` y saca el perfil de `/api/auth/me`. Probado en el navegador: entrar con Firebase, crear un torneo, navegar con la sesión y salir. El login por email de las cuentas de demo sigue por cookie hasta T12. | `web/src/firebase.ts`, `web/src/api.ts`, `web/src/auth.tsx` |
+| T10 | Google entra y se vincula con Firebase Auth en la web (`signInWithPopup`, `linkWithPopup`); la API anota `google_sub` y `google_email` cuando el token trae Google y los borra al desvincular (`providersToUnlink`), sin que un token viejo los vuelva a poner. Se fueron las rutas de Google por servidor y `GOOGLE_CLIENT_*`. 5 pruebas. | `functions/src/auth.js`, `functions/src/routes/auth.js`, `web/src/pages/Login.tsx`, `web/src/pages/Profile.tsx`, `functions/test/google.test.js` |
+| T10 | Sin probar en el navegador integrado: abre la ventana del emulador de Auth en la misma pestaña y el popup no puede volver. Se prueba en un navegador común (T32). | — |
+| T11 | Steam con token propio: `POST /api/auth/steam/start` guarda el estado en `authStates` (TTL en `firestore.indexes.json`), la vuelta verifica el OpenID y que la respuesta sea para este sitio, crea la cuenta en Auth la primera vez y redirige a `/entrar#token=...`; la web entra con `signInWithCustomToken` y va al perfil. Vincular, "ocupado" y desvincular sobre Firestore. El `GET /api/auth/steam` de entonces lo borró T14. 12 pruebas con Steam simulado; la vuelta probada en el navegador. | `functions/src/routes/auth.js`, `web/src/auth.tsx`, `functions/test/steam.test.js` |
+| T09 | La web usa el SDK de Firebase (emuladores en dev, proyecto `demo-aoe3draft`). `api.ts` espera a que Firebase recupere la sesión y manda el token; `auth.tsx` sigue a `onIdTokenChanged` y saca el perfil de `/api/auth/me`. Probado en el navegador: entrar con Firebase, crear un torneo, navegar con la sesión y salir. El login por email de las cuentas de demo pasó a `signInWithEmailAndPassword` en T12. | `web/src/firebase.ts`, `web/src/api.ts`, `web/src/auth.tsx` |
+| T12 | El formulario de email y contraseña entra con `signInWithEmailAndPassword` y solo se muestra con `import.meta.env.DEV`. `/api/auth/providers` devuelve `dev_login: true` solo si `FUNCTIONS_EMULATOR === 'true'`. Las cuentas `@demo.aoematch` / `demo1234` las crea el seed (T24): el formulario queda listo, el seed no. | `web/src/pages/Login.tsx`, `web/src/auth.tsx`, `functions/src/routes/auth.js`, `functions/test/auth.test.js` |
+| T14 | Steam entra y se vincula con botones que llaman a `POST /api/auth/steam/start` (`{ link: true }` para vincular) y navegan a la `url`. Se borró `GET /api/auth/steam`. El perfil muestra `?google=ok` como `?steam=ok`. En `/entrar#token=...` se ve "Entrando…" en vez del formulario. Falta la prueba en un navegador común. | `web/src/pages/Login.tsx`, `web/src/pages/Profile.tsx`, `functions/src/routes/auth.js`, `functions/test/steam.test.js` |
 
 **Fase 3 · API sobre Firestore**
 
@@ -55,14 +73,23 @@ esas tareas. `npm test` corre 100 pruebas contra los emuladores.
 |---|---|---|
 | T15 | `availability.js` calcula sobre usuarios ya leídos (`users/{uid}.availability`). Rutas de horarios, excepciones (con id propio) y cruce sobre Firestore. Las rutas que siguen en SQLite usan `usuariosConHorario()` de `db.js`. 9 pruebas. | `functions/src/availability.js`, `functions/src/routes/catalog.js`, `functions/test/horarios.test.js` |
 | T16 | Listado, alta (slug como id, con `-2`, `-3` si se repite), detalle, edición, borrado y horarios del torneo sobre Firestore, con la misma forma de JSON que antes. Lo que todavía es de SQLite (inscripciones, equipos, llaves, armador) quedó en `routes/tournaments-sqlite.js`, montado después. 13 pruebas. | `functions/src/routes/tournaments.js`, `functions/test/torneos.test.js` |
-| T16 | El id de una inscripción ahora es el uid del inscripto: el `PATCH .../registrations/${r.id}` de la web sigue andando sin cambios. | — |
+| T16 | El id de una inscripción ahora es el uid del inscripto. T07 manda `r.user_id` en el `PATCH` (es el mismo valor). | — |
+| T17 | Inscripción, retiro, pagos, alta y edición de equipos y de sus integrantes sobre Firestore, cada una en una transacción que mantiene los contadores del torneo y los lectores de la sala del equipo. Un equipo que queda vacío se borra con su sala. 14 pruebas. | `functions/src/routes/tournaments.js`, `functions/test/inscripciones.test.js` |
+| T18 | Llaves sobre Firestore: el cuadro se arma en memoria con los ids generados antes y se escribe por lotes (`escribirEnLotes`). Para 15 formatos y tamaños da los mismos cruces, enlaces, byes y siembras que la versión SQLite. Volver a generar borra partidos, drafts, avisos y salas de partido. La versión vieja quedó como `brackets-sqlite.js` (playoffs, suizo y partidos, hasta T19 y T23). 19 pruebas. | `functions/src/brackets.js`, `functions/test/llaves.test.js` |
+| T19 | `cerrarMatch` en una transacción con todos los partidos del torneo; `tablaDesde`, `generarPlayoffs` y `siguienteRondaSuiza` sobre Firestore (los dos últimos en transacción), con sus rutas. Jugados hasta el final, simple, liga, grupos + playoff y suizo dan lo mismo que SQLite. **Cambio a propósito:** la doble eliminación con byes ahora termina (en SQLite quedaba trabada: el lugar que esperaba al perdedor de un partido ganado por bye no se llenaba nunca). 20 pruebas. | `functions/src/brackets.js`, `functions/test/cierre.test.js` |
+| T20 | Armador sobre Firestore, mismo algoritmo con azar inyectable; confirmar crea equipos, salas, inscripciones y contador en una transacción. Rutas `autoteams` y `autoteams/confirm`. La sala de equipo se crea con `guardarSalaDeEquipo` de `data/salas.js`. 5 pruebas. | `functions/src/teambuilder.js`, `functions/test/armador.test.js` |
 | T21 | Motor de draft partido en `draft-core.js` (reglas, sin base) y `draft.js` (una transacción por operación: crear, listo, acción, timeout). Dos acciones a la vez del mismo paso: entra una sola. El motor SQLite quedó como `draft-sqlite.js` para las rutas de partido hasta T23. 30 pruebas. | `functions/src/draft-core.js`, `functions/src/draft.js`, `functions/test/draft-core.test.js`, `functions/test/draft.test.js` |
+| T23 | Rutas de partido sobre Firestore: detalle (sin `chat`; resuelve pasos vencidos antes de responder), draft, resultados (`recalcularSerie` cierra o reabre la serie), resultado forzado, horarios y votos, con avisos en `live` y en el chat. 15 pruebas, con un draft entero jugado por la API. | `functions/src/routes/matches.js`, `functions/test/partidos.test.js` |
+| T24 | Demo en `functions/src/demo.js`: 40 cuentas en el emulador de Auth (`<nombre>@demo.aoematch` / `demo1234`), los cuatro torneos, cuartos jugados con drafts reales, semis agendadas (la primera con el draft abierto) y chat. `npm run seed` la siembra si no está; `npm run reset` vacía los emuladores y la vuelve a sembrar. Solo corre contra un proyecto `demo-*` (D2 sigue abierta). Tarda unos 30 s. 7 pruebas. | `functions/src/demo.js`, `functions/scripts/seed.js`, `functions/test/demo.test.js` |
+| T22 | Reloj: cuando un paso estrena plazo, `draft.js` encola `{ matchId, step, deadline }` en Cloud Tasks (`relojes.js`); la función `vencerPaso` lo resuelve, o corta con error si llegó antes de tiempo para que la cola reintente. `resolverVencidos()` es el respaldo para las rutas de partido (T23). 7 pruebas; en el emulador el camino completo anda, pero la cola dispara en el acto sin esperar el horario (en producción sí espera). | `functions/src/relojes.js`, `functions/src/draft.js`, `functions/src/index.js`, `functions/test/reloj.test.js` |
 
 **Fase 4 · Tiempo real**
 
 | ID | Qué quedó | Dónde |
 |---|---|---|
+| T25 | Chat: `chat.js` decide quién lee y quién escribe cada sala, la crea cuando hace falta y publica avisos del sistema; `GET /api/rooms/:room` la abre y `POST /api/rooms/:room/messages` escribe. Se borraron `realtime.js` y la dependencia `ws`. 13 pruebas. | `functions/src/chat.js`, `functions/src/routes/rooms.js`, `functions/test/chat.test.js` |
 | T26 | `avisar(matchId, tipo)` suma en `live/{matchId}` (`draft`, `match`, `votes`). `draft.js` avisa después de cada commit: `draft` siempre, `match` si cambió el estado o las partidas. | `functions/src/live.js` |
+| T27 | `web/src/live.ts` reemplaza `ws.ts`: `useChat` abre cada sala en la API y escucha sus mensajes en Firestore, `useLive` vuelve a pedir el partido cuando cambia `live/{matchId}`, `useConectado` sale de Realtime Database. Probado en el navegador con la demo: chat del torneo y del partido, mensaje propio, y la página que se actualiza sola cuando el rival marca listo y escribe desde otra sesión. | `web/src/live.ts`, `web/src/pages/MatchRoom.tsx`, `web/src/pages/TournamentPage.tsx` |
 
 **Fase 5 · Publicación y cierre**
 
@@ -71,6 +98,19 @@ esas tareas. `npm test` corre 100 pruebas contra los emuladores.
 | T29 | `Cache-Control: public, max-age=604800, immutable` para `/assets/**`; `maxInstances: 3` y 512 MiB para `api`; parámetro `PUBLIC_URL` (vacío: se deduce del pedido) y secreto `STEAM_API_KEY`. | `firebase.json`, `functions/src/index.js`, `functions/src/config.js` |
 | T29 | Sin verificar en local: el emulador de Hosting no aplica ninguna cabecera configurada. Se mira en el primer deploy (T30). | — |
 | T29 | `web/.env.production` no se creó (los permisos de esta PC no dejan escribir archivos `.env`): las variables `VITE_FIREBASE_*` van en el entorno del deploy (T30) o en ese archivo, creado a mano. Sin ellas, la web de producción se corta al cargar con un mensaje claro. | `web/src/firebase.ts` |
+
+**Fase 6 · Sin servidor** (plan Spark)
+
+| ID | Qué quedó | Dónde |
+|---|---|---|
+| T34 | Lógica pura en `web/src/logica/`: `llaves.js` (cuadros, avance, tabla, y nuevas `cerrarPartido`, `cuadroDePlayoffs` y `rondaSuiza`, que devuelven lo que hay que escribir), `armador.js` (`proponerEquipos(torneo, sueltos)`), `horarios.js`, `catalogo.js` y `orden.js`. El catálogo (`civs.json`, `maps.json`) pasó a `web/src/logica/datos/`; `npm run assets` lo escribe ahí. `functions/src` (`brackets.js`, `teambuilder.js`, `availability.js`, `catalogo.js`) importa de la web, así la API sigue andando hasta T47. `web/tsconfig.json` con `allowJs`. Pruebas con `node:test` (no Vitest: sin dependencias nuevas) en `web/test/`: `npm --prefix web test`; `npm test` las corre después de las de `functions/`. | `web/src/logica/`, `web/test/` |
+| T35 | `firestore.rules` con escrituras del cliente para `users` (dueño, campos de perfil, `steam_url` validado, sin `is_admin`; `rating_1v1` y `rating_team` los edita el dueño, como hoy `PATCH /me`), `users/{uid}/privado`, `tournaments` (crea quien queda de organizador; los admins no tocan `admin_ids` ni `organizer_id`), `stages` (staff), `registrations` (alta, retiro, vuelta y cambio de equipo del dueño; pago y estado del staff; el capitán suma y saca de su equipo) y `teams` (equipo propio de uno, sumarse con lugar, irse, capitán, staff). Leer: todo eso, cualquiera. Los contadores `inscriptos`, `pagos` y `equipos` ya no los puede mantener nadie desde el cliente: T37 los saca. 29 pruebas en `functions/test/reglas-torneos.test.js`. | `firestore.rules`, `functions/test/reglas-torneos.test.js` |
+
+**Fase 7 · Draft nuevo**
+
+| ID | Qué quedó | Dónde |
+|---|---|---|
+| T42 | `web/src/logica/draft.js`: `planDeDraft(torneo, partido, equipos, gameNo)` arma el documento del draft (`state` `mapa`/`bans`/`picks`/`listo`, `map_chooser_team_id`, `map_pool`, `map_id`, `civ_pool`, `ban_order`, `banned_civ_ids`, `player_ids`, `team_of`, `civs_usadas`, `revealed`); `elegirMapa`, `banear`, `turnoDeBan`, `civsPermitidas`, `validarPick`, `eligieronTodos` y `revelar` (que devuelve las civs para `games[].civs`). Mapa de la primera: `first_map_id` o uno del pool por hash del id del partido. Bans: en la primera arranca el equipo A. Juegan los primeros `team_size` de cada equipo, capitán primero. 13 pruebas en `web/test/draft.test.js`. | `web/src/logica/draft.js` |
 
 **Lógica que se reutiliza**
 
@@ -92,52 +132,47 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | ID | Tarea | Dif. | Rol | Tiempo | Depende de | Ola |
 |---|---|---|---|---|---|---|
 | **Fase 0 · Base del proyecto** |||||||
-| T01 | Proyecto en la consola: Blaze, alerta de gasto, Firestore, RTDB, Auth con Google | 1 | J | 1 h | — | 0 |
-| **Fase 1 · Datos y seguridad** |||||||
-| T07 | Ids de texto en `web/src/types.ts` y páginas | 2 | J | 4 h | — | 0 |
-| **Fase 2 · Autenticación** |||||||
-| T10 | Google con `signInWithPopup`, `linkWithPopup` y desvincular | 3 | S | 2 h | — | 0 |
-| T11 | Steam con `createCustomToken` | 5 | S | 1 d | — | 0 |
-| T12 | Login de prueba por email solo en el emulador | 2 | J | 1 h | — | 0 |
-| T13 | Buscador de usuarios sobre Firestore | 2 | J | 1 h | decisión D4 | 0 |
-| T14 | Botones y mensajes de `Login.tsx` y `Profile.tsx` | 2 | J | 2 h | T10, T11 | 1 |
-| **Fase 3 · API sobre Firestore** |||||||
-| T17 | Inscripciones y equipos con transacciones | 4 | S | 1 d | — | 0 |
-| T18 | Generación de llaves (`brackets.js`) | 4 | S | 2 d | — | 0 |
-| T19 | `cerrarMatch`, tablas, suizo y playoffs | 5 | S | 4 h | T18 | 1 |
-| T20 | Armador de equipos (`teambuilder.js`) | 3 | S | 4 h | T17 | 1 |
-| T22 | Reloj del draft con Cloud Tasks | 4 | S | 1 d? | — | 0 |
-| T23 | Rutas de partido (`routes/matches.js`) | 4 | S | 1 d | T19, T25 | 2 |
-| T24 | Seed de la demo con el Admin SDK | 3 | S | 1 d | T12, T17, T19, T20, T23, decisión D2 (solo producción) | 3 |
+| T01 | Proyecto en la consola en Spark: Firestore, RTDB, Auth con Google | 1 | J | 1 h | — | 0 |
 | **Fase 4 · Tiempo real** |||||||
-| T25 | Chat: salas, mensajes por la API y avisos del sistema | 4 | S | 4 h | T17 | 1 |
-| T27 | `web/src/live.ts` reemplaza `ws.ts` en `MatchRoom` y `TournamentPage` | 4 | S | 1 d | T25 | 2 |
 | T28 | Presencia con Realtime Database | 3 | J | 2 h | — | 0 |
+| **Fase 6 · Sin servidor** |||||||
+| T36 | `firestore.rules` de partidos, draft con pick ciego y chat | 5 | S | 1 d | — | 0 |
+| T37 | `web/src/datos/`: lecturas y escrituras con el SDK de cliente; reemplaza `api.ts` | 3 | S | 1 d | — | 0 |
+| T38 | Ingreso solo con Google; link de Steam sin verificar en el perfil | 2 | J | 2 h | T37 | 1 |
+| T39 | Panel del creador: llaves, playoffs, suizo y armador corriendo en su navegador | 4 | S | 1 d | T37 | 1 |
+| T40 | Resultados por el creador: ganador por partida, cerrar serie y avanzar la llave | 4 | S | 1 d | T39 | 2 |
+| T41 | Links de las partidas por partido y por fase (`vod_links`) | 2 | J | 4 h | T37 | 1 |
+| **Fase 7 · Draft nuevo** |||||||
+| T43 | Draft sobre Firestore: crear, elegir mapa, banear, pick ciego y revelar | 4 | S | 1 d | T36 | 1 |
+| T44 | `DraftBoard.tsx` y `MatchRoom.tsx` para el draft nuevo | 2 | J | 1 d | T43 | 2 |
+| T45 | `TournamentForm.tsx`: quitar modos viejos, sumar bans de civ y primer mapa fijo o al azar | 2 | J | 2 h | — | 0 |
+| T46 | Tiempo real sin API: escuchas del partido y del draft; chat escrito desde el cliente | 3 | J | 4 h | T36 | 1 |
+| T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T40, T44, T46 | 3 |
 | **Fase 5 · Publicación y cierre** |||||||
-| T30 | Deploy automático con GitHub Actions | 3 | S | 4 h | T01 | 1 |
-| T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 2 |
-| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T14, T22, T24, T27, T28, T30 | 4 |
-| T33 | Borrar Render, SQLite, sesiones por cookie y WebSocket; actualizar README | 1 | J | 2 h | T32, decisión D5 | 4 |
+| T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T01, T47 | 3 |
+| T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 4 |
+| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T28, T30, T41, T45 | 4 |
+| T33 | Borrar Render, SQLite, `functions/` y lo que quedó viejo; actualizar README | 1 | J | 2 h | T32, decisión D5 | 5 |
 
-Las dependencias con tareas hechas ya están cumplidas y no figuran en la tabla.
+Las dependencias con tareas hechas ya están cumplidas y no figuran en la tabla. T29 quedó hecha y su
+número no se reusa.
 
 ## Olas de ejecución
 
 ```
-Ola 0  ─ T18 ∥ T17 ∥ T11 ∥ T22 ∥ T10 ∥ T01 ∥ T07 ∥ T28 ∥ T12 ∥ T13   · 2 d    (T18 marca la ola; T01, T07, T28, T12 y T13 junior)
-Ola 1  ─ T19 ∥ T20 ∥ T25 ∥ T30 ∥ T14                                 · 4 h    (T14 junior)
-Ola 2  ─ T23 ∥ T27 ∥ T31                                             · 1 d    (T31 junior)
-Ola 3  ─ T24                                                         · 1 d
-Ola 4  ─ T32  →  T33                                                 · 6 h
+Ola 0  ─ T36 ∥ T37 ∥ T01 ∥ T28 ∥ T45        · 1 d    (T36 y T37 seniors; T01 vos; T28 y T45 junior)
+Ola 1  ─ T43 ∥ T39 ∥ T38 ∥ T41 ∥ T46        · 1 d    (T43 y T39 seniors; el resto junior)
+Ola 2  ─ T44 ∥ T40                          · 1 d
+Ola 3  ─ T47 → T30                          · 1 d
+Ola 4  ─ T32 ∥ T31                          · 4 h
+Ola 5  ─ T33                                · 2 h
 ```
 
-- **Camino crítico:** T18 → T19 → T23 → T24 → T32 → T33 = 34 h (unos 6 días).
-- **Equipo mínimo:** 2 seniors y 1 junior. La ola 0 tiene 32 h de trabajo senior (T18, T17, T11,
-  T22, T10): con dos seniors dura unos 3 d y con tres, 2 d. Desde la ola 1 alcanzan dos y lo demás
-  está atado al camino crítico. El junior tiene 18 h en total: no hace falta más de uno.
-- **Una sola persona:** seguir las olas en orden y, dentro de cada ola, el orden de la tabla.
-- **Duración total:** unos 6 días si cada ola se hace en paralelo completo (34 h sumando las olas),
-  unos 7 con dos seniors, y unos 14 días con una sola persona (84 h, la suma de la columna Tiempo).
+- **Camino crítico:** T36 → T43 → T44 → T47 → T30 → T32 → T33 = 32 h (unos 5 días).
+- **Equipo mínimo:** 2 seniors y 1 junior. En las olas 0 y 1 hay dos tareas senior de un día en
+  paralelo; un tercer senior no acelera porque T47 espera a las dos ramas.
+- **Una sola persona:** seguir las olas en orden.
+- **Duración total:** 32 h con el equipo mínimo (suma de las olas); 66 h con una sola persona.
 
 ## Detalle de cada tarea
 
@@ -145,263 +180,221 @@ Ola 4  ─ T32  →  T33                                                 · 6 h
 
 ### T01 · Proyecto en la consola de Firebase — dif. 1 · junior · 1 h
 
-- [ ] Crear el proyecto en console.firebase.google.com, pasarlo a Blaze y crear una alerta de
-      presupuesto (por ejemplo USD 5) en Google Cloud Billing. La alerta avisa, no corta el gasto.
-- [ ] Crear Firestore (modo producción) en `southamerica-east1` (D1). La ubicación de Firestore no se
-      puede cambiar después.
-- [ ] Crear Realtime Database en `us-central1`: RTDB no está disponible en São Paulo. Solo guarda la
-      presencia (T28), así que la distancia no pesa.
-- [ ] Authentication: habilitar Google. Email y contraseña queda apagado en producción (el login de
-      prueba es solo del emulador, T12).
-- [ ] Habilitar en Google Cloud las APIs de Cloud Tasks y Secret Manager. Anotar el id del proyecto
-      en `.firebaserc` como alias `prod`.
-
-### Fase 1 · Datos y seguridad
-
-### T07 · Ids de texto en el frontend — dif. 2 · junior · 4 h
-
-- [ ] `web/src/types.ts`: los ids de usuarios, torneos, equipos, inscripciones, partidos, etapas,
-      grupos, drafts y mensajes pasan de `number` a `string` (hay unos 44 campos `id` / `*_id`). Los
-      de civ y mapa siguen siendo `number`.
-- [ ] Buscar `Number(` y `parseInt(` sobre ids en `web/src` (parámetros de ruta, selects) y sacarlos.
-- [ ] Revisar comparaciones `===` entre ids que mezclen número y texto.
-- [ ] Listo cuando `npm run build` compila sin errores de tipos.
-
-### Fase 2 · Autenticación
-
-### T10 · Google con Firebase Auth — dif. 3 · senior · 2 h
-
-- [ ] `Login.tsx`: el botón de Google llama a `signInWithPopup(auth, new GoogleAuthProvider())` en
-      vez de navegar a `/api/auth/google`.
-- [ ] `Profile.tsx`: vincular usa `linkWithPopup`. Si esa cuenta de Google ya está en otro usuario
-      llega `auth/credential-already-in-use`: mostrar lo mismo que hoy con `?google=ocupado`.
-- [ ] `POST /api/auth/google/unlink` queda en el servidor y usa
-      `getAuth().updateUser(uid, { providersToUnlink: ['google.com'] })`, con la regla de hoy (no
-      soltar el único acceso).
-- [ ] Borrar `/api/auth/google` y `/google/return` de `routes/auth.js` y las variables
-      `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Firebase usa su propio cliente OAuth; el que se
-      configuró para Render deja de usarse.
-
-### T11 · Steam con token propio — dif. 5 · senior · 1 d
-
-- [ ] `POST /api/auth/steam/start` guarda `authStates/{nonce}` con
-      `{ uid | null, link, expiresAt: +10 min }` y devuelve la URL de Steam con
-      `return_to = /api/auth/steam/return?state=<nonce>`. Hace falta porque la vuelta de Steam es una
-      redirección del navegador y no trae el token.
-- [ ] `GET /api/auth/steam/return`: reusar la verificación de hoy (`check_authentication`,
-      `is_valid:true`, id de 17 dígitos) y `perfilSteam`. El uid sale de `steamIds/{id64}`; si es
-      nuevo, `getAuth().createUser()`; si es vincular, va al uid del estado, con el caso "ocupado".
-- [ ] Emitir `getAuth().createCustomToken(uid)` y redirigir a `/entrar#token=...` (en el hash no
-      llega a ningún servidor). La web hace `signInWithCustomToken` y limpia el hash.
-- [ ] En producción la cuenta de servicio de las funciones necesita el rol *Service Account Token
-      Creator* para firmar el token; en el emulador no hace falta.
-- [ ] `POST /api/auth/steam/unlink`: borra `steamIds/{id64}` y los campos `steam_*`, con la regla de
-      hoy.
-- [ ] Política TTL de Firestore sobre `authStates.expiresAt` para que los estados viejos se borren
-      solos.
-
-### T12 · Login de prueba solo en el emulador — dif. 2 · junior · 1 h
-
-- [ ] `Login.tsx`: el formulario de email y contraseña usa `signInWithEmailAndPassword` y solo se
-      muestra con `import.meta.env.DEV`.
-- [ ] `/api/auth/providers` devuelve `dev_login: true` solo si `FUNCTIONS_EMULATOR === 'true'`.
-- [ ] Las cuentas `@demo.aoematch` con `demo1234` las crea el seed (T24) en el emulador de Auth.
-- [ ] En producción el proveedor de email y contraseña queda apagado (T01).
-
-### T13 · Buscador de usuarios — dif. 2 · junior · 1 h
-
-- [ ] Antes hay que cerrar la decisión D4.
-- [ ] `GET /api/auth/users?q=`: si D4 es "empieza con", consultar `display_name_lower >= q` y
-      `< q + '\uf8ff'` con `limit(20)`. Hoy es `LIKE '%q%'` sobre `display_name` y `steam_name`.
-- [ ] `display_name_lower` se escribe en el alta (T08) y en `PATCH /api/auth/me`.
-- [ ] Misma respuesta que hoy (`avatar_url` cae en `steam_avatar` si falta).
-
-### T14 · Pantallas de ingreso y perfil — dif. 2 · junior · 2 h
-
-- [ ] `Login.tsx` y `Profile.tsx`: los enlaces `href="/api/auth/steam"` y `?link=1` pasan a botones
-      que llaman a `POST /api/auth/steam/start` y navegan a la URL que devuelve.
-- [ ] Mensajes para popup cerrado (`auth/popup-closed-by-user`: sin error visible), cuenta ocupada y
-      error de Steam (`/entrar?steam=error` sigue existiendo).
-- [ ] Estado de carga mientras vuelve de Steam y corre `signInWithCustomToken`.
-- [ ] Probar en el emulador: entrar, vincular y desvincular con los dos proveedores.
-
-### Fase 3 · API sobre Firestore
-
-### T17 · Inscripciones y equipos — dif. 4 · senior · 1 d
-
-- [ ] Pasar de `routes/tournaments-sqlite.js` a `routes/tournaments.js` (sobre `data/`): `register`,
-      `withdraw`, `PATCH registrations/:regId` (`:regId` es el uid del inscripto), `POST` y `PATCH
-      teams`, y alta y baja de miembros, cada una en una transacción. Borrarlas del archivo SQLite.
-- [ ] En la misma transacción: contadores del torneo con `FieldValue.increment` y `readers` de la sala
-      del equipo (`rooms/equipo_{id}`) cuando alguien entra o sale.
-- [ ] Mismas reglas de hoy: cupo por equipo, `allow_solo`, solo capitán u organizador, el equipo se
-      borra si queda vacío.
-- [ ] Las respuestas usan `detalle()` y `equipoCompleto()` de `tournaments.js` (T16), que ya calculan
-      `overlap_min`.
-
-### T18 · Generación de llaves — dif. 4 · senior · 2 d
-
-- [ ] `brackets.js`: eliminación simple y doble, liga, grupos + playoff, suizo y tercer puesto,
-      escribiendo en `matches` y `stages` con `data/`. Las rutas `brackets`, `playoffs` y `swiss/next`
-      pasan de `routes/tournaments-sqlite.js` a `routes/tournaments.js`.
-- [ ] `next_match_id` y `loser_match_id` necesitan los ids antes de escribir: generarlos con
-      `collection('matches').doc()` y escribir todo en un batch (máximo 500 escrituras; 64 equipos en
-      doble eliminación quedan lejos).
-- [ ] `ordenSiembra`, `nombreRonda` y la siembra 1-8, 4-5, 2-7, 3-6 no cambian; `limpiar()` borra
-      los partidos previos del torneo en un batch aparte y `resolverBye` va dentro del batch que crea.
-- [ ] `crearMatch` deja de crear la sala de chat del partido: la crea T25 cuando hace falta.
-- [ ] Prueba: generar cada formato en el emulador y comparar con la versión SQLite (mismos cruces y
-      mismos enlaces).
-
-### T19 · Cierre de partido y tablas — dif. 5 · senior · 4 h
-
-- [ ] `cerrarMatch` en una transacción: cierra el partido y pasa el ganador (y el perdedor, en doble
-      eliminación) al slot de `next_match_id` / `loser_match_id`. Dos reportes al mismo tiempo no
-      pueden pisarse.
-- [ ] `tablaDesde` ya está sobre datos leídos en `routes/tournaments.js` (T16): moverla a
-      `brackets.js` y usarla también para los clasificados de `generarPlayoffs`.
-- [ ] `siguienteRondaSuiza` y `generarPlayoffs` como transacción o batch.
-- [ ] Frontera: quién llama a `cerrarMatch` al reportar resultados es T23.
-
-### T20 · Armador de equipos — dif. 3 · senior · 4 h
-
-- [ ] `teambuilder.js`: `proponerEquipos` lee las inscripciones sueltas y los usuarios con un
-      `getAll`. El algoritmo (serpiente + 4000 intercambios) no cambia.
-- [ ] `confirmarEquipos` en un batch: crea equipos y miembros, sus salas con `readers`, y actualiza
-      inscripciones y contadores. Las rutas `autoteams` y `autoteams/confirm` pasan a
-      `routes/tournaments.js`; el horario sale de los docs de usuario (`mascaraUsuario(usuario)`), no
-      de `usuariosConHorario()`.
-- [ ] Mismos errores de hoy (torneo 1v1, sin sueltos suficientes).
-
-### T22 · Reloj del draft — dif. 4 · senior · 1 d?
-
-- [ ] Función `vencerPaso` con `onTaskDispatched`. En `correr()` y `crearDraft()` de `draft.js`, cuando
-      cambia `deadline_at`, encolar `{ matchId, step, deadline }` con `scheduleTime = deadline` usando
-      `despues(...)`, como ya hace el aviso de `live`.
-- [ ] Al dispararse llama a `porTimeout(matchId, { step, deadline })` de `draft.js`: el núcleo ya
-      ignora los avisos viejos o repetidos (probado en T21).
-- [ ] Respaldo: antes de responder, `GET /api/matches/:id` y las acciones del draft resuelven los
-      pasos vencidos (`vencido()` de `draft-core.js`), por si una tarea se pierde.
-- [ ] Reemplaza `iniciarRelojes()`, que revisaba cada 1 s. La precisión pasa a ser de unos segundos.
-- [ ] Duda (de ahí el `?`): hasta dónde llega el emulador de Cloud Tasks. Si no alcanza, probar el
-      respaldo en local y la cola en producción.
-
-### T23 · Rutas de partido — dif. 4 · senior · 1 d
-
-- [ ] `routes/matches.js` sobre `data/`: detalle, crear draft, listo, acción, resultado por partida
-      (`recalcularSerie`), resultado forzado, horarios y votos. El draft usa `draft.js` (T21):
-      `crearDraft`, `marcarListo`, `aplicarAccion` y `estadoDelPartido`, que ya avisan en `live`.
-- [ ] Resultados, horarios y votos avisan con `avisar(matchId, 'match' | 'votes')` de `live.js` después
-      del commit.
-- [ ] `avisoSistema` (draft cerrado, serie cerrada, partido agendado) escribe en
-      `rooms/partido_{id}/messages` con las funciones de T25.
-- [ ] El detalle deja de traer `chat.general` y `chat.team`: el historial lo lee el cliente (T27).
-- [ ] Mismos permisos: `puedeReportar`, staff y capitán.
-
-### T24 · Datos de demo — dif. 3 · senior · 1 d
-
-- [ ] Para la parte de producción, antes hay que cerrar la decisión D2.
-- [ ] `functions/scripts/seed.js` con el Admin SDK contra los emuladores (`FIRESTORE_EMULATOR_HOST`,
-      `FIREBASE_AUTH_EMULATOR_HOST`): 24 usuarios en Auth con `@demo.aoematch` / `demo1234`, sus
-      horarios, los tres torneos y la copa mockup con drafts a medio jugar y chat.
-- [ ] Reusar las funciones migradas (T17, T19, T20, T21, T23) en vez de escribir documentos a mano,
-      como hoy `seed.js` usa `generarLlaves` y `aplicarAccion` (ahora de `draft.js`).
-- [ ] `--reset` vacía los emuladores con sus endpoints REST
-      (`DELETE /emulator/v1/projects/{id}/databases/(default)/documents` y `.../accounts`).
-- [ ] Contra producción, solo con un flag explícito y si D2 lo pide.
+- [ ] Crear el proyecto en console.firebase.google.com y dejarlo en Spark. No pide tarjeta.
+- [ ] Crear Firestore (modo producción) en `southamerica-east1` (D1). La ubicación no se puede
+      cambiar después.
+- [ ] Crear Realtime Database en `us-central1`: RTDB no está en São Paulo. Solo guarda la presencia
+      (T28).
+- [ ] Authentication: habilitar Google. Email y contraseña queda apagado en producción (es solo del
+      emulador).
+- [ ] Registrar una app web y pasar los valores de `firebaseConfig` (van en las `VITE_FIREBASE_*`
+      de `web/src/firebase.ts`) y el id del proyecto para `.firebaserc` (alias `prod`).
 
 ### Fase 4 · Tiempo real
 
-### T25 · Chat en Firestore — dif. 4 · senior · 4 h
-
-- [ ] `POST /api/rooms/:room/messages` con las reglas de `puedeEscribir` de hoy (general: inscriptos
-      y staff; partido: jugadores y staff; equipo: miembros y staff), texto recortado a 2000.
-- [ ] `salaDeChat` crea `rooms/{kind}_{id}` con `public_read`, `readers` y `tournament_id`.
-      `publicarMensaje` y `avisoSistema` escriben en `messages` con `created_at` del servidor y el
-      nombre y avatar del autor copiados (el cliente no puede leer `users`).
-- [ ] Crear las salas que hoy crean `POST /` (torneo), `register` y `POST teams`; las de partido se
-      crean con el primer mensaje o aviso (ya no las crea `crearMatch`). Mantener `readers` al día es
-      de T17.
-- [ ] Se borran `realtime.js`, `bus.js` y la dependencia `ws`.
-
-### T27 · Tiempo real en la web — dif. 4 · senior · 1 d
-
-- [ ] `web/src/live.ts` reemplaza `ws.ts`: `useChat(room)` con `onSnapshot` sobre
-      `rooms/{room}/messages` (`orderBy('created_at', 'desc')`, `limit(80)`) y
-      `useLive(matchId, onCambio)` sobre `live/{matchId}`.
-- [ ] `MatchRoom.tsx`: un cambio de `draft`, `match` o `votes` vuelve a pedir `GET /api/matches/:id`,
-      como hoy hace `cargar()`.
-- [ ] `TournamentPage.tsx`: el chat general usa `useChat`; enviar va por `POST /api/rooms/:room/messages`.
-- [ ] `conectado` sale de `.info/connected` de RTDB.
-- [ ] Sala de equipo sin permiso: mostrar el error en vez de quedar cargando.
-
 ### T28 · Presencia — dif. 3 · junior · 2 h
 
-- [ ] `web/src/presence.ts`: al entrar a una sala, escribir `presence/{room}/{uid}` con nombre y
-      avatar y registrar `onDisconnect().remove()`; al salir, borrarlo.
-- [ ] Hook `usePresencia(room)` que escucha `presence/{room}` y devuelve la misma lista que hoy llega
-      en el mensaje `presence`.
-- [ ] Los anónimos no escriben presencia (hoy tampoco cuentan).
-- [ ] Copiar el patrón de presencia de la documentación de Firebase; las reglas son de T06.
+- [ ] `web/src/presence.ts`: al entrar a una sala, escribir `presence/{room}/{uid}` con
+      `display_name` y `avatar_url` y registrar `onDisconnect().remove()`; al salir, borrarlo.
+- [ ] Hook `usePresencia(room)` que escucha `presence/{room}`; reemplaza a `useConectado` de
+      `web/src/live.ts`, que hoy devuelve una lista vacía.
+- [ ] Los anónimos no escriben presencia.
+- [ ] `database.rules.json`: leer `presence/{room}` cualquiera; escribir `presence/{room}/{uid}` solo
+      `auth.uid == $uid`, con solo esos dos campos de texto.
+
+### Fase 6 · Sin servidor
+
+### T36 · Reglas de partidos, draft y chat — dif. 5 · senior · 1 d
+
+- [ ] `matches/{matchId}`: leer cualquiera; escribir resultados, `games`, estado, horario fijado y
+      `vod_links` solo el staff del torneo (`get` del torneo por `tournament_id`). Votos de horario:
+      cada jugador de los dos equipos, solo su propia entrada de `schedule_votes`.
+- [ ] `matches/{matchId}/drafts/{gameNo}`: lo crea un jugador del partido o el staff, solo si la
+      partida anterior tiene ganador; campos de `planDeDraft` (`web/src/logica/draft.js`, T42). Mapa: un miembro del equipo de `map_chooser_team_id`, con un
+      `map_id` del pool. Bans: el equipo de `ban_order[banned_civ_ids.size()]` (miembro según `team_of`), con una civ
+      de `civ_pool`.
+- [ ] Pick ciego en `drafts/{gameNo}/picks/{uid}`: crear o cambiar solo el dueño, si está en
+      `player_ids`, la civ está en `civ_pool`, no en `banned_civ_ids` ni en `civs_usadas[uid]`, y el draft no está revelado. Leer: el
+      dueño siempre; los demás solo con `revealed == true`.
+- [ ] `revealed: true` lo pone cualquiera de `player_ids`, solo si existen los picks de todos. Las
+      reglas no tienen bucles: `(n < 1 || exists(pick0)) && … && (n < 8 || exists(pick7))`. Son hasta
+      8 `exists` más el `get` del draft, justo bajo el límite de 10 accesos por pedido. Máximo 4
+      jugadores por equipo.
+- [ ] Chat `rooms/{roomId}/messages`: escribir con sesión según `puedeEscribir` (hoy en
+      `functions/src/chat.js`): sala del torneo, inscriptos y staff; de partido, jugadores y staff;
+      de equipo, `readers`. `user` del mensaje igual al autor; `system` siempre falso desde el
+      cliente.
+- [ ] Pruebas en un archivo junto a `functions/test/reglas-torneos.test.js` (T35), con un draft 2v2
+      entero: nadie lee el pick ajeno antes de
+      revelar, revelar con un pick faltante falla, y después todos los leen.
+
+### T37 · Capa de datos en la web — dif. 3 · senior · 1 d
+
+- [ ] `web/src/datos/` con un módulo por entidad (`usuarios.ts`, `torneos.ts`, `inscripciones.ts`,
+      `equipos.ts`, `partidos.ts`, `salas.ts`) sobre el SDK de cliente; copiar nombres y formas de
+      `functions/src/data/*.js` para que las pantallas reciban los mismos objetos que hoy da la API.
+- [ ] Reemplazar las llamadas de `web/src/api.ts` en `Home.tsx`, `CreateTournament.tsx`,
+      `TournamentPage.tsx`, `Profile.tsx` y `MatchRoom.tsx`. Llaves, armador y resultados quedan para
+      T39 y T40; el draft, para T43.
+- [ ] Lo que la API completaba al leer: nombres y avatares de miembros (`where(documentId(), 'in',
+      ...)` de a 30) y excepciones de horario vencidas (filtrar al leer).
+- [ ] Escrituras de varios documentos en `writeBatch` o `runTransaction`, igual que hoy en la API
+      (inscribirse con equipo, sumar miembro).
+- [ ] Un `permission-denied` se muestra en la pantalla con mensaje en castellano.
+
+### T38 · Ingreso y Steam sin verificar — dif. 2 · junior · 2 h
+
+- [ ] `Login.tsx` y `web/src/auth.tsx`: solo el botón de Google. Sacar Steam y las llamadas a
+      `/api/auth/*`; el perfil `users/{uid}` lo crea el cliente la primera vez que entra.
+- [ ] `Profile.tsx`: campo `steam_url` para pegar el perfil de Steam. Aceptar solo
+      `https://steamcommunity.com/id/...` o `/profiles/...`; mostrarlo como link en el perfil y en
+      los equipos, con el aviso "no verificado".
+- [ ] Sacar de `Profile.tsx` vincular y desvincular Steam y Google.
+
+### T39 · Panel del creador — dif. 4 · senior · 1 d
+
+- [ ] En `TournamentPage.tsx`, solo para el organizador y `admin_ids`: generar llaves, playoffs desde
+      grupos, siguiente ronda suiza y armador, con `generarCuadro`, `cuadroDePlayoffs` y `rondaSuiza` (`web/src/logica/llaves.js`) y
+      `proponerEquipos` (`web/src/logica/armador.js`) corriendo en su navegador.
+- [ ] Cada generación se escribe en un `writeBatch` (hasta 500 escrituras; una doble eliminación de
+      64 equipos son unas 127). Si ya hay partidos, pedir confirmación y borrarlos antes.
+- [ ] Armador: proponer, mostrar y, al confirmar, crear equipos, inscripciones y salas de equipo en
+      una transacción, como hoy `teambuilder.js`.
+- [ ] Quien no es staff no ve los botones; si fuerza la escritura, la niegan las reglas de T35.
+
+### T40 · Resultados por el creador — dif. 4 · senior · 1 d
+
+- [ ] En la llave y en `MatchRoom.tsx`, solo para el staff: cargar el ganador de cada partida de la
+      serie y copiar las civs reveladas del draft a `games[].civs`.
+- [ ] Al llegar al mejor de N, cerrar la serie y avanzar ganador y perdedor (`next_match_id`,
+      `loser_match_id`) en una `runTransaction` con `cerrarPartido` de `web/src/logica/llaves.js`, que devuelve los
+      cambios de cada partido y si el torneo terminó. Cambiar un resultado
+      cerrado reabre la serie y saca al equipo del partido siguiente si no empezó (como
+      `recalcularSerie` en `functions/src/routes/matches.js`).
+- [ ] Byes: el avance del partido con bye va en la misma transacción.
+- [ ] Sacar el reporte de los capitanes y el "resultado forzado": todo resultado lo carga el staff.
+
+### T41 · Links de las partidas — dif. 2 · junior · 4 h
+
+- [ ] Campo `vod_links: [{ label, url }]` en `matches/{matchId}` (por llave) y en
+      `tournaments/{slug}/stages/{stageId}` (por fase). Máximo 20 por documento.
+- [ ] Editor para el staff: agregar, cambiar y borrar; aceptar solo `http://` y `https://`.
+- [ ] Mostrarlos en `Bracket.tsx` (ícono en cada partido con links), en `MatchRoom.tsx` y en la
+      cabecera de cada fase en `TournamentPage.tsx`. Abren en otra pestaña con
+      `rel="noopener noreferrer"`.
+- [ ] `games[].replay_url` ya existe por partida: mostrarlo junto a estos links, no duplicarlo.
+
+### Fase 7 · Draft nuevo
+
+### T43 · Draft sobre Firestore — dif. 4 · senior · 1 d
+
+- [ ] `web/src/datos/drafts.ts`: crear `drafts/{gameNo}` con `planDeDraft` de T42 (`state: 'mapa' |
+      'bans' | 'picks' | 'listo'`), elegir mapa, banear (transacción que verifica el turno) y guardar
+      el pick propio en `picks/{uid}`.
+- [ ] Al guardar un pick, el cliente intenta poner `revealed: true` y `state: 'listo'`; si las reglas
+      lo niegan porque falta alguien, no pasa nada. Cada cliente que escucha el draft reintenta
+      cuando llega un pick nuevo.
+- [ ] Copiar los picks a `games[].civs` lo hace el staff al cargar el resultado (T40) con lo que
+      devuelve `revelar`, no el jugador.
+- [ ] Sin reloj: el staff puede borrar el draft y reiniciarlo, o cargar el resultado sin draft.
+
+### T44 · Pantalla del draft — dif. 2 · junior · 1 d
+
+- [ ] `DraftBoard.tsx` en tres etapas. Mapa: el equipo que elige ve la grilla, el otro ve
+      "eligiendo". Bans: turno visible para los dos. Picks: cada jugador ve las civs y su elección; de
+      los demás, solo "eligió" o "falta".
+- [ ] Cuando `revealed` pasa a verdadero, mostrar todas las civs juntas.
+- [ ] Sacar de `MatchRoom.tsx` el reloj, "listo" y los modos viejos.
+- [ ] Espectadores (sin sesión o de otro partido) ven el tablero sin botones.
+
+### T45 · Formulario del torneo — dif. 2 · junior · 2 h
+
+- [ ] `TournamentForm.tsx`: sacar `map_mode`, `map_bans`, `civ_pattern`, el reloj por paso y la opción
+      de pick ciego (ahora siempre es ciego).
+- [ ] Sacar `civ_mirror` y `civ_repeat_team` (D6); `civ_repeat_series` queda.
+- [ ] Sumar `civ_bans` (0 a 3 por equipo) y "primer mapa": fijo (`first_map_id`) o al azar.
+- [ ] Mantener `map_repeat` y el pool de mapas y civs (`PoolPicker.tsx`).
+
+### T46 · Tiempo real sin API — dif. 3 · junior · 4 h
+
+- [ ] `web/src/live.ts`: `useLive` deja de escuchar `live/{matchId}` y escucha directo
+      `matches/{matchId}` y el draft abierto con `onSnapshot`.
+- [ ] `useChat`: escribir con `addDoc` en `rooms/{roomId}/messages`, copiando nombre y avatar del
+      autor; crear la sala con `setDoc` si no existe (deciden las reglas de T36).
+- [ ] Los avisos del sistema que hoy publica la API ("cargó el resultado", "empezó el draft") se
+      sacan: el cliente no puede escribir `system: true`.
+- [ ] Cortar las escuchas al salir de la pantalla.
+
+### T47 · Sacar el servidor — dif. 3 · senior · 4 h
+
+- [ ] Borrar `functions/src/app.js`, `index.js`, `routes/`, `relojes.js`, `live.js`, `config.js`,
+      `auth.js`, `draft.js`, `draft-core.js` y lo que quede sin uso; en `firebase.json`, la sección
+      `functions`, el rewrite `/api/**` y los emuladores `functions` y `tasks`.
+- [ ] Borrar `web/src/api.ts` y el proxy de `/api` de Vite.
+- [ ] Demo: rehacer `functions/src/demo.js` y `functions/scripts/seed.js` sobre el modelo nuevo
+      (draft con picks, `vod_links`, sin `live`). El seed sigue con el Admin SDK contra el emulador;
+      puede pasar a `tools/`.
+- [ ] `npm test` corre las pruebas de lógica (`web/test/`) y de reglas (T35, T36); borrar las que
+      probaban rutas y los reexports de `functions/src` hacia `web/src/logica/`.
 
 ### Fase 5 · Publicación y cierre
 
 ### T30 · Deploy automático — dif. 3 · senior · 4 h
 
 - [ ] `.github/workflows/deploy.yml`: en cada push a `master`, Node 22, `npm ci`, `npm run assets`,
-      `npm run build` y `firebase deploy --only hosting,functions,firestore,database --project prod`.
-      El build necesita las `VITE_FIREBASE_*` (ver `web/src/firebase.ts`) como variables del workflow.
-- [ ] Antes del primer deploy, crear el secreto `STEAM_API_KEY` (`firebase functions:secrets:set
-      STEAM_API_KEY`; sin clave de Steam, cualquier valor).
-- [ ] Autenticación con una cuenta de servicio guardada en el secreto `FIREBASE_SERVICE_ACCOUNT`, con
-      los roles que pide `firebase deploy` para Hosting, funciones, reglas y secretos.
-- [ ] Si falla la descarga de `npm run assets`, el deploy sigue, como hoy en Render.
-- [ ] El primer deploy se hace a mano desde la PC para confirmar permisos y cuotas. Ahí verificar con
+      `npm run build` y `firebase deploy --only hosting,firestore,database --project prod`. Sin
+      `functions`: Spark no las deja publicar.
+- [ ] El build necesita las `VITE_FIREBASE_*` (T01) como variables del workflow.
+- [ ] Autenticación con una cuenta de servicio en el secreto `FIREBASE_SERVICE_ACCOUNT`, con los
+      roles de Hosting y reglas.
+- [ ] Si falla la descarga de `npm run assets`, el deploy sigue.
+- [ ] Primer deploy a mano desde la PC. Verificar con
       `curl -I https://PROYECTO.web.app/assets/flags/Flag_German.png` que llegue el `Cache-Control`
-      de T29 (el emulador no lo aplica).
+      de T29.
 
 ### T31 · Dominio propio — dif. 1 · junior · 1 h
 
 - [ ] Antes hay que cerrar la decisión D3.
-- [ ] Hosting → Agregar dominio personalizado; cargar los registros TXT y A en el proveedor del
-      dominio. El certificado lo emite Firebase.
+- [ ] Hosting → Agregar dominio personalizado; cargar los registros TXT y A en el proveedor. El
+      certificado lo emite Firebase.
 - [ ] Authentication → Configuración → Dominios autorizados: agregar el dominio.
-- [ ] `PUBLIC_URL = https://DOMINIO` (T29) para que Steam vuelva al dominio.
 
 ### T32 · Prueba completa — dif. 2 · junior · 4 h
 
-- [ ] En los emuladores con la demo (T24) y después en producción: entrar con Google y con Steam,
-      vincular y desvincular.
+- [ ] En los emuladores con la demo y después en producción: entrar con Google y cargar el link de
+      Steam.
 - [ ] Crear un torneo 2v2, inscribirse solo y con equipo, correr el armador y generar las llaves.
-- [ ] Draft con dos navegadores: bans, picks, modo ciega y un reloj vencido que elige solo (esperar
-      sin tocar).
-- [ ] Chat de equipo: una cuenta del equipo rival no lo ve. Chat y presencia se actualizan en vivo.
-- [ ] Reportar resultados hasta cerrar la serie y ver que el ganador avanza en la llave.
-- [ ] Anotar cada falla con los pasos para reproducirla.
+- [ ] Draft con cuatro navegadores: mapa por el perdedor, bans, picks ciegos; desde la consola del
+      navegador, leer el pick ajeno antes de revelar debe dar `permission-denied`.
+- [ ] Como jugador común, escribir un resultado desde la consola del navegador debe fallar.
+- [ ] Como creador, cargar resultados hasta cerrar la serie, ver que el ganador avanza y dejar links
+      en un partido y en una fase.
+- [ ] Chat de equipo: una cuenta del equipo rival no lo ve. Chat y presencia en vivo.
 
 ### T33 · Limpieza y README — dif. 1 · junior · 2 h
 
 - [ ] Antes hay que cerrar la decisión D5.
-- [ ] Confirmar con `grep -rn "db.js" functions/src` que ya no quede SQL. Borrar `render.yaml`,
-      `Dockerfile`, `schema.sql`, `db.js` (con `usuariosConHorario`), `cargarCatalogo()` (con su
-      llamada en `app.js`), `draft-sqlite.js`, `routes/tournaments-sqlite.js` (y su `app.use` en
-      `app.js`) y la carpeta `server/` (solo quedó su `node_modules`).
-- [ ] Borrar el puente de sesión por cookie de T08: en `functions/src/auth.js`, `createSession`,
-      `destroySession`, `userForToken`, `setSessionCookie`, `hashPassword`, `checkPassword` y la rama
-      de cookie de `attachUser` (con `req.usuarioFirebase`); en `routes/auth.js`, `/login`, `/logout` y
-      la rama SQLite de `PATCH /me`; en `web/src/auth.tsx`, el `POST /api/auth/logout`; las
-      dependencias `bcryptjs` y `cookie-parser`.
+- [ ] Borrar `render.yaml`, `Dockerfile`, `schema.sql`, `db.js`, `brackets-sqlite.js` (y sus
+      comparaciones en las pruebas), la carpeta `server/` y lo que quede de `functions/` que no sea
+      catálogo, demo o pruebas.
+- [ ] Sacar dependencias sin uso: `express`, `cookie-parser`, `bcryptjs`, `firebase-functions`, `ws`.
 - [ ] Revisar el `engines` de la raíz (`>=23.4.0` era por `node:sqlite`).
-- [ ] `README.md`: rehacer Arrancar (emuladores, Java y `npm test`), la tabla de variables, Ingreso
-      con Google, Publicarlo y Cómo está armado.
-- [ ] Dar de baja el servicio en Render si D5 lo indica.
+- [ ] `README.md`: arrancar (emuladores, Java, `npm test`), variables, ingreso con Google, publicar y
+      cómo está armado (sin servidor, reglas como seguridad).
+- [ ] Dar de baja Render si D5 lo indica.
 
 ## Decisiones abiertas
 
 | ID | Decisión | Opciones | Bloquea |
 |---|---|---|---|
-| D1 | Región de Firestore, funciones y Cloud Tasks | **Cerrada: `southamerica-east1` (São Paulo).** Realtime Database va en `us-central1` porque no existe en São Paulo. | — |
-| D2 | ¿Demo en producción? | Sembrar la demo para mostrar la página, o arrancar vacío para torneos reales. | T24 (parte de producción) |
+| D1 | Región | **Cerrada: Firestore en `southamerica-east1`, Realtime Database en `us-central1`.** | — |
+| D2 | ¿Demo en producción? | Sembrarla para mostrar la página, o arrancar vacío. | T47 (parte de producción) |
 | D3 | Dominio | Cuál comprar y en qué registrador. | T31 |
-| D4 | Buscador de usuarios | Firestore no busca "contiene". "Empieza con" (consulta por prefijo), o traer todos los usuarios a la función y filtrar (sirve mientras sean unos pocos miles). | T13 |
+| D4 | Buscador de usuarios | **Cerrada: empieza con** (prefijo sobre `display_name_lower`). | — |
 | D5 | Render al terminar | Darlo de baja, o dejarlo un tiempo como respaldo. | T33 |
+| D6 | Civ repetida en el pick ciego | **Cerrada (2026-10-26): se permite.** Espejo y civ repetida en el mismo equipo valen. | — |
+| D7 | Plan de Firebase | **Cerrada (2026-10-26): Spark.** Blaze no se pudo pagar con la tarjeta en dólares de Brubank. | — |
+| D8 | Steam | **Cerrada: link pegado a mano, sin verificar.** | — |
+| D9 | Quién elige mapa | **Cerrada: el que perdió la partida anterior; la primera, fija del creador o al azar.** | — |
+| D10 | Bans de civ | **Cerrada: los configura el creador (0 a 3 por equipo).** | — |
+| D11 | Reloj del draft | **Cerrada: sin reloj.** El staff reinicia el draft o carga el resultado. | — |

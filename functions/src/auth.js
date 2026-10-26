@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { getAuth } from 'firebase-admin/auth';
 import { get, run } from './db.js';
-import { guardarUsuario, leerUsuario } from './data/usuarios.js';
+import { actualizarUsuario, guardarUsuario, leerUsuario } from './data/usuarios.js';
 
 // ------------------------------------------------------------ Firebase Auth
 
@@ -21,7 +21,23 @@ export async function usuarioDelToken(header) {
   } catch {
     return null;
   }
-  return (await leerUsuario(claims.uid)) ?? altaDesdeToken(claims);
+  const usuario = (await leerUsuario(claims.uid)) ?? (await altaDesdeToken(claims));
+  return conGoogleAlDia(usuario, claims);
+}
+
+/**
+ * Si el token trae una cuenta de Google que el perfil no tiene (se acaba de
+ * vincular con linkWithPopup), la anota. Desvincular la borra la API y deja
+ * `google_unlinked_at`: un token emitido antes de eso todavía trae Google y
+ * no tiene que volver a anotarla.
+ */
+async function conGoogleAlDia(usuario, claims) {
+  const sub = claims.firebase?.identities?.['google.com']?.[0];
+  if (!usuario || !sub || usuario.google_sub === sub) return usuario;
+  if (usuario.google_unlinked_at && claims.iat * 1000 <= usuario.google_unlinked_at) return usuario;
+  const cambios = { google_sub: sub, google_email: claims.email ?? null };
+  await actualizarUsuario(usuario.id, cambios);
+  return { ...usuario, ...cambios };
 }
 
 /** Perfil inicial con lo que trae el token, según con qué entró. */

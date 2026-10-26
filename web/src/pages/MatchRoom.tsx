@@ -5,9 +5,9 @@ import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
-import { useSocket } from '../ws';
+import { useChat, useConectado, useLive } from '../live';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, offsetZona, rangoSemana, zonaDelNavegador } from '../lib';
-import type { ChatMessage, DraftState, MatchDetail, Window } from '../types';
+import type { DraftState, MatchDetail, Window } from '../types';
 
 export function MatchRoom() {
   const { id } = useParams();
@@ -15,8 +15,6 @@ export function MatchRoom() {
   const [m, setM] = useState<MatchDetail | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [error, setError] = useState('');
-  const [mensajes, setMensajes] = useState<Record<string, ChatMessage[]>>({});
-  const [presencia, setPresencia] = useState<Record<string, { id: number; display_name: string; avatar_url: string | null }[]>>({});
 
   const cargar = useCallback(async () => {
     try {
@@ -38,14 +36,20 @@ export function MatchRoom() {
     return out;
   }, [id, m?.me.team_id]);
 
-  const { conectado, enviar } = useSocket(salas, (msg) => {
-    if (msg.type === 'history') setMensajes((p) => ({ ...p, [msg.room]: msg.messages as ChatMessage[] }));
-    if (msg.type === 'chat')
-      setMensajes((p) => ({ ...p, [msg.room]: [...(p[msg.room] ?? []), msg.message as ChatMessage] }));
-    if (msg.type === 'presence') setPresencia((p) => ({ ...p, [msg.room]: msg.users as never }));
-    if (msg.type === 'draft') setDraft(msg.payload as DraftState);
-    if (msg.type === 'match') void cargar();
-  });
+  const { mensajes, enviar } = useChat(salas);
+  const conectado = useConectado();
+  // Cualquier cambio (draft, resultado, horario, votos) vuelve a pedir el
+  // partido: la API arma lo que ve cada uno, picks ciegos incluidos.
+  useLive(id, () => void cargar());
+
+  const mandar = async (room: string, body: string) => {
+    try {
+      await enviar(room, body);
+    } catch (err) {
+      setError((err as Error).message);
+      setTimeout(() => setError(''), 4000);
+    }
+  };
 
   if (error) return <div className="mx-auto max-w-3xl p-10"><Alerta>{error}</Alerta></div>;
   if (!m) return <Spinner />;
@@ -60,7 +64,7 @@ export function MatchRoom() {
       : []),
   ];
 
-  const accionDraft = async (kind: string, targetId: number, forUserId?: number) => {
+  const accionDraft = async (kind: string, targetId: number, forUserId?: string) => {
     setError('');
     try {
       setDraft(
@@ -115,8 +119,8 @@ export function MatchRoom() {
         <ChatPanel
           salas={salasChat}
           mensajes={mensajes}
-          presencia={presencia}
-          onSend={(room, body) => enviar({ type: 'chat', room, body })}
+          presencia={{}}
+          onSend={(room, body) => void mandar(room, body)}
           puedeEscribir={!!user && (!!m.me.team_id || m.me.is_staff)}
           conectado={conectado}
         />
@@ -196,13 +200,13 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
   const { user } = useAuth();
   const tz = user?.timezone || zonaDelNavegador();
   const [abierto, setAbierto] = useState(false);
-  const [data, setData] = useState<{ windows: Window[]; partial: Window[]; users: { id: number; display_name: string }[] } | null>(null);
+  const [data, setData] = useState<{ windows: Window[]; partial: Window[]; users: { id: string; display_name: string }[] } | null>(null);
   const [manual, setManual] = useState('');
 
   useEffect(() => {
     if (!abierto) return;
     api
-      .get<{ windows: Window[]; partial: Window[]; users: { id: number; display_name: string }[] }>(
+      .get<{ windows: Window[]; partial: Window[]; users: { id: string; display_name: string }[] }>(
         `/api/matches/${m.id}/schedule?duration=90`
       )
       .then(setData)
@@ -329,7 +333,7 @@ function Reportar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
     setError('');
     try {
       await api.post(`/api/matches/${m.id}/games/${Number(gameNo)}`, {
-        winner_team_id: Number(ganador),
+        winner_team_id: ganador,
         replay_url: replay || null,
       });
       setAbierto(false);

@@ -154,3 +154,8 @@ export function horas(min: number | null | undefined): string {
   const m = min % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
 }
+
+/** ¿El usuario cerró la ventana de Google? No es un error: no se avisa nada. */
+export function popupCerrado(err: unknown): boolean {
+  return ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes((err as { code?: string }).code ?? '');
+}

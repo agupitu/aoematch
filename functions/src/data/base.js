@@ -82,6 +82,19 @@ export async function enTransaccion(fn) {
   return resultado;
 }
 
+/**
+ * Escribe muchas cosas en batches de hasta 450 operaciones (Firestore acepta
+ * 500 por batch). Cada `escritura` recibe el batch: `(w) => guardarPartido(datos, w)`.
+ * Cada batch es atómico; el conjunto no, si pasa de un batch.
+ */
+export async function escribirEnLotes(escrituras) {
+  for (let i = 0; i < escrituras.length; i += 450) {
+    const batch = firestore.batch();
+    await Promise.all(escrituras.slice(i, i + 450).map((escribir) => escribir(batch)));
+    await batch.commit();
+  }
+}
+
 /** Ordena por varios criterios; `null`/`undefined` van al final. */
 export function ordenarPor(lista, ...claves) {
   const valor = (x, k) => (typeof k === 'function' ? k(x) : x[k]);

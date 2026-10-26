@@ -229,7 +229,12 @@ describe('salas', () => {
     assert.deepEqual((await salas.leerSala('equipo_e1')).readers, ['u1', 'u2']);
 
     const autor = { id: 'u1', display_name: 'Kaiser', avatar_url: null, google_email: 'no@debe.ir' };
-    for (const body of ['uno', 'dos', 'tres']) await salas.publicarMensaje('equipo_e1', { user: autor, body });
+    // Dos mensajes en el mismo milisegundo empatan y el orden entre ellos queda librado al id.
+    const pausa = () => new Promise((ok) => setTimeout(ok, 5));
+    for (const body of ['uno', 'dos', 'tres']) {
+      await salas.publicarMensaje('equipo_e1', { user: autor, body });
+      await pausa();
+    }
     await salas.publicarMensaje('equipo_e1', { body: 'Draft cerrado.', system: 1 });
 
     const todos = await salas.historial('equipo_e1');

@@ -1,11 +1,279 @@
 rules_version = '2';
 
-// El cliente lee directo solo dos cosas: los mensajes del chat y el aviso de
-// cambios de cada partido. Todo lo demás pasa por la API, que usa el Admin SDK
-// y no pasa por estas reglas. Nadie escribe desde el cliente.
+// Plan Spark: no hay servidor. La web lee y escribe directo, y estas reglas
+// son la única barrera: cada escritura que la web hace tiene que pasar por acá.
 // Modelo completo: docs/firestore-modelo.md.
+//
+// Staff de un torneo = su organizador o un uid de `admin_ids`.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ------------------------------------------------------------ utilidades
+
+    function conSesion() {
+      return request.auth != null;
+    }
+
+    function yo() {
+      return request.auth.uid;
+    }
+
+    /** Solo cambian estos campos respecto del documento guardado. */
+    function soloCambian(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    function textoOpcional(v, max) {
+      return v == null || (v is string && v.size() <= max);
+    }
+
+    function texto(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function enteroEntre(v, min, max) {
+      return v is int && v >= min && v <= max;
+    }
+
+    function rutaTorneo(slug) {
+      return /databases/$(database)/documents/tournaments/$(slug);
+    }
+
+    function rutaEquipo(teamId) {
+      return /databases/$(database)/documents/teams/$(teamId);
+    }
+
+    function esStaffDe(t) {
+      return conSesion() && (t.organizer_id == yo() || yo() in t.get('admin_ids', []));
+    }
+
+    function esStaff(slug) {
+      return esStaffDe(get(rutaTorneo(slug)).data);
+    }
+
+    function inscripcionAbierta(t) {
+      return t.status in ['inscripcion', 'armado'];
+    }
+
+    // -------------------------------------------------------------- usuarios
+
+    // Lo que el dueño puede escribir de su perfil. `is_admin` no está.
+    function camposDePerfil() {
+      return ['display_name', 'display_name_lower', 'avatar_url', 'timezone', 'discord', 'xbox_tag',
+              'aoe3_profile', 'steam_url', 'rating_1v1', 'rating_team', 'availability', 'exceptions'];
+    }
+
+    function ratingValido(v) {
+      return v == null || enteroEntre(v, 0, 5000);
+    }
+
+    // El link de Steam se pega a mano y no se verifica: solo se exige que sea
+    // un perfil de steamcommunity.com.
+    function steamValido(v) {
+      return v == null || (v is string && v.size() <= 120
+        && v.matches('https://steamcommunity[.]com/(id|profiles)/[A-Za-z0-9_-]{2,64}/?'));
+    }
+
+    function perfilValido(d) {
+      return texto(d.display_name, 1, 60)
+        && d.display_name_lower == d.display_name.lower()
+        && textoOpcional(d.get('avatar_url', null), 500)
+        && textoOpcional(d.get('timezone', null), 60)
+        && textoOpcional(d.get('discord', null), 200)
+        && textoOpcional(d.get('xbox_tag', null), 200)
+        && textoOpcional(d.get('aoe3_profile', null), 200)
+        && steamValido(d.get('steam_url', null))
+        && ratingValido(d.get('rating_1v1', null))
+        && ratingValido(d.get('rating_team', null))
+        && d.get('availability', []) is list && d.get('availability', []).size() <= 336
+        && d.get('exceptions', []) is list && d.get('exceptions', []).size() <= 200;
+    }
+
+    match /users/{userId} {
+      // Perfil público: lo ven todos (nombres en llaves, equipos y chat).
+      allow read: if true;
+      allow create: if conSesion() && yo() == userId
+        && request.resource.data.keys().hasOnly(camposDePerfil().concat(['created_at', 'is_admin']))
+        && request.resource.data.get('is_admin', 0) == 0
+        && perfilValido(request.resource.data);
+      allow update: if conSesion() && yo() == userId
+        && soloCambian(camposDePerfil())
+        && perfilValido(request.resource.data);
+      allow delete: if false;
+
+      // Datos que solo ve el dueño (por ejemplo el email de Google).
+      match /privado/{doc} {
+        allow read, write: if conSesion() && yo() == userId;
+      }
+    }
+
+    // --------------------------------------------------------------- torneos
+
+    function torneoValido(d) {
+      return texto(d.name, 1, 120)
+        && d.status in ['borrador', 'inscripcion', 'armado', 'en_curso', 'finalizado', 'cancelado']
+        && d.team_size in [1, 2, 3, 4]
+        && d.get('admin_ids', []) is list && d.get('admin_ids', []).size() <= 10
+        && enteroEntre(d.get('civ_bans', 0), 0, 3)
+        && enteroEntre(d.get('best_of', 1), 1, 9);
+    }
+
+    match /tournaments/{slug} {
+      allow read: if true;
+      allow create: if conSesion()
+        && request.resource.data.organizer_id == yo()
+        && request.resource.data.slug == slug
+        && torneoValido(request.resource.data);
+      // Los admins editan todo menos el organizador y la lista de admins.
+      allow update: if esStaffDe(resource.data)
+        && request.resource.data.organizer_id == resource.data.organizer_id
+        && request.resource.data.slug == slug
+        && (resource.data.organizer_id == yo()
+            || request.resource.data.get('admin_ids', []) == resource.data.get('admin_ids', []))
+        && torneoValido(request.resource.data);
+      allow delete: if esStaffDe(resource.data);
+
+      // Etapas (grupos, suizo): las genera el staff desde su navegador.
+      match /stages/{stageId} {
+        allow read: if true;
+        allow write: if esStaff(slug);
+      }
+
+      // ---------------------------------------------------------- inscripciones
+
+      // Equipo del torneo que, después de esta escritura, incluye al usuario.
+      function equipoConmigo(teamId) {
+        return teamId == null || (
+          getAfter(rutaEquipo(teamId)).data.tournament_id == slug
+          && yo() in getAfter(rutaEquipo(teamId)).data.member_ids);
+      }
+
+      // Suelto sin equipo, o con equipo; nunca mitad y mitad.
+      function equipoCoherente(d) {
+        return (d.team_id == null) == (d.kind == 'solo');
+      }
+
+      function altaPropia(userId) {
+        let d = request.resource.data;
+        let t = get(rutaTorneo(slug)).data;
+        return yo() == userId
+          && inscripcionAbierta(t)
+          && d.keys().hasOnly(['user_id', 'team_id', 'kind', 'status', 'paid', 'paid_at', 'payment_ref', 'note', 'created_at'])
+          && d.user_id == userId
+          && d.status == 'pendiente'
+          && d.paid == 0 && d.paid_at == null && d.payment_ref == null
+          && d.kind in ['solo', 'equipo']
+          && (d.kind == 'equipo' || t.team_size == 1 || t.allow_solo == 1)
+          && equipoCoherente(d)
+          && equipoConmigo(d.team_id)
+          && textoOpcional(d.note, 500);
+      }
+
+      // El dueño se retira, vuelve (si estaba retirado y está abierto) o
+      // cambia de equipo. Pago, estado del staff y nota del staff no los toca.
+      function cambioPropio(userId) {
+        let d = request.resource.data;
+        let r = resource.data;
+        return yo() == userId
+          && soloCambian(['status', 'kind', 'team_id', 'note'])
+          && (d.status == r.status
+              || d.status == 'retirada'
+              || (r.status == 'retirada' && d.status == 'pendiente' && inscripcionAbierta(get(rutaTorneo(slug)).data)))
+          && (d.status == 'retirada'
+              ? d.team_id == null
+              : (equipoCoherente(d) && equipoConmigo(d.team_id)))
+          && textoOpcional(d.note, 500);
+      }
+
+      // El capitán suma a alguien a su equipo o lo saca.
+      function cambioDeCapitan(userId) {
+        let d = request.resource.data;
+        let r = resource.data;
+        return conSesion()
+          && soloCambian(['team_id', 'kind'])
+          && (d.team_id == null
+              ? (r.team_id != null && d.kind == 'solo'
+                 && get(rutaEquipo(r.team_id)).data.captain_id == yo())
+              : (d.kind == 'equipo'
+                 && getAfter(rutaEquipo(d.team_id)).data.tournament_id == slug
+                 && getAfter(rutaEquipo(d.team_id)).data.captain_id == yo()
+                 && userId in getAfter(rutaEquipo(d.team_id)).data.member_ids));
+      }
+
+      match /registrations/{userId} {
+        allow read: if true;
+        allow create: if esStaff(slug) || (conSesion() && altaPropia(userId));
+        allow update: if esStaff(slug) || (conSesion() && cambioPropio(userId)) || cambioDeCapitan(userId);
+        allow delete: if esStaff(slug);
+      }
+    }
+
+    // --------------------------------------------------------------- equipos
+
+    function equipoValido(d, t) {
+      return texto(d.name, 1, 60)
+        && textoOpcional(d.get('tag', null), 8)
+        && textoOpcional(d.get('logo_url', null), 500)
+        && d.member_ids is list && d.members is list
+        && d.members.size() == d.member_ids.size()
+        && d.member_ids.size() <= t.team_size
+        && (d.captain_id == null || d.captain_id in d.member_ids);
+    }
+
+    // Un jugador crea su equipo con él solo, como capitán.
+    function equipoNuevoPropio(d, t) {
+      return inscripcionAbierta(t)
+        && d.keys().hasOnly(['tournament_id', 'name', 'tag', 'logo_url', 'captain_id', 'seed', 'auto_built',
+                             'created_at', 'members', 'member_ids'])
+        && d.captain_id == yo()
+        && d.member_ids == [yo()]
+        && d.members == [{ 'user_id': yo(), 'role': 'capitan' }]
+        && d.get('seed', null) == null
+        && d.get('auto_built', 0) == 0;
+    }
+
+    // Un jugador se suma solo a un equipo con lugar.
+    function meSumo(r, d, t) {
+      return inscripcionAbierta(t)
+        && soloCambian(['members', 'member_ids'])
+        && !(yo() in r.member_ids)
+        && d.member_ids == r.member_ids.concat([yo()])
+        && d.members == r.members.concat([{ 'user_id': yo(), 'role': 'jugador' }]);
+    }
+
+    // Un jugador se va de su equipo.
+    function meVoy(r, d) {
+      return soloCambian(['members', 'member_ids'])
+        && yo() in r.member_ids
+        && d.member_ids == r.member_ids.removeAll([yo()])
+        && d.members == r.members.removeAll([{ 'user_id': yo(), 'role': 'jugador' },
+                                             { 'user_id': yo(), 'role': 'capitan' }]);
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+
+      allow create: if conSesion()
+        && (esStaff(request.resource.data.tournament_id)
+            || equipoNuevoPropio(request.resource.data, get(rutaTorneo(request.resource.data.tournament_id)).data))
+        && equipoValido(request.resource.data, get(rutaTorneo(request.resource.data.tournament_id)).data);
+
+      // Seed y `auto_built` solo los cambia el staff.
+      allow update: if conSesion()
+        && request.resource.data.tournament_id == resource.data.tournament_id
+        && (esStaff(resource.data.tournament_id)
+            || (resource.data.captain_id == yo()
+                && soloCambian(['name', 'tag', 'logo_url', 'captain_id', 'members', 'member_ids']))
+            || meSumo(resource.data, request.resource.data, get(rutaTorneo(resource.data.tournament_id)).data)
+            || meVoy(resource.data, request.resource.data))
+        && equipoValido(request.resource.data, get(rutaTorneo(resource.data.tournament_id)).data);
+
+      // Se borra con el staff, o cuando se va el último que quedaba.
+      allow delete: if conSesion()
+        && (esStaff(resource.data.tournament_id) || resource.data.member_ids == [yo()]);
+    }
+
+    // ------------------------------------------------- chat y avisos (T36)
 
     // Avisos de cambios de cada partido: solo contadores, sin datos de nadie.
     match /live/{matchId} {

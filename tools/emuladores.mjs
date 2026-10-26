@@ -3,7 +3,7 @@
 //   npm run emuladores   -> levanta todos (auth, firestore, database, functions,
 //                           hosting, tasks) con la UI en :4000
 //   npm test             -> levanta auth, firestore y database, corre las pruebas de
-//                           functions/ y los apaga
+//                           functions/ y las de lógica de web/, y los apaga
 //
 // Firestore y Realtime Database corren en Java. Si local.env trae
 // JAVA_HOME_EMULADORES (la carpeta de un JDK 11+), se pone primero en el PATH;
@@ -30,7 +30,7 @@ const [modo, ...extra] = process.argv.slice(2);
 let args;
 if (modo === 'test') {
   // Base vacía y aparte: las pruebas no usan ni tocan .emulator-data.
-  args = ['emulators:exec', '--only', 'auth,firestore,database', '"npm --prefix functions test"'];
+  args = ['emulators:exec', '--only', 'auth,firestore,database', '"npm --prefix functions test && npm --prefix web test"'];
 } else {
   const DATOS = './.emulator-data';
   args = ['emulators:start', '--export-on-exit', DATOS];

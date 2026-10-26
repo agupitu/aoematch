@@ -1,5 +1,5 @@
 export type User = {
-  id: number;
+  id: string;
   display_name: string;
   avatar_url: string | null;
   timezone: string;
@@ -27,7 +27,7 @@ export type Civ = {
 export type GameMap = { id: number; slug: string; name_es: string; img: string };
 
 export type Member = {
-  id: number;
+  id: string;
   display_name: string;
   avatar_url: string | null;
   timezone?: string;
@@ -37,12 +37,12 @@ export type Member = {
 };
 
 export type Team = {
-  id: number;
-  tournament_id: number;
+  id: string;
+  tournament_id: string;
   name: string;
   tag: string | null;
   logo_url: string | null;
-  captain_id: number | null;
+  captain_id: string | null;
   seed: number | null;
   auto_built: number;
   members: Member[];
@@ -50,9 +50,9 @@ export type Team = {
 };
 
 export type Registration = {
-  id: number;
-  user_id: number;
-  team_id: number | null;
+  id: string;
+  user_id: string;
+  team_id: string | null;
   team_name: string | null;
   kind: 'solo' | 'equipo';
   status: 'pendiente' | 'confirmada' | 'rechazada' | 'retirada';
@@ -68,19 +68,19 @@ export type Registration = {
 };
 
 export type Match = {
-  id: number;
-  tournament_id: number;
-  stage_id: number | null;
-  group_id: number | null;
+  id: string;
+  tournament_id: string;
+  stage_id: string | null;
+  group_id: string | null;
   bracket: 'W' | 'L' | 'F';
   round: number;
   position: number;
   label: string | null;
-  team_a_id: number | null;
-  team_b_id: number | null;
+  team_a_id: string | null;
+  team_b_id: string | null;
   team_a_name: string | null;
   team_b_name: string | null;
-  winner_team_id: number | null;
+  winner_team_id: string | null;
   score_a: number;
   score_b: number;
   best_of: number;
@@ -120,21 +120,21 @@ export type PrizePool = {
 };
 
 export type Stage = {
-  id: number;
+  id: string;
   name: string;
   type: string;
   idx: number;
-  groups: { id: number; name: string; standings: StandingRow[] }[];
+  groups: { id: string; name: string; standings: StandingRow[] }[];
 };
 
 export type Tournament = {
-  id: number;
+  id: string;
   slug: string;
   name: string;
   description: string | null;
   rules_md: string | null;
   banner_url: string | null;
-  organizer_id: number;
+  organizer_id: string;
   status: string;
   format: string;
   team_size: number;
@@ -172,7 +172,7 @@ export type Tournament = {
   prize_notes: string | null;
   prizes: Prize[];
   prize_pool: PrizePool;
-  organizer: { id: number; display_name: string };
+  organizer: { id: string; display_name: string };
   maps: GameMap[];
   civs: Civ[];
   teams: Team[];
@@ -180,7 +180,7 @@ export type Tournament = {
   stages: Stage[];
   matches: Match[];
   standings: StandingRow[] | null;
-  me: { is_staff: boolean; registration: Registration | null; team_id: number | null } | null;
+  me: { is_staff: boolean; registration: Registration | null; team_id: string | null } | null;
 };
 
 export type DraftStep = {
@@ -194,18 +194,18 @@ export type DraftStep = {
 
 export type CivPick = {
   step_idx: number;
-  team_id: number;
+  team_id: string;
   side: 'a' | 'b' | null;
   slot: number | null;
-  user_id: number | null;
+  user_id: string | null;
   civ_id: number | null;
   hidden: boolean;
   auto: boolean;
 };
 
 export type DraftState = {
-  id: number;
-  match_id: number;
+  id: string;
+  match_id: string;
   game_no: number;
   state: 'espera' | 'en_curso' | 'finalizado';
   current_step: number;
@@ -213,11 +213,11 @@ export type DraftState = {
   deadline_at: string | null;
   timer_s: number;
   ready: { a: boolean; b: boolean };
-  first_team_id: number | null;
-  teams: { a: { id: number; roster: Member[] }; b: { id: number; roster: Member[] } };
+  first_team_id: string | null;
+  teams: { a: { id: string; roster: Member[] }; b: { id: string; roster: Member[] } };
   steps: DraftStep[];
   step: DraftStep | null;
-  turn_team_id: number | null;
+  turn_team_id: string | null;
   pools: { maps: GameMap[]; civs: Civ[] };
   maps_banned: number[];
   map_picked: number | null;
@@ -235,16 +235,16 @@ export type DraftState = {
 };
 
 export type ChatMessage = {
-  id: number;
+  id: string;
   body: string;
   system: boolean;
   created_at: string;
-  user: { id: number; display_name: string; avatar_url: string | null } | null;
+  user: { id: string; display_name: string; avatar_url: string | null } | null;
 };
 
 export type MatchDetail = Match & {
   tournament: {
-    id: number;
+    id: string;
     slug: string;
     name: string;
     team_size: number;
@@ -254,27 +254,26 @@ export type MatchDetail = Match & {
     draft_timer_s: number;
   };
   teams: {
-    a: { id: number; name: string; roster: Member[] } | null;
-    b: { id: number; name: string; roster: Member[] } | null;
+    a: { id: string; name: string; roster: Member[] } | null;
+    b: { id: string; name: string; roster: Member[] } | null;
   };
   games: {
-    id: number;
+    id: string;
     game_no: number;
     map_id: number | null;
     map: GameMap | null;
-    winner_team_id: number | null;
+    winner_team_id: string | null;
     replay_url: string | null;
-    civs: { user_id: number; team_id: number; civ_id: number; name_es: string; flag: string; display_name: string }[];
+    civs: { user_id: string; team_id: string; civ_id: number; name_es: string; flag: string; display_name: string }[];
   }[];
   draft: DraftState | null;
-  me: { team_id: number | null; is_staff: boolean; can_report: boolean; is_captain: boolean };
-  chat: { general: ChatMessage[]; team: ChatMessage[] | null; team_id: number | null };
+  me: { team_id: string | null; is_staff: boolean; can_report: boolean; is_captain: boolean };
 };
 
 export type Window = {
   start_min: number;
   end_min: number;
   count: number;
-  missing: number[];
+  missing: string[];
   next_utc: string;
 };

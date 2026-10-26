@@ -2,7 +2,8 @@
 // (draft-core.js) dentro de una transacción, lo corre y guarda el draft y el
 // partido de una vez: dos capitanes que eligen a la vez no se pisan, porque
 // Firestore reintenta al segundo con el draft ya avanzado. Después del commit
-// avisa en live/{matchId} (live.js) para que los clientes vuelvan a pedir el estado.
+// avisa en live/{matchId} (live.js) para que los clientes vuelvan a pedir el
+// estado y, si el paso estrena plazo, programa su vencimiento (relojes.js).
 
 import * as motor from './draft-core.js';
 import { enTransaccion, ordenarPor } from './data/base.js';
@@ -12,6 +13,7 @@ import { actualizarPartido, leerPartido } from './data/partidos.js';
 import { leerTorneo } from './data/torneos.js';
 import { mapaDeUsuarios } from './data/usuarios.js';
 import { avisar } from './live.js';
+import { programarVencimiento } from './relojes.js';
 
 export { patronPorDefecto } from './draft-core.js';
 
@@ -77,10 +79,13 @@ const CAMPOS_DEL_DRAFT = ['state', 'current_step', 'deadline_at', 'ready_a', 're
  * cambió. `mover` devuelve lo que devuelven las acciones de draft-core.js, o
  * null si no hay nada que hacer. Devuelve el estado nuevo (o null).
  */
-function correr(matchId, mover, viewerTeamId) {
+function correr(matchId, mover, viewerTeamId, { sinDraft = 'error' } = {}) {
   return enTransaccion(async (tx, despues) => {
     const draft = await ultimoDraft(matchId, tx);
-    if (!draft) throw new Error('No hay draft abierto.');
+    if (!draft) {
+      if (sinDraft === 'nada') return null;
+      throw new Error('No hay draft abierto.');
+    }
     const ctx = await contexto(matchId, tx);
 
     const r = mover(ctx, draft);
@@ -90,6 +95,7 @@ function correr(matchId, mover, viewerTeamId) {
     for (const c of CAMPOS_DEL_DRAFT) cambios[c] = r.draft[c];
     actualizarDraft(matchId, draft.game_no, cambios, tx);
     despues(() => avisar(matchId, 'draft'));
+    if (r.draft.deadline_at !== draft.deadline_at) despues(() => programarVencimiento(matchId, r.draft));
 
     const partido = {};
     if (r.partido.status !== ctx.partido.status) partido.status = r.partido.status;
@@ -114,9 +120,34 @@ export function aplicarAccion(matchId, user, opts, { viewerTeamId = null, ahora,
 }
 
 /**
- * Resuelve al azar el paso vencido. Con `aviso` ({ step, deadline }) solo actúa
- * si el draft sigue en ese paso con ese plazo. Devuelve null si no hizo nada.
+ * Resuelve al azar el paso vencido. Con `aviso` ({ step, deadline }, lo que
+ * encola el reloj) solo actúa si el draft sigue en ese paso con ese plazo;
+ * si no, devuelve null. Si el aviso es el vigente pero el plazo todavía no
+ * llegó (la tarea se adelantó), corta con error para que Cloud Tasks reintente.
  */
-export function porTimeout(matchId, aviso = {}, { ahora, rnd } = {}) {
-  return correr(matchId, (ctx, draft) => motor.porTimeout(ctx, draft, aviso, { ahora, rnd }), null);
+export function porTimeout(matchId, aviso = {}, { ahora = Date.now(), rnd } = {}) {
+  return correr(matchId, (ctx, draft) => {
+    const vigente = aviso.step === draft.current_step && aviso.deadline === draft.deadline_at;
+    if (vigente && !motor.vencido(draft, ahora)) throw new Error('Todavía no venció el plazo.');
+    return motor.porTimeout(ctx, draft, aviso, { ahora, rnd });
+  }, null, { sinDraft: 'nada' });
+}
+
+/**
+ * Respaldo del reloj: si el paso actual ya venció (por ejemplo, porque se
+ * perdió la tarea), lo resuelve ahora. Las rutas de partido lo llaman antes de
+ * responder (T23). Devuelve el estado nuevo, o null si no había nada vencido.
+ */
+export function resolverVencidos(matchId, { viewerTeamId = null, ahora = Date.now(), rnd } = {}) {
+  return correr(
+    matchId,
+    (ctx, draft) => (motor.vencido(draft, ahora) ? motor.porTimeout(ctx, draft, {}, { ahora, rnd }) : null),
+    viewerTeamId,
+    { sinDraft: 'nada' }
+  );
+}
+
+/** Lo que hace la tarea del reloj al dispararse (función `vencerPaso` de index.js). */
+export async function alVencer({ matchId, step, deadline }) {
+  await porTimeout(matchId, { step, deadline });
 }

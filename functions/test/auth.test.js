@@ -6,7 +6,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { cuentaConEmail, cuentaConGoogle, levantarApi, vaciarAuth } from './apoyo.js';
 
-const { leerUsuario } = await import('../src/data/usuarios.js');
+const { guardarUsuario, leerUsuario } = await import('../src/data/usuarios.js');
 
 let api;
 
@@ -80,11 +80,76 @@ describe('sesión con Firebase Auth', () => {
     assert.equal((await leerUsuario(uid)).display_name_lower, 'garja');
   });
 
+  it('el login de prueba solo se anuncia en el emulador de Functions', async () => {
+    const antes = process.env.FUNCTIONS_EMULATOR;
+    delete process.env.FUNCTIONS_EMULATOR;
+    assert.equal((await pedir('GET', '/auth/providers')).datos.dev_login, false);
+    process.env.FUNCTIONS_EMULATOR = 'true';
+    assert.equal((await pedir('GET', '/auth/providers')).datos.dev_login, true);
+    if (antes === undefined) delete process.env.FUNCTIONS_EMULATOR;
+    else process.env.FUNCTIONS_EMULATOR = antes;
+  });
+
   it('un nombre vacío no borra el que había', async () => {
     const { token } = await cuentaConEmail('fifty@demo.aoematch');
     await pedir('PATCH', '/auth/me', { token, body: { display_name: 'Fifty' } });
     const { datos } = await pedir('PATCH', '/auth/me', { token, body: { display_name: '', xbox_tag: 'Fifty50' } });
     assert.equal(datos.user.display_name, 'Fifty');
     assert.equal(datos.user.xbox_tag, 'Fifty50');
+  });
+});
+
+describe('buscador de usuarios', () => {
+  it('el alta y el PATCH guardan display_name_lower, y solo matchea el prefijo', async () => {
+    const { uid, token } = await cuentaConEmail('kaisert13@demo.aoematch');
+    await pedir('GET', '/auth/me', { token });
+    assert.equal((await leerUsuario(uid)).display_name_lower, 'kaisert13');
+
+    await pedir('PATCH', '/auth/me', { token, body: { display_name: 'KaiserT13' } });
+    assert.equal((await leerUsuario(uid)).display_name_lower, 'kaisert13');
+
+    const si = await pedir('GET', `/auth/users?q=${encodeURIComponent('  KAISERT ')}`, { token });
+    assert.equal(si.status, 200);
+    assert.ok(si.datos.some((u) => u.id === uid && u.display_name === 'KaiserT13'));
+
+    const no = await pedir('GET', '/auth/users?q=isert1', { token });
+    assert.equal(no.datos.some((u) => u.id === uid), false);
+  });
+
+  it('sin avatar_url cae en steam_avatar, y no devuelve más de 20', async () => {
+    const { token } = await cuentaConEmail('testigo-t13@demo.aoematch');
+    await pedir('GET', '/auth/me', { token });
+
+    await guardarUsuario('t13-avatar', {
+      display_name: 'AvatarT13',
+      avatar_url: null,
+      steam_avatar: 'https://steam.example/a.png',
+      steam_name: 'steam-avatar',
+      rating_1v1: 1600,
+    });
+    const { datos } = await pedir('GET', '/auth/users?q=avatart13', { token });
+    const avatar = datos.find((u) => u.id === 't13-avatar');
+    assert.deepEqual(avatar, {
+      id: 't13-avatar',
+      display_name: 'AvatarT13',
+      avatar_url: 'https://steam.example/a.png',
+      steam_avatar: 'https://steam.example/a.png',
+      steam_name: 'steam-avatar',
+      rating_1v1: 1600,
+      rating_team: null,
+    });
+
+    for (let i = 0; i < 21; i++) {
+      const n = String(i).padStart(2, '0');
+      await guardarUsuario(`t13tope${n}`, { display_name: `T13Tope${n}` });
+    }
+    const tope = await pedir('GET', '/auth/users?q=t13tope', { token });
+    assert.equal(tope.datos.length, 20);
+    assert.equal(tope.datos.some((u) => u.id === 't13tope20'), false);
+    assert.ok(tope.datos.every((u) => u.display_name.toLowerCase().startsWith('t13tope')));
+
+    const vacia = await pedir('GET', '/auth/users', { token });
+    assert.ok(Array.isArray(vacia.datos));
+    assert.ok(vacia.datos.length <= 20);
   });
 });

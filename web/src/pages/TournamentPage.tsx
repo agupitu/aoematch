@@ -8,12 +8,12 @@ import { AvailabilityGrid } from '../components/AvailabilityGrid';
 import { MatchCalendar } from '../components/MatchCalendar';
 import { TournamentForm, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
-import { useSocket } from '../ws';
+import { useChat, useConectado } from '../live';
 import {
   ETIQUETA_CIV, ETIQUETA_ESTADO, ETIQUETA_FORMATO, ETIQUETA_MAPA,
   fechaCorta, horas, monto, plata, rangoSemana, offsetZona, zonaDelNavegador,
 } from '../lib';
-import type { ChatMessage, Civ, GameMap, Registration, StandingRow, Team, Tournament, Window } from '../types';
+import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, Window } from '../types';
 
 type Pestania = 'resumen' | 'inscripciones' | 'equipos' | 'llaves' | 'horarios' | 'chat' | 'config';
 
@@ -96,7 +96,7 @@ function AccionesInscripcion({
   onDone,
 }: {
   t: Tournament;
-  user: { id: number } | null;
+  user: { id: string } | null;
   onDone: () => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -122,7 +122,7 @@ function AccionesInscripcion({
       await api.post(`/api/tournaments/${t.id}/register`, {
         kind,
         team_name: nombreEquipo || undefined,
-        team_id: equipoId ? Number(equipoId) : undefined,
+        team_id: equipoId || undefined,
       });
       setAbierto(false);
       onDone();
@@ -400,7 +400,7 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const filas = t.registrations.filter((r) => r.status !== 'retirada');
 
   const marcar = async (r: Registration, campos: Partial<Registration>) => {
-    await api.patch(`/api/tournaments/${t.id}/registrations/${r.id}`, campos);
+    await api.patch(`/api/tournaments/${t.id}/registrations/${r.user_id}`, campos);
     onDone();
   };
 
@@ -475,8 +475,8 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
 type Propuesta = {
   score: number;
-  teams: { name: string; avg_rating: number; overlap_min: number; members: { id: number; display_name: string; rating: number | null }[] }[];
-  leftovers: { id: number; display_name: string }[];
+  teams: { name: string; avg_rating: number; overlap_min: number; members: { id: string; display_name: string; rating: number | null }[] }[];
+  leftovers: { id: string; display_name: string }[];
   note?: string;
 };
 
@@ -858,23 +858,17 @@ function Horarios({ t }: { t: Tournament }) {
 
 function ChatTorneo({ t, puedeEscribir }: { t: Tournament; puedeEscribir: boolean }) {
   const sala = `tournament:${t.id}`;
-  const [mensajes, setMensajes] = useState<Record<string, ChatMessage[]>>({});
-  const [presencia, setPresencia] = useState<Record<string, { id: number; display_name: string; avatar_url: string | null }[]>>({});
-
-  const { conectado, enviar } = useSocket([sala], (msg) => {
-    if (msg.type === 'history') setMensajes((p) => ({ ...p, [msg.room]: msg.messages as ChatMessage[] }));
-    if (msg.type === 'chat')
-      setMensajes((p) => ({ ...p, [msg.room]: [...(p[msg.room] ?? []), msg.message as ChatMessage] }));
-    if (msg.type === 'presence') setPresencia((p) => ({ ...p, [msg.room]: msg.users as never }));
-  });
+  const { mensajes, errores, enviar } = useChat([sala]);
+  const conectado = useConectado();
 
   return (
     <div className="h-[32rem]">
+      {errores[sala] && <Alerta>{errores[sala]}</Alerta>}
       <ChatPanel
         salas={[{ id: sala, label: 'General del torneo' }]}
         mensajes={mensajes}
-        presencia={presencia}
-        onSend={(room, body) => enviar({ type: 'chat', room, body })}
+        presencia={{}}
+        onSend={(room, body) => void enviar(room, body).catch(() => {})}
         puedeEscribir={puedeEscribir}
         conectado={conectado}
       />

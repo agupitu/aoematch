@@ -2,19 +2,15 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 
 import { attachUser } from './auth.js';
-import { cargarCatalogo } from './seed.js';
 
 import { router as authRouter } from './routes/auth.js';
 import { router as catalogRouter } from './routes/catalog.js';
 import { router as tournamentsRouter } from './routes/tournaments.js';
-import { router as tournamentsSqliteRouter } from './routes/tournaments-sqlite.js';
 import { router as matchesRouter } from './routes/matches.js';
+import { router as roomsRouter } from './routes/rooms.js';
 
 // La API completa, sin listen: la monta la función `api` de index.js detrás de
 // /api/**. La web y las imágenes las sirve Hosting (en local, Vite).
-
-// Mientras la base siga en SQLite, civs y mapas viven en tablas (hasta T05).
-cargarCatalogo();
 
 export const app = express();
 app.disable('x-powered-by');
@@ -27,9 +23,8 @@ app.use(attachUser);
 app.use('/api/auth', authRouter);
 app.use('/api', catalogRouter);
 app.use('/api/tournaments', tournamentsRouter);
-// Lo que todavía no pasó a Firestore (hasta T17–T20).
-app.use('/api/tournaments', tournamentsSqliteRouter);
 app.use('/api/matches', matchesRouter);
+app.use('/api/rooms', roomsRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 

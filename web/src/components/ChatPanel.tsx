@@ -15,7 +15,7 @@ export function ChatPanel({
 }: {
   salas: SalaChat[];
   mensajes: Record<string, ChatMessage[]>;
-  presencia: Record<string, { id: number; display_name: string; avatar_url: string | null }[]>;
+  presencia: Record<string, { id: string; display_name: string; avatar_url: string | null }[]>;
   onSend: (sala: string, texto: string) => void;
   puedeEscribir: boolean;
   conectado: boolean;

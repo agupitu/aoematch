@@ -29,12 +29,12 @@ export function DraftBoard({
   onIniciar,
 }: {
   draft: DraftState | null;
-  miEquipo: number | null;
+  miEquipo: string | null;
   soyCapitan: boolean;
   esStaff: boolean;
   nombres: { a: string; b: string };
   onReady: () => void;
-  onAction: (kind: string, targetId: number, forUserId?: number) => void;
+  onAction: (kind: string, targetId: number, forUserId?: string) => void;
   onIniciar: () => void;
 }) {
   const restante = useCuentaRegresiva(draft?.deadline_at ?? null);

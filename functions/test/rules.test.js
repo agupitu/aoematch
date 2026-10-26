@@ -32,8 +32,6 @@ before(async () => {
     await db.doc('rooms/equipo_e1').set({ kind: 'equipo', public_read: false, readers: ['miembro', 'staff'] });
     await db.doc('rooms/equipo_e1/messages/m1').set({ body: 'banean Alaska' });
     await db.doc('live/p1').set({ draft: 1 });
-    await db.doc('users/miembro').set({ display_name: 'Miembro', google_email: 'privado@gmail.com' });
-    await db.doc('tournaments/copa').set({ name: 'Copa' });
     await db.doc('matches/p1').set({ tournament_id: 'copa' });
   });
 });
@@ -78,13 +76,10 @@ describe('reglas de Firestore', () => {
     await assertFails(como('miembro').firestore().collection('rooms/torneo_copa/messages').add({ body: 'hola' }));
   });
 
-  it('el resto no se lee: usuarios, torneos, partidos, salas', async () => {
+  it('partidos y salas no se leen (T36)', async () => {
     const db = como('miembro').firestore();
-    await assertFails(db.doc('users/miembro').get());
-    await assertFails(db.doc('tournaments/copa').get());
     await assertFails(db.doc('matches/p1').get());
     await assertFails(db.doc('rooms/equipo_e1').get());
-    await assertFails(anonimo().firestore().collection('users').get());
   });
 });
 

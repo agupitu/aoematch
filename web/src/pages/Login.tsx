@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Alerta } from '../components/ui';
-
-type Proveedores = { steam: boolean; google: boolean; dev_login: boolean };
+import { auth } from '../firebase';
+import { popupCerrado } from '../lib';
 
 const MENSAJES: Record<string, string> = {
   error: 'No se pudo completar el ingreso. Probá de nuevo.',
-  sin_config: 'El ingreso con Google todavía no está configurado en este servidor.',
   ocupado: 'Esa cuenta ya está vinculada a otro usuario.',
 };
 
@@ -16,17 +16,41 @@ export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [prov, setProv] = useState<Proveedores>({ steam: true, google: false, dev_login: false });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [errorGoogle, setErrorGoogle] = useState('');
+  const [errorSteam, setErrorSteam] = useState('');
+  const [yendoASteam, setYendoASteam] = useState(false);
+  const [volviendoDeSteam] = useState(
+    () => new URLSearchParams(window.location.hash.slice(1)).has('token')
+  );
 
-  useEffect(() => {
-    api.get<Proveedores>('/api/auth/providers').then(setProv).catch(() => {});
-  }, []);
+  const aviso = errorSteam || errorGoogle || (MENSAJES[params.get('steam') ?? ''] ?? '');
+  const entrando = volviendoDeSteam && params.get('steam') !== 'error';
 
-  const aviso = MENSAJES[params.get('google') ?? ''] ?? MENSAJES[params.get('steam') ?? ''] ?? '';
+  const entrarConSteam = async () => {
+    setErrorSteam('');
+    setYendoASteam(true);
+    try {
+      const { url } = await api.post<{ url: string }>('/api/auth/steam/start', {});
+      window.location.assign(url);
+    } catch (err) {
+      setYendoASteam(false);
+      setErrorSteam((err as Error).message);
+    }
+  };
+
+  const entrarConGoogle = async () => {
+    setErrorGoogle('');
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      navigate('/perfil?google=ok');
+    } catch (err) {
+      if (!popupCerrado(err)) setErrorGoogle(MENSAJES.error);
+    }
+  };
 
   const entrarDemo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +65,14 @@ export function Login() {
       setEnviando(false);
     }
   };
+
+  if (entrando) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-12 text-center">
+        <p className="title text-2xl">Entrando…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-md px-4 py-12">
@@ -57,25 +89,19 @@ export function Login() {
       )}
 
       <div className="space-y-3">
-        <a href="/api/auth/steam" className="btn btn-primary w-full py-3">
+        <button type="button" className="btn btn-primary w-full py-3" disabled={yendoASteam} onClick={entrarConSteam}>
           Continuar con Steam
-        </a>
-        {prov.google ? (
-          <a href="/api/auth/google" className="btn btn-ghost w-full py-3">
-            Continuar con Google
-          </a>
-        ) : (
-          <button className="btn btn-ghost w-full py-3" disabled title="Falta configurar GOOGLE_CLIENT_ID">
-            Continuar con Google
-          </button>
-        )}
+        </button>
+        <button type="button" className="btn btn-ghost w-full py-3" onClick={entrarConGoogle}>
+          Continuar con Google
+        </button>
       </div>
 
       <p className="hint mt-5 text-xs">
         Con Steam queda vinculada tu cuenta de Age of Empires III y se traen tu nombre y avatar.
       </p>
 
-      {prov.dev_login && (
+      {import.meta.env.DEV && (
         <details className="mt-8">
           <summary className="cursor-pointer text-xs text-parch-400 hover:text-gold-400">
             Entrar con una cuenta de prueba

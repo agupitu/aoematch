@@ -33,6 +33,8 @@ export async function levantarApi() {
   const base = `http://127.0.0.1:${servidor.address().port}/api`;
 
   return {
+    /** URL de la API, para pedidos a mano (por ejemplo sin seguir redirecciones). */
+    base,
     /** Pedido a la API; `token` va como Bearer y `body` como JSON. */
     async pedir(metodo, ruta, { token, body } = {}) {
       const headers = {};
@@ -65,11 +67,16 @@ async function pedirToken(metodo, cuerpo) {
   });
   const datos = await r.json();
   assert.ok(r.ok, JSON.stringify(datos));
-  return { uid: datos.localId, token: datos.idToken };
+  // signInWithCustomToken no devuelve localId: el uid sale del propio token.
+  const uid = datos.localId ?? JSON.parse(Buffer.from(datos.idToken.split('.')[1], 'base64url')).user_id;
+  return { uid, token: datos.idToken };
 }
 
 /** Cuenta de email y contraseña, como las de demo. */
 export const cuentaConEmail = (email) => pedirToken('signUp', { email, password: 'demo1234' });
+
+/** Canjea un token propio (createCustomToken) por un ID token, como hace la web. */
+export const tokenDeCustom = (token) => pedirToken('signInWithCustomToken', { token });
 
 /** Cuenta de Google: el emulador acepta un id_token sin firmar. */
 export function cuentaConGoogle(claims) {
