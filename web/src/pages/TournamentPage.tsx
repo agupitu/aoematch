@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '../api';
+import {
+  confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
+} from '../datos/llaves';
 import { actualizarTorneo, detalleTorneo, horariosDelTorneo } from '../datos/torneos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
@@ -496,7 +498,7 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
     setError('');
     setCargando(true);
     try {
-      setPropuesta(await api.post<Propuesta>(`/api/tournaments/${t.id}/autoteams`, { weight_overlap: peso }));
+      setPropuesta((await proponerEquiposDelTorneo(t, peso)) as Propuesta);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -537,9 +539,14 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
               <button
                 className="btn btn-ghost"
                 onClick={async () => {
-                  await api.post(`/api/tournaments/${t.id}/autoteams/confirm`, { proposal: propuesta });
-                  setPropuesta(null);
-                  onDone();
+                  setError('');
+                  try {
+                    await confirmarEquipos(t, propuesta);
+                    setPropuesta(null);
+                    onDone();
+                  } catch (err) {
+                    setError((err as Error).message);
+                  }
                 }}
               >
                 Confirmar y crear
@@ -652,10 +659,20 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const staff = !!t.me?.is_staff;
   const [error, setError] = useState('');
 
-  const accion = async (path: string) => {
+  const [mensaje, setMensaje] = useState('');
+  const accion = async (cual: 'llaves' | 'playoffs' | 'suizo') => {
     setError('');
+    setMensaje('');
     try {
-      await api.post(`/api/tournaments/${t.id}/${path}`);
+      if (cual === 'llaves') {
+        if (t.matches.length && !confirm('Regenerar borra los partidos, sus drafts y los chats de partido. ¿Seguimos?')) return;
+        await generarLlaves(t.id);
+      } else if (cual === 'playoffs') {
+        await generarPlayoffs(t.id);
+      } else {
+        const r = await siguienteRondaSuiza(t.id);
+        setMensaje(`Ronda ${r.ronda} armada${r.bye ? ` · queda libre ${r.bye}` : ''}.`);
+      }
       onDone();
     } catch (err) {
       setError((err as Error).message);
@@ -668,7 +685,7 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
     <div className="space-y-6">
       {staff && (
         <div className="flex flex-wrap items-center gap-2">
-          <button className="btn btn-primary" onClick={() => accion('brackets')}>
+          <button className="btn btn-primary" onClick={() => accion('llaves')}>
             {t.matches.length ? 'Regenerar llaves' : 'Generar llaves'}
           </button>
           {hayGrupos && (
@@ -677,7 +694,7 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
             </button>
           )}
           {t.format === 'suizo' && (
-            <button className="btn btn-ghost" onClick={() => accion('swiss/next')}>
+            <button className="btn btn-ghost" onClick={() => accion('suizo')}>
               Siguiente ronda
             </button>
           )}
@@ -688,6 +705,7 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
       )}
 
       {error && <Alerta>{error}</Alerta>}
+      {mensaje && <Alerta tone="info">{mensaje}</Alerta>}
 
       {t.standings && t.standings.length > 0 && <Tabla filas={t.standings} titulo="Posiciones" />}
 

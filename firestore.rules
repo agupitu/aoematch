@@ -319,6 +319,8 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['votes'])
           && request.resource.data.votes is list
           && request.resource.data.votes.size() <= 50;
+        // Al regenerar las llaves, el staff borra el partido con sus votos.
+        allow delete: if esStaff(get(rutaPartido(matchId)).data.tournament_id);
       }
 
       // ---------------------------------------------------------------- draft

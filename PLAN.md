@@ -14,9 +14,9 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 14 tareas pendientes, 53 h en total (unos 9 días de 6 h para una persona sola; unos 4
-días con dos seniors y un junior). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
-anterior, y T01, T34–T37 y T42 del plan Spark. No hay datos para migrar.
+**Estado.** 12 tareas pendientes, 39 h en total (unos 6,5 días de 6 h para una persona sola; unos 3
+días con un senior y un junior). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+anterior, y T01, T34–T37, T39, T42 y T43 del plan Spark. No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
 armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
@@ -113,12 +113,14 @@ las rutas y pasa a `firestore.rules`.
 | T35 | `firestore.rules` con escrituras del cliente para `users` (dueño, campos de perfil, `steam_url` validado, sin `is_admin`; `rating_1v1` y `rating_team` los edita el dueño, como hoy `PATCH /me`), `users/{uid}/privado`, `tournaments` (crea quien queda de organizador; los admins no tocan `admin_ids` ni `organizer_id`), `stages` (staff), `registrations` (alta, retiro, vuelta y cambio de equipo del dueño; pago y estado del staff; el capitán suma y saca de su equipo) y `teams` (equipo propio de uno, sumarse con lugar, irse, capitán, staff). Leer: todo eso, cualquiera. Los contadores `inscriptos`, `pagos` y `equipos` ya no los puede mantener nadie desde el cliente: T37 los saca. 29 pruebas en `functions/test/reglas-torneos.test.js`. | `firestore.rules`, `functions/test/reglas-torneos.test.js` |
 | T36 | `firestore.rules` de `matches` (leer todos; escribir el staff; los capitanes solo agendan), `matches/{id}/votos/{uid}` (cada jugador del partido, solo lo suyo: reemplaza a `schedule_votes`, que las reglas no pueden proteger por entrada), `drafts/{gameNo}` (lo crea un jugador o el staff con la partida anterior cerrada; después solo se puede elegir mapa, banear, anotarse en `picked` y revelar, cada uno en su turno), `drafts/{gameNo}/picks/{uid}` (el ajeno no se lee hasta `revealed`) y el chat (`rooms` y `messages`). **Cambios contra el plan:** revelar exige que `picked` tenga a todos los de `player_ids`, y anotarse exige que exista el pick propio (`existsAfter`), en vez de 8 `exists`; la sala de equipo no usa `readers`: quién lee sale del equipo y del staff; un mensaje lleva `created_at == request.time` y el `user` igual al perfil del autor; desde el cliente no hay mensajes del sistema. 21 pruebas en `functions/test/reglas-partidos.test.js`, con drafts armados por `planDeDraft`. | `firestore.rules`, `functions/test/reglas-partidos.test.js` |
 | T37 | `web/src/datos/`: `base.ts` (leer, consultar, `leerPorIds` de a 30, `Rechazo`, `mensajeDeError`, `conMensaje`), `usuarios.ts` (`asegurarPerfil` crea el perfil la primera vez en una transacción, `actualizarPerfil`, horario), `torneos.ts` (`listarTorneos` con `getCountFromServer`, `crearTorneo` con slug libre en transacción, `detalleTorneo` con la forma de la API, `actualizarTorneo`, `horariosDelTorneo`), `inscripciones.ts` (`inscribirse`, `retirarse`, `sacarMiembro`, `marcarInscripcion`; si se va el capitán, el primero que queda pasa a serlo) y `partidos.ts` (`detallePartido`, `horariosDelPartido`, `agendar`). Ya no usan la API: `auth.tsx` (perfil), `Home`, `CreateTournament`, `TournamentPage` (detalle, inscripción, retiro, pagos, sacar miembro, horarios, configuración), `Profile` (horario) y `MatchRoom` (detalle y agenda). Probado en el navegador con la demo: listado, detalle, alta de perfil, inscripción con equipo nuevo, retiro, volver suelto, perfil, configuración y alta de torneo como Kaiser. Quedan en la API, para sus tareas: llaves y armador (T39), resultados (T40), draft (T43: el detalle del partido devuelve `draft: null` hasta entonces), chat (T46) y Steam (T38). | `web/src/datos/`, `web/src/pages/` |
+| T39 | `web/src/datos/llaves.ts`: `generarLlaves` (borra partidos con sus drafts, picks y votos, salas de partido con sus mensajes y etapas; escribe el cuadro, las siembras y pasa el torneo a `en_curso`, en tandas de 450), `generarPlayoffs`, `siguienteRondaSuiza`, `proponerEquiposDelTorneo` y `confirmarEquipos` (en una transacción; ahora deja la inscripción con `kind: 'equipo'`). `TournamentPage.tsx` los usa en Llaves y Equipos; regenerar pide confirmación. Las reglas suman que el staff borre votos ajenos (al regenerar). Probado en el navegador como Kaiser: grupos de Clan Wars, regenerar el Ladder 1v1 (borró partido, draft y picks viejos, creó 7 partidos) y armador de la Copa Sudamericana (5 equipos). | `web/src/datos/llaves.ts`, `web/src/pages/TournamentPage.tsx` |
 
 **Fase 7 · Draft nuevo**
 
 | ID | Qué quedó | Dónde |
 |---|---|---|
 | T42 | `web/src/logica/draft.js`: `planDeDraft(torneo, partido, equipos, gameNo)` arma el documento del draft (`state` `mapa`/`bans`/`picks`/`listo`, `map_chooser_team_id`, `map_pool`, `map_id`, `civ_pool`, `ban_order`, `banned_civ_ids`, `player_ids`, `team_of`, `civs_usadas`, `revealed`); `elegirMapa`, `banear`, `turnoDeBan`, `civsPermitidas`, `validarPick`, `eligieronTodos` y `revelar` (que devuelve las civs para `games[].civs`). Mapa de la primera: `first_map_id` o uno del pool por hash del id del partido. Bans: en la primera arranca el equipo A. Juegan los primeros `team_size` de cada equipo, capitán primero. 13 pruebas en `web/test/draft.test.js`. | `web/src/logica/draft.js` |
+| T43 | `web/src/datos/drafts.ts`: `partidaActual`, `abrirDraft` (transacción que lee torneo, partido y equipos y guarda `planDeDraft` con `picked: []`), `elegirMapaDelDraft` y `banearCiv` (transacciones), `elegirCiv` (batch del pick con `picked: arrayUnion`), `revelarSiEstanTodos`, `reiniciarDraft` (staff) y `civsDeLaPartida` (para T40); `useDraft(matchId, gameNo, uid)` escucha el draft, el pick propio y, con el revelado ya confirmado en el servidor, todos los picks, y revela cuando están todos. `DraftBoard.tsx` reescrito para el modelo nuevo (funcional: mapa, bans, picks con "eligió"/"falta", revelado, reiniciar) y `MatchRoom.tsx` sin la API de draft. Un draft del modelo viejo muestra "reiniciar". Probado en el navegador con Mitoe y Fifty: mapa al azar, un ban por equipo, pick ciego (el rival ve "eligió"), espejo permitido y revelado en vivo en la pestaña que revela. | `web/src/datos/drafts.ts`, `web/src/components/DraftBoard.tsx`, `web/src/pages/MatchRoom.tsx` |
 
 **Lógica que se reutiliza**
 
@@ -143,20 +145,18 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | T28 | Presencia con Realtime Database | 3 | J | 2 h | — | 0 |
 | **Fase 6 · Sin servidor** |||||||
 | T38 | Ingreso solo con Google; link de Steam sin verificar en el perfil | 2 | J | 2 h | — | 0 |
-| T39 | Panel del creador: llaves, playoffs, suizo y armador corriendo en su navegador | 4 | S | 1 d | — | 0 |
-| T40 | Resultados por el creador: ganador por partida, cerrar serie y avanzar la llave | 4 | S | 1 d | T39 | 1 |
+| T40 | Resultados por el creador: ganador por partida, cerrar serie y avanzar la llave | 4 | S | 1 d | — | 0 |
 | T41 | Links de las partidas por partido y por fase (`vod_links`) | 2 | J | 4 h | — | 0 |
 | **Fase 7 · Draft nuevo** |||||||
-| T43 | Draft sobre Firestore: crear, elegir mapa, banear, pick ciego y revelar | 4 | S | 1 d | — | 0 |
-| T44 | `DraftBoard.tsx` y `MatchRoom.tsx` para el draft nuevo | 2 | J | 1 d | T43 | 1 |
+| T44 | Pulir `DraftBoard.tsx` y sacar el draft viejo de `types.ts` y `lib.ts` | 2 | J | 4 h | — | 0 |
 | T45 | `TournamentForm.tsx`: quitar modos viejos, sumar bans de civ y primer mapa fijo o al azar | 2 | J | 2 h | — | 0 |
 | T46 | Tiempo real sin API: escuchas del partido y del draft; chat escrito desde el cliente | 3 | J | 4 h | — | 0 |
-| T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T40, T44, T46 | 2 |
+| T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T40, T44, T46 | 1 |
 | **Fase 5 · Publicación y cierre** |||||||
-| T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T47 | 2 |
-| T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 3 |
-| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T28, T30, T41, T45 | 3 |
-| T33 | Borrar Render, SQLite, `functions/` y lo que quedó viejo; actualizar README | 1 | J | 2 h | T32, decisión D5 | 4 |
+| T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T47 | 1 |
+| T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 2 |
+| T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T28, T30, T41, T45 | 2 |
+| T33 | Borrar Render, SQLite, `functions/` y lo que quedó viejo; actualizar README | 1 | J | 2 h | T32, decisión D5 | 3 |
 
 Las dependencias con tareas hechas ya están cumplidas y no figuran en la tabla. T29 quedó hecha y su
 número no se reusa.
@@ -164,18 +164,18 @@ número no se reusa.
 ## Olas de ejecución
 
 ```
-Ola 0  ─ T43 ∥ T39 ∥ T28 ∥ T38 ∥ T41 ∥ T45 ∥ T46   · 1 d    (T43 y T39 seniors; el resto junior)
-Ola 1  ─ T44 ∥ T40                                · 1 d
-Ola 2  ─ T47 → T30                                · 1 d
-Ola 3  ─ T32 ∥ T31                                · 4 h
-Ola 4  ─ T33                                      · 2 h
+Ola 0  ─ T40 ∥ T28 ∥ T38 ∥ T41 ∥ T44 ∥ T45 ∥ T46   · 1 d    (T40 senior; el resto junior, 18 h)
+Ola 1  ─ T47 → T30                                · 1 d
+Ola 2  ─ T32 ∥ T31                                · 4 h
+Ola 3  ─ T33                                      · 2 h
 ```
 
-- **Camino crítico:** T43 → T44 → T47 → T30 → T32 → T33 = 26 h (unos 4 días).
-- **Equipo mínimo:** 2 seniors y 1 junior. En la ola 0 hay dos tareas senior de un día en paralelo
-  y cinco junior que suman 14 h; un segundo junior acorta la ola 0 pero no el camino crítico.
+- **Camino crítico:** T40 → T47 → T30 → T32 → T33 = 20 h (unos 3 días).
+- **Equipo mínimo:** 1 senior y 1 junior. La ola 0 tiene un solo senior (T40) y 18 h de junior;
+  con dos juniors la ola 0 baja a un día. Un segundo senior no acelera: T47 y T30 van en fila.
 - **Una sola persona:** seguir las olas en orden.
-- **Duración total:** 26 h con el equipo mínimo (suma de las olas); 53 h con una sola persona.
+- **Duración total:** con un senior y dos juniors, unas 20 h (suma de las olas); con una sola
+  persona, 39 h.
 
 ## Detalle de cada tarea
 
@@ -206,21 +206,12 @@ Ola 4  ─ T33                                      · 2 h
       los equipos, con el aviso "no verificado".
 - [ ] Sacar de `Profile.tsx` vincular y desvincular Steam y Google.
 
-### T39 · Panel del creador — dif. 4 · senior · 1 d
-
-- [ ] En `TournamentPage.tsx`, solo para el organizador y `admin_ids`: generar llaves, playoffs desde
-      grupos, siguiente ronda suiza y armador, con `generarCuadro`, `cuadroDePlayoffs` y `rondaSuiza` (`web/src/logica/llaves.js`) y
-      `proponerEquipos` (`web/src/logica/armador.js`) corriendo en su navegador.
-- [ ] Cada generación se escribe en un `writeBatch` (hasta 500 escrituras; una doble eliminación de
-      64 equipos son unas 127). Si ya hay partidos, pedir confirmación y borrarlos antes.
-- [ ] Armador: proponer, mostrar y, al confirmar, crear equipos, inscripciones y salas de equipo en
-      una transacción, como hoy `teambuilder.js`.
-- [ ] Quien no es staff no ve los botones; si fuerza la escritura, la niegan las reglas de T35.
-
 ### T40 · Resultados por el creador — dif. 4 · senior · 1 d
 
-- [ ] En la llave y en `MatchRoom.tsx`, solo para el staff: cargar el ganador de cada partida de la
-      serie y copiar las civs reveladas del draft a `games[].civs`.
+- [ ] En la llave y en `MatchRoom.tsx` (hoy `Reportar` llama a `/api/matches/:id/games/:n`), solo
+      para el staff: cargar el ganador de cada partida de la serie y copiar el mapa y las civs del
+      draft revelado a `games[]` (`civsDeLaPartida` de `web/src/datos/drafts.ts`, con los picks que
+      da `useDraft`).
 - [ ] Al llegar al mejor de N, cerrar la serie y avanzar ganador y perdedor (`next_match_id`,
       `loser_match_id`) en una `runTransaction` con `cerrarPartido` de `web/src/logica/llaves.js`, que devuelve los
       cambios de cada partido y si el torneo terminó. Cambiar un resultado
@@ -241,28 +232,17 @@ Ola 4  ─ T33                                      · 2 h
 
 ### Fase 7 · Draft nuevo
 
-### T43 · Draft sobre Firestore — dif. 4 · senior · 1 d
+### T44 · Pulir la pantalla del draft — dif. 2 · junior · 4 h
 
-- [ ] Antes de esta tarea, `detallePartido` (`web/src/datos/partidos.ts`) devuelve `draft: null`;
-      `MatchRoom.tsx` todavía llama a `/api/matches/:id/draft*`: reemplazarlo.
-- [ ] `web/src/datos/drafts.ts`: crear `drafts/{gameNo}` con `planDeDraft` de T42 (`state: 'mapa' |
-      'bans' | 'picks' | 'listo'`), elegir mapa, banear (transacción que verifica el turno) y guardar
-      el pick propio en `picks/{uid}`.
-- [ ] El pick va en un batch con `picked: arrayUnion(uid)` en el draft (así lo piden las reglas de
-      T36; `picked` muestra quién ya eligió sin revelar qué). Cuando `picked` tiene a todos los de
-      `player_ids`, cualquier jugador que lo vea pone `revealed: true` y `state: 'listo'`.
-- [ ] Copiar los picks a `games[].civs` lo hace el staff al cargar el resultado (T40) con lo que
-      devuelve `revelar`, no el jugador.
-- [ ] Sin reloj: el staff puede borrar el draft y reiniciarlo, o cargar el resultado sin draft.
-
-### T44 · Pantalla del draft — dif. 2 · junior · 1 d
-
-- [ ] `DraftBoard.tsx` en tres etapas. Mapa: el equipo que elige ve la grilla, el otro ve
-      "eligiendo". Bans: turno visible para los dos. Picks: cada jugador ve las civs y su elección; de
-      los demás, solo "eligió" o "falta".
-- [ ] Cuando `revealed` pasa a verdadero, mostrar todas las civs juntas.
-- [ ] Sacar de `MatchRoom.tsx` el reloj, "listo" y los modos viejos.
-- [ ] Espectadores (sin sesión o de otro partido) ven el tablero sin botones.
+- [ ] `DraftBoard.tsx` ya funciona con el draft nuevo (T43): mapa, bans, pick ciego con "eligió" /
+      "falta", revelado y reiniciar. Falta el pulido: el mapa elegido grande arriba, el turno con el
+      color del equipo, las civs baneadas aparte con el equipo que las baneó, y que en celular la
+      grilla de civs no se corte.
+- [ ] Mostrar la civ propia elegida antes de revelar ("Tu civ: …, podés cambiarla hasta que eligan
+      todos").
+- [ ] Sacar el draft viejo: tipos `DraftStep`, `CivPick` y `DraftState` de `types.ts` (y `draft`
+      de `MatchDetail`), `ETIQUETA_PASO` de `lib.ts`.
+- [ ] Probar como espectador (sin sesión): ve el tablero sin botones y no ve picks hasta revelar.
 
 ### T45 · Formulario del torneo — dif. 2 · junior · 2 h
 

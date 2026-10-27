@@ -2,26 +2,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { agendar, detallePartido, horariosDelPartido } from '../datos/partidos';
+import { partidaActual, useDraft } from '../datos/drafts';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
 import { useChat, useConectado, useLive } from '../live';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, offsetZona, rangoSemana, zonaDelNavegador } from '../lib';
-import type { DraftState, MatchDetail, Window } from '../types';
+import type { MatchDetail, Window } from '../types';
 
 export function MatchRoom() {
   const { id } = useParams();
   const { user } = useAuth();
   const [m, setM] = useState<MatchDetail | null>(null);
-  const [draft, setDraft] = useState<DraftState | null>(null);
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState('');
 
   const cargar = useCallback(async () => {
     try {
-      const d = await detallePartido(id!, user?.id ?? null);
-      setM(d);
-      setDraft(d.draft);
+      setM(await detallePartido(id!, user?.id ?? null));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -37,18 +36,24 @@ export function MatchRoom() {
     return out;
   }, [id, m?.me.team_id]);
 
+  const gameNo = m ? partidaActual(m) : null;
+  const estadoDraft = useDraft(id, gameNo, user?.id ?? null);
+  const avisar = (mensaje: string) => {
+    setAviso(mensaje);
+    setTimeout(() => setAviso(''), 4000);
+  };
+
   const { mensajes, enviar } = useChat(salas);
   const conectado = useConectado();
-  // Cualquier cambio (draft, resultado, horario, votos) vuelve a pedir el
-  // partido: la API arma lo que ve cada uno, picks ciegos incluidos.
+  // Resultado u horario cambiados por la API vieja vuelven a pedir el partido;
+  // el draft se escucha aparte (useDraft). T46 pasa esto a una escucha directa.
   useLive(id, () => void cargar());
 
   const mandar = async (room: string, body: string) => {
     try {
       await enviar(room, body);
     } catch (err) {
-      setError((err as Error).message);
-      setTimeout(() => setError(''), 4000);
+      avisar((err as Error).message);
     }
   };
 
@@ -64,22 +69,6 @@ export function MatchRoom() {
       ? [{ id: `team:${m.me.team_id}`, label: 'Mi equipo', hint: 'Privada: solo tus compañeros.' }]
       : []),
   ];
-
-  const accionDraft = async (kind: string, targetId: number, forUserId?: string) => {
-    setError('');
-    try {
-      setDraft(
-        await api.post<DraftState>(`/api/matches/${id}/draft/action`, {
-          kind,
-          target_id: targetId,
-          for_user_id: forUserId,
-        })
-      );
-    } catch (err) {
-      setError((err as Error).message);
-      setTimeout(() => setError(''), 4000);
-    }
-  };
 
   return (
     <div className="mx-auto max-w-[110rem] px-4 py-5">
@@ -109,7 +98,7 @@ export function MatchRoom() {
         </div>
       </header>
 
-      {error && <div className="mb-3"><Alerta>{error}</Alerta></div>}
+      {aviso && <div className="mb-3"><Alerta>{aviso}</Alerta></div>}
       {faltanEquipos && (
         <div className="mb-3">
           <Alerta tone="info">Este partido todavía espera a los ganadores de la ronda anterior.</Alerta>
@@ -132,28 +121,7 @@ export function MatchRoom() {
               Cuando estén los dos equipos se abre el draft.
             </div>
           ) : (
-            <DraftBoard
-              draft={draft}
-              miEquipo={m.me.team_id}
-              soyCapitan={m.me.is_captain}
-              esStaff={m.me.is_staff}
-              nombres={nombres}
-              onIniciar={async () => {
-                try {
-                  setDraft(await api.post<DraftState>(`/api/matches/${id}/draft`, {}));
-                } catch (err) {
-                  setError((err as Error).message);
-                }
-              }}
-              onReady={async () => {
-                try {
-                  setDraft(await api.post<DraftState>(`/api/matches/${id}/draft/ready`));
-                } catch (err) {
-                  setError((err as Error).message);
-                }
-              }}
-              onAction={accionDraft}
-            />
+            <DraftBoard m={m} gameNo={gameNo} estado={estadoDraft} uid={user?.id ?? null} onError={avisar} />
           )}
         </div>
       </div>

@@ -113,6 +113,8 @@ describe('partidos', () => {
     await assertFails(como('a2').doc('matches/m1/votos/b1').set(votos));
     await assertFails(como('c1').doc('matches/m1/votos/c1').set(votos));
     await assertSucceeds(anonimo().collection('matches/m1/votos').get());
+    await assertFails(como('b1').doc('matches/m1/votos/a2').delete());
+    await assertSucceeds(como('org').doc('matches/m1/votos/a2').delete());
   });
 });
 
