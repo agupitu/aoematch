@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-aoe3draft"
+    "default": "demo-aoe3draft",
+    "prod": "aoe-3-draft-2eea7"
   }
 }

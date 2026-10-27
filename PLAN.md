@@ -14,9 +14,9 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 17 tareas pendientes, 66 h en total (unos 11 días de 6 h para una persona sola; unos 5
+**Estado.** 16 tareas pendientes, 65 h en total (unos 11 días de 6 h para una persona sola; unos 5
 días con dos seniors y un junior). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
-anterior, y T34, T35 y T42 del plan Spark. No hay datos para migrar.
+anterior, y T01, T34, T35 y T42 del plan Spark. No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
 armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
@@ -99,6 +99,12 @@ las rutas y pasa a `firestore.rules`.
 | T29 | Sin verificar en local: el emulador de Hosting no aplica ninguna cabecera configurada. Se mira en el primer deploy (T30). | — |
 | T29 | `web/.env.production` no se creó (los permisos de esta PC no dejan escribir archivos `.env`): las variables `VITE_FIREBASE_*` van en el entorno del deploy (T30) o en ese archivo, creado a mano. Sin ellas, la web de producción se corta al cargar con un mensaje claro. | `web/src/firebase.ts` |
 
+**Fase 0 · Base del proyecto** (plan Spark)
+
+| ID | Qué quedó | Dónde |
+|---|---|---|
+| T01 | Proyecto `aoe-3-draft-2eea7` (número 122691877670) en Spark: Firestore en `southamerica-east1`, Realtime Database en `us-central1`, Auth con Google y app web registrada. Alias `prod` en `.firebaserc`. La config de la app web va fija en `web/src/firebase.ts` (no es secreta; las `VITE_FIREBASE_*` la reemplazan si están), porque esta PC no deja escribir `.env`. | `.firebaserc`, `web/src/firebase.ts` |
+
 **Fase 6 · Sin servidor** (plan Spark)
 
 | ID | Qué quedó | Dónde |
@@ -131,8 +137,6 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 
 | ID | Tarea | Dif. | Rol | Tiempo | Depende de | Ola |
 |---|---|---|---|---|---|---|
-| **Fase 0 · Base del proyecto** |||||||
-| T01 | Proyecto en la consola en Spark: Firestore, RTDB, Auth con Google | 1 | J | 1 h | — | 0 |
 | **Fase 4 · Tiempo real** |||||||
 | T28 | Presencia con Realtime Database | 3 | J | 2 h | — | 0 |
 | **Fase 6 · Sin servidor** |||||||
@@ -149,7 +153,7 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | T46 | Tiempo real sin API: escuchas del partido y del draft; chat escrito desde el cliente | 3 | J | 4 h | T36 | 1 |
 | T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T40, T44, T46 | 3 |
 | **Fase 5 · Publicación y cierre** |||||||
-| T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T01, T47 | 3 |
+| T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T47 | 3 |
 | T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 4 |
 | T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T28, T30, T41, T45 | 4 |
 | T33 | Borrar Render, SQLite, `functions/` y lo que quedó viejo; actualizar README | 1 | J | 2 h | T32, decisión D5 | 5 |
@@ -160,7 +164,7 @@ número no se reusa.
 ## Olas de ejecución
 
 ```
-Ola 0  ─ T36 ∥ T37 ∥ T01 ∥ T28 ∥ T45        · 1 d    (T36 y T37 seniors; T01 vos; T28 y T45 junior)
+Ola 0  ─ T36 ∥ T37 ∥ T28 ∥ T45              · 1 d    (T36 y T37 seniors; T28 y T45 junior)
 Ola 1  ─ T43 ∥ T39 ∥ T38 ∥ T41 ∥ T46        · 1 d    (T43 y T39 seniors; el resto junior)
 Ola 2  ─ T44 ∥ T40                          · 1 d
 Ola 3  ─ T47 → T30                          · 1 d
@@ -172,23 +176,11 @@ Ola 5  ─ T33                                · 2 h
 - **Equipo mínimo:** 2 seniors y 1 junior. En las olas 0 y 1 hay dos tareas senior de un día en
   paralelo; un tercer senior no acelera porque T47 espera a las dos ramas.
 - **Una sola persona:** seguir las olas en orden.
-- **Duración total:** 32 h con el equipo mínimo (suma de las olas); 66 h con una sola persona.
+- **Duración total:** 32 h con el equipo mínimo (suma de las olas); 65 h con una sola persona.
 
 ## Detalle de cada tarea
 
 ### Fase 0 · Base del proyecto
-
-### T01 · Proyecto en la consola de Firebase — dif. 1 · junior · 1 h
-
-- [ ] Crear el proyecto en console.firebase.google.com y dejarlo en Spark. No pide tarjeta.
-- [ ] Crear Firestore (modo producción) en `southamerica-east1` (D1). La ubicación no se puede
-      cambiar después.
-- [ ] Crear Realtime Database en `us-central1`: RTDB no está en São Paulo. Solo guarda la presencia
-      (T28).
-- [ ] Authentication: habilitar Google. Email y contraseña queda apagado en producción (es solo del
-      emulador).
-- [ ] Registrar una app web y pasar los valores de `firebaseConfig` (van en las `VITE_FIREBASE_*`
-      de `web/src/firebase.ts`) y el id del proyecto para `.firebaserc` (alias `prod`).
 
 ### Fase 4 · Tiempo real
 
@@ -344,7 +336,8 @@ Ola 5  ─ T33                                · 2 h
 - [ ] `.github/workflows/deploy.yml`: en cada push a `master`, Node 22, `npm ci`, `npm run assets`,
       `npm run build` y `firebase deploy --only hosting,firestore,database --project prod`. Sin
       `functions`: Spark no las deja publicar.
-- [ ] El build necesita las `VITE_FIREBASE_*` (T01) como variables del workflow.
+- [ ] La config de la app web ya está en `web/src/firebase.ts` (T01): el build no necesita
+      variables.
 - [ ] Autenticación con una cuenta de servicio en el secreto `FIREBASE_SERVICE_ACCOUNT`, con los
       roles de Hosting y reglas.
 - [ ] Si falla la descarga de `npm run assets`, el deploy sigue.
