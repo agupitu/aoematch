@@ -17,6 +17,7 @@ const equipos = await import('../src/data/equipos.js');
 const partidos = await import('../src/data/partidos.js');
 const drafts = await import('../src/data/drafts.js');
 const salas = await import('../src/data/salas.js');
+const rondas = await import('../src/data/rondas.js');
 
 async function vaciarBase() {
   const proyecto = process.env.GCLOUD_PROJECT;
@@ -303,5 +304,48 @@ describe('borrarTorneo', () => {
 
     assert.ok(await torneos.leerTorneo('copa-a'));
     assert.equal((await partidos.listarPartidos('copa-a')).length, 4);
+  });
+});
+
+describe('rondas y horarios', () => {
+  const slug = 'copa-rondas';
+  const ronda = {
+    stage_id: 's1', bracket: 'W', round: 2, label: 'Semifinal',
+    from_day: '2026-11-14', to_day: '2026-11-16', zone: 'America/Argentina/Buenos_Aires',
+    starts_at: '2026-11-14T03:00:00.000Z', ends_at: '2026-11-17T03:00:00.000Z',
+  };
+  const bloque = { starts_at: '2026-11-14T21:00:00.000Z', ends_at: '2026-11-14T23:00:00.000Z' };
+
+  it('guarda y lee las fechas de una ronda', async () => {
+    await torneos.guardarTorneo(slug, { name: 'Copa de las rondas' });
+    await rondas.guardarRonda(slug, 's1_W2', ronda);
+    const r = await rondas.leerRonda(slug, 's1_W2');
+    assert.equal(r.id, 's1_W2');
+    assert.equal(r.label, 'Semifinal');
+    assert.equal(r.starts_at, ronda.starts_at);
+    assert.ok(r.updated_at);
+    assert.equal(await rondas.leerRonda(slug, 's1_W9'), null);
+  });
+
+  it('lista las rondas del torneo', async () => {
+    await rondas.guardarRonda(slug, 's1_W3', { ...ronda, round: 3, label: 'Final' });
+    assert.deepEqual((await rondas.listarRondas(slug)).map((r) => r.id).sort(), ['s1_W2', 's1_W3']);
+  });
+
+  it('los horarios se guardan por jugador y los que no cargaron quedan vacíos', async () => {
+    await rondas.guardarHorario(slug, 's1_W2', 'u1', [bloque]);
+    await rondas.guardarHorario(slug, 's1_W2', 'u2', []);
+    const h = await rondas.leerHorarios(slug, 's1_W2', ['u1', 'u2', 'u3']);
+    assert.deepEqual([...h.keys()], ['u1', 'u2', 'u3']);
+    assert.deepEqual(h.get('u1'), [bloque]);
+    assert.deepEqual(h.get('u2'), []);
+    assert.deepEqual(h.get('u3'), []);
+  });
+
+  it('borrarTorneo se lleva las rondas y sus horarios', async () => {
+    await torneos.borrarTorneo(slug);
+    assert.equal(await rondas.leerRonda(slug, 's1_W2'), null);
+    assert.deepEqual(await rondas.listarRondas(slug), []);
+    assert.deepEqual((await rondas.leerHorarios(slug, 's1_W2', ['u1'])).get('u1'), []);
   });
 });
