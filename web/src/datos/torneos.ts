@@ -15,7 +15,7 @@ import {
 import { firestore } from '../firebase';
 import { mapaPorId, civs as todasLasCivs } from '../logica/catalogo.js';
 import { poolCivs, poolMapas } from '../logica/draft.js';
-import { minutosEnComun, proximaFecha, ventanas } from '../logica/horarios.js';
+import { minutosEnComun } from '../logica/horarios.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
@@ -324,27 +324,4 @@ export async function detalleTorneo(slug: string, uid: string | null): Promise<T
         }
       : null,
   } as unknown as Tournament;
-}
-
-// ------------------------------------------------------- horarios del torneo
-
-/**
- * Mejores ventanas para todos los inscriptos (no retirados): las que juntan al
- * 60 % o más durante `duracion` minutos.
- */
-export async function horariosDelTorneo(t: Tournament, duracion = 90) {
-  const ids = [...new Set(t.registrations.filter((r) => r.status !== 'retirada').map((r) => r.user_id))];
-  const usuarios = await mapaDeUsuarios(ids);
-  const conHorario = ids.map((id) => usuarios.get(id) ?? { id, availability: [] });
-  const vs = ventanas(conHorario, {
-    duracionMin: Math.max(30, duracion),
-    minimo: Math.ceil(ids.length * 0.6),
-    limite: 20,
-  });
-  return {
-    total: ids.length,
-    windows: vs.map((v) => ({ ...v, next_utc: proximaFecha(v.start_min).toISOString() })),
-    // Horario de cada uno, para el mapa de calor.
-    horarios: conHorario.map((u) => ({ id: u.id, blocks: (u.availability ?? []) as { start_min: number; end_min: number }[] })),
-  };
 }

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
 } from '../datos/llaves';
-import { actualizarTorneo, detalleTorneo, guardarVodFase, horariosDelTorneo } from '../datos/torneos';
+import { actualizarTorneo, detalleTorneo, guardarVodFase } from '../datos/torneos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
 import { Bracket, MatchCard } from '../components/Bracket';
-import { AvailabilityGrid } from '../components/AvailabilityGrid';
+import { FechasDeRonda } from '../components/FechasDeRonda';
 import { MatchCalendar } from '../components/MatchCalendar';
+import { MisHorarios } from '../components/MisHorarios';
 import { TournamentForm, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
 import { EditorVod, ListaVod } from '../components/VodLinks';
@@ -18,18 +19,23 @@ import { useChat, useConectado } from '../live';
 import { usePresencia } from '../presence';
 import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
-  fechaCorta, horas, monto, plata, rangoSemana, offsetZona, zonaDelNavegador,
+  fechaCorta, horas, monto, plata, zonaDelNavegador,
 } from '../lib';
-import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User, Window } from '../types';
+import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User } from '../types';
 
 type Pestania = 'resumen' | 'inscripciones' | 'equipos' | 'llaves' | 'horarios' | 'chat' | 'config';
+
+/** Las que se pueden pedir con `?tab=` (por ejemplo desde la sala de un partido). */
+const PESTANIAS_POR_URL: Pestania[] = ['resumen', 'inscripciones', 'equipos', 'llaves', 'horarios', 'chat'];
 
 export function TournamentPage() {
   const { slug } = useParams();
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  const pedida = params.get('tab') as Pestania | null;
   const [t, setT] = useState<Tournament | null>(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<Pestania>('resumen');
+  const [tab, setTab] = useState<Pestania>(pedida && PESTANIAS_POR_URL.includes(pedida) ? pedida : 'resumen');
 
   const cargar = useCallback(async () => {
     try {
@@ -698,6 +704,8 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
       {error && <Alerta>{error}</Alerta>}
       {mensaje && <Alerta tone="info">{mensaje}</Alerta>}
 
+      {staff && t.matches.length > 0 && <FechasDeRonda t={t} onDone={onDone} />}
+
       {t.standings && t.standings.length > 0 && <Tabla filas={t.standings} titulo="Posiciones" />}
 
       {t.stages.map((s) => (
@@ -790,83 +798,17 @@ function ListaPartidos({ matches }: { matches: Tournament['matches'] }) {
 function Horarios({ t }: { t: Tournament }) {
   const { user } = useAuth();
   const tz = user?.timezone || zonaDelNavegador();
-  const [duracion, setDuracion] = useState(90);
-  const [data, setData] = useState<{ total: number; windows: Window[] } | null>(null);
-  const [heat, setHeat] = useState<number[] | null>(null);
-
-  const ids = useMemo(
-    () => t.registrations.filter((r) => r.status !== 'retirada').map((r) => r.user_id),
-    [t.registrations]
-  );
-
-  useEffect(() => {
-    horariosDelTorneo(t, duracion)
-      .then((r) => {
-        setData(r);
-        // Mapa de calor: cuántos pueden en cada bloque de 30 min.
-        if (!r.horarios.length) return;
-        const c = new Array(336).fill(0);
-        for (const u of r.horarios) {
-          for (const b of u.blocks) {
-            for (let m = b.start_min; m < b.end_min; m += 30) c[Math.floor(m / 30) % 336]++;
-          }
-        }
-        setHeat(c);
-      })
-      .catch(() => setData(null));
-  }, [t, duracion]);
-
-  const offset = offsetZona(tz);
 
   return (
     <div className="space-y-5">
+      <MisHorarios t={t} />
+
       <section className="card p-5">
         <h3 className="title mb-1 text-lg">Partidos</h3>
         <p className="hint mb-4 text-sm">
           Lo que está agendado y lo que ya se jugó, con el resultado.
         </p>
         <MatchCalendar matches={t.matches} tz={tz} />
-      </section>
-
-      <section className="card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="title text-lg">Cuándo puede jugar la mayoría</h3>
-            <p className="hint text-sm">
-              Cruce de la disponibilidad de los {ids.length} inscriptos, en tu zona ({tz}).
-            </p>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-parch-400">
-            Duración
-            <select className="field w-auto" value={duracion} onChange={(e) => setDuracion(Number(e.target.value))}>
-              {[60, 90, 120, 180].map((d) => (
-                <option key={d} value={d}>
-                  {d} min
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {heat && <AvailabilityGrid value={[]} timezone={tz} readOnly heat={heat} heatMax={ids.length} />}
-      </section>
-
-      <section className="card p-5">
-        <h3 className="title mb-3 text-lg">Mejores ventanas</h3>
-        {!data || data.windows.length === 0 ? (
-          <Empty>Nadie cargó horarios todavía, o no hay ventanas que sirvan.</Empty>
-        ) : (
-          <ul className="space-y-2">
-            {data.windows.map((w, i) => (
-              <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-ink-700 px-3 py-2">
-                <span className="text-sm text-parch-100">{rangoSemana(w.start_min, w.end_min, offset)}</span>
-                <span className="text-xs text-parch-400">
-                  {w.count} de {data.total} disponibles · próxima: {fechaCorta(w.next_utc, tz)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </div>
   );
