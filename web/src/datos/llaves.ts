@@ -90,6 +90,12 @@ async function borrarLlaves(slug: string) {
     const mensajes = await getDocs(collection(s.ref, 'messages'));
     refs.push(...mensajes.docs.map((x) => x.ref), s.ref);
   }
+  // Fechas de ronda y los horarios que cargaron los jugadores.
+  const rondas = await getDocs(collection(firestore, 'tournaments', slug, 'rondas'));
+  for (const r of rondas.docs) {
+    const horarios = await getDocs(collection(r.ref, 'horarios'));
+    refs.push(...horarios.docs.map((h) => h.ref), r.ref);
+  }
   refs.push(...(await getDocs(etapas(slug))).docs.map((e) => e.ref));
   await escribirEnTandas(refs.map((r) => (b) => b.delete(r)));
 }

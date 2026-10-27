@@ -217,3 +217,39 @@ export type Window = {
   missing: string[];
   next_utc: string;
 };
+
+/** Franja en la que puede jugar un jugador: instantes UTC en texto ISO. */
+export type Bloque = { starts_at: string; ends_at: string };
+
+/** Un día del calendario de una ronda, en la zona de quien lo mira (`web/src/logica/calendario.js`). */
+export type Dia = {
+  dia: string;
+  barras: { ms: number | null; hora: string; dentro: boolean }[];
+};
+
+/** tournaments/{slug}/rondas/{rondaId}: las fechas que fija el staff para una ronda. */
+export type RondaDoc = {
+  id: string;
+  stage_id: string;
+  bracket: 'W' | 'L' | 'F';
+  round: number;
+  label: string | null;
+  from_day: string;
+  to_day: string;
+  zone: string;
+  starts_at: string;
+  ends_at: string;
+};
+
+/** Una ronda del cuadro con sus partidos (`web/src/logica/rondas.js`). */
+export type Ronda = {
+  id: string;
+  stage_id: string;
+  bracket: 'W' | 'L' | 'F';
+  round: number;
+  label: string;
+  partidos: Match[];
+};
+
+/** Tramo en el que pueden jugar los jugadores de un partido (`web/src/logica/cruce.js`). */
+export type Ventana = { starts_at: string; ends_at: string; count: number; missing: string[] };
