@@ -4,9 +4,11 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { civPorId, mapaPorId } from '../logica/catalogo.js';
-import { proximaFecha, ventanas } from '../logica/horarios.js';
-import type { MatchDetail } from '../types';
+import { cruceDeRonda } from '../logica/cruce.js';
+import { rondaIdDe } from '../logica/rondas.js';
+import type { MatchDetail, Ventana } from '../types';
 import { type Doc, conMensaje, leer, leerPorIds, ordenarPor } from './base';
+import { horariosDeLaRonda } from './rondas';
 import { esStaff } from './torneos';
 import { mapaDeUsuarios } from './usuarios';
 
@@ -99,19 +101,29 @@ export function agendar(m: { id: string; status: string }, scheduledAt: string |
 
 /**
  * Ventanas en las que pueden jugar todos los del partido (o, si no hay
- * ninguna, todos menos uno) durante `duracion` minutos.
+ * ninguna, todos menos uno) durante `duracion` minutos, con los horarios que
+ * cargaron en la ronda del partido. `estado` dice si hay algo que cruzar:
+ * `falta_rival` si todavía no están los dos equipos y `sin_fechas` si el staff
+ * no fijó las fechas de la ronda.
  */
 export async function horariosDelPartido(m: MatchDetail, duracion = 90) {
   const jugadores = [...(m.teams.a?.roster ?? []), ...(m.teams.b?.roster ?? [])];
-  if (!jugadores.length) return { users: [], windows: [], partial: [] };
-  const usuarios = await mapaDeUsuarios(jugadores.map((p) => p.id));
-  const conHorario = jugadores.map((p) => usuarios.get(p.id) ?? { id: p.id, availability: [] });
-  const largo = Math.max(30, duracion);
-  const vs = ventanas(conHorario, { duracionMin: largo, limite: 15 });
-  const casi = vs.length ? [] : ventanas(conHorario, { duracionMin: largo, minimo: jugadores.length - 1, limite: 10 });
-  const conFecha = (v: { start_min: number; end_min: number; count: number; missing: string[] }) => ({
-    ...v,
-    next_utc: proximaFecha(v.start_min).toISOString(),
-  });
-  return { users: jugadores, duration_min: largo, windows: vs.map(conFecha), partial: casi.map(conFecha) };
+  const base = {
+    users: jugadores.map((p) => ({ id: p.id, display_name: p.display_name })),
+    duration_min: Math.max(30, duracion),
+    windows: [] as Ventana[],
+    partial: [] as Ventana[],
+  };
+  if (!m.teams.a || !m.teams.b) return { ...base, estado: 'falta_rival' as const };
+
+  const ronda = await leer(doc(firestore, 'tournaments', m.tournament_id, 'rondas', rondaIdDe(m)));
+  if (!ronda) return { ...base, estado: 'sin_fechas' as const };
+
+  const horarios = await horariosDeLaRonda(m.tournament_id, ronda.id, jugadores.map((p) => p.id));
+  const { windows, partial } = cruceDeRonda(
+    jugadores.map((p) => ({ id: p.id, blocks: horarios.get(p.id) ?? [] })),
+    { starts_at: ronda.starts_at, ends_at: ronda.ends_at },
+    { duracionMin: base.duration_min }
+  );
+  return { ...base, estado: 'ok' as const, windows: windows as Ventana[], partial: partial as Ventana[] };
 }

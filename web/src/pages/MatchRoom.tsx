@@ -10,8 +10,8 @@ import { DraftBoard } from '../components/DraftBoard';
 import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado, useLive } from '../live';
 import { usePresencia } from '../presence';
-import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, offsetZona, rangoSemana, zonaDelNavegador } from '../lib';
-import type { MatchDetail, Window } from '../types';
+import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, zonaDelNavegador } from '../lib';
+import type { MatchDetail, Ventana } from '../types';
 
 export function MatchRoom() {
   const { id } = useParams();
@@ -191,11 +191,17 @@ export function MatchRoom() {
 
 // ---------------------------------------------------------------- agendar
 
+/** "sáb, 14 nov, 18:00 – 21:00": el día y la hora de inicio de la ventana y la hora en que termina. */
+const rangoDeVentana = (w: Ventana, tz: string) =>
+  `${fechaCorta(w.starts_at, tz)} – ${new Date(w.ends_at).toLocaleTimeString('es-AR', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  })}`;
+
 function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
   const { user } = useAuth();
   const tz = user?.timezone || zonaDelNavegador();
   const [abierto, setAbierto] = useState(false);
-  const [data, setData] = useState<{ windows: Window[]; partial: Window[]; users: { id: string; display_name: string }[] } | null>(null);
+  const [data, setData] = useState<Awaited<ReturnType<typeof horariosDelPartido>> | null>(null);
   const [manual, setManual] = useState('');
 
   useEffect(() => {
@@ -205,7 +211,6 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
       .catch(() => setData(null));
   }, [abierto, m]);
 
-  const offset = offsetZona(tz);
   const puede = m.me.is_staff || m.me.is_captain;
 
   const guardar = async (iso: string | null) => {
@@ -225,14 +230,32 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
           <Spinner />
         ) : (
           <div className="space-y-5">
-            <p className="text-sm text-parch-400">
-              Cruce de la disponibilidad cargada por los {data.users.length} jugadores del partido, en tu zona ({tz}).
-            </p>
+            {data.estado === 'ok' && (
+              <p className="text-sm text-parch-400">
+                Cruce de los horarios que cargaron los {data.users.length} jugadores del partido para esta ronda, en
+                tu zona ({tz}).
+              </p>
+            )}
 
-            {data.windows.length === 0 && data.partial.length === 0 && (
+            {data.estado === 'falta_rival' && (
               <Alerta tone="info">
-                No hay ninguna franja en común. Pedí en la sala del partido que carguen o amplíen sus horarios en
-                el perfil.
+                Todavía no se sabe quién es el rival: cuando estén los dos equipos se cruzan sus horarios.
+              </Alerta>
+            )}
+
+            {data.estado === 'sin_fechas' && (
+              <Alerta tone="info">
+                El organizador todavía no fijó las fechas de esta ronda, así que nadie pudo cargar horarios.
+              </Alerta>
+            )}
+
+            {data.estado === 'ok' && data.windows.length === 0 && data.partial.length === 0 && (
+              <Alerta tone="info">
+                No hay ninguna franja en común. Pedí que carguen o amplíen sus horarios en la pestaña{' '}
+                <Link className="underline" to={`/t/${m.tournament.slug}?tab=horarios`}>
+                  Horarios del torneo
+                </Link>
+                .
               </Alerta>
             )}
 
@@ -242,12 +265,9 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
                 <ul className="space-y-2">
                   {data.windows.map((w, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-ink-700 px-3 py-2">
-                      <div>
-                        <p className="text-sm text-parch-100">{rangoSemana(w.start_min, w.end_min, offset)}</p>
-                        <p className="text-xs text-parch-400">Próxima: {fechaCorta(w.next_utc, tz)}</p>
-                      </div>
+                      <p className="text-sm text-parch-100">{rangoDeVentana(w, tz)}</p>
                       {puede && (
-                        <button className="btn btn-primary" onClick={() => guardar(w.next_utc)}>
+                        <button className="btn btn-primary" onClick={() => guardar(w.starts_at)}>
                           Agendar
                         </button>
                       )}
@@ -264,13 +284,13 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
                   {data.partial.map((w, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-ink-700 px-3 py-2">
                       <div>
-                        <p className="text-sm text-parch-200">{rangoSemana(w.start_min, w.end_min, offset)}</p>
+                        <p className="text-sm text-parch-200">{rangoDeVentana(w, tz)}</p>
                         <p className="text-xs text-parch-400">
                           No puede: {w.missing.map((id) => data.users.find((u) => u.id === id)?.display_name).join(', ')}
                         </p>
                       </div>
                       {puede && (
-                        <button className="btn btn-ghost" onClick={() => guardar(w.next_utc)}>
+                        <button className="btn btn-ghost" onClick={() => guardar(w.starts_at)}>
                           Agendar igual
                         </button>
                       )}
