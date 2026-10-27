@@ -1,8 +1,9 @@
-// Datos de demostración para los emuladores: jugadores con cuentas de prueba y
-// horarios, un torneo abierto a inscripción, otro con las llaves armadas, otro
-// listo para armar y la copa de muestra con drafts jugados, semis agendadas y
-// chat. Usa la misma lógica que la web (web/src/logica/: llaves, draft y
-// resultados) y escribe con el Admin SDK, sin pasar por las reglas.
+// Datos de demostración para los emuladores: jugadores con cuentas de prueba,
+// un torneo abierto a inscripción, otro con las llaves armadas, otro listo para
+// armar y la copa de muestra con drafts jugados, semis agendadas, fechas de
+// ronda con horarios cargados y chat. Usa la misma lógica que la web
+// (web/src/logica/: llaves, draft, resultados y calendario) y escribe con el
+// Admin SDK, sin pasar por las reglas.
 //
 // Las cuentas entran con email y contraseña desde el formulario de prueba,
 // que solo aparece contra el emulador: kaiser@demo.aoematch / demo1234.
@@ -11,12 +12,15 @@
 import { getAuth } from 'firebase-admin/auth';
 import { civs, maps } from '../../web/src/logica/catalogo.js';
 import { banear, civsPermitidas, elegirMapa, planDeDraft, revelar, turnoDeBan } from '../../web/src/logica/draft.js';
+import { instanteLocal, rangoDeDias } from '../../web/src/logica/calendario.js';
 import { cargarPartidas, generarCuadro } from '../../web/src/logica/llaves.js';
+import { rondaIdDe } from '../../web/src/logica/rondas.js';
 import { escribirEnLotes } from './data/base.js';
 import { guardarDraft, guardarPick } from './data/drafts.js';
 import { actualizarEquipo, listarEquipos, guardarEquipo, leerEquipo } from './data/equipos.js';
 import { guardarInscripcion } from './data/inscripciones.js';
 import { actualizarPartido, guardarPartido, leerPartido, listarPartidos, refPartido } from './data/partidos.js';
+import { guardarHorario, guardarRonda } from './data/rondas.js';
 import { guardarSala, guardarSalaDeEquipo, publicarMensaje } from './data/salas.js';
 import { actualizarTorneo, guardarEtapa, guardarTorneo, leerTorneo, refEtapa } from './data/torneos.js';
 import { guardarUsuario, leerUsuario } from './data/usuarios.js';
@@ -41,21 +45,8 @@ function rngSemilla(semilla) {
   };
 }
 
-function bloquesAleatorios(rnd) {
-  // 3 a 6 franjas semanales de 2-5 horas.
-  const bloques = [];
-  const dias = [...Array(7).keys()].sort(() => rnd() - 0.5).slice(0, 3 + Math.floor(rnd() * 4));
-  for (const d of dias) {
-    const inicioH = 16 + Math.floor(rnd() * 5); // tarde/noche
-    const largoH = 2 + Math.floor(rnd() * 4);
-    const start = d * 1440 + inicioH * 60;
-    bloques.push({ start_min: start, end_min: Math.min(d * 1440 + 1440, start + largoH * 60) });
-  }
-  return bloques.sort((a, b) => a.start_min - b.start_min);
-}
-
 /** Cuenta de prueba en el emulador de Auth (uid `demo-<nombre>`) y su perfil. */
-async function crearUsuario(nombre, rnd, { admin = false, availability } = {}) {
+async function crearUsuario(nombre, rnd, { admin = false } = {}) {
   const corto = nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
   const uid = `demo-${corto}`;
   const email = `${corto}@demo.aoematch`;
@@ -66,7 +57,6 @@ async function crearUsuario(nombre, rnd, { admin = false, availability } = {}) {
     rating_1v1: 900 + Math.floor(rnd() * 900),
     rating_team: 900 + Math.floor(rnd() * 900),
     is_admin: admin ? 1 : 0,
-    availability: availability ?? bloquesAleatorios(rnd),
   };
   await getAuth().createUser({ uid, email, password: CLAVE_DEMO, displayName: nombre });
   await guardarUsuario(uid, datos);
@@ -170,6 +160,29 @@ function fechaRelativa(dias, horaUtc) {
 
 const capitanDe = async (teamId) => ({ id: (await leerEquipo(teamId)).captain_id });
 
+const ZONA_DEMO = 'America/Argentina/Buenos_Aires';
+
+/** Fecha 'YYYY-MM-DD' a N días de hoy. */
+const diaRelativo = (dias) => fechaRelativa(dias, 12).slice(0, 10);
+
+/** rondas/{rondaId} como lo guarda el staff: de 00:00 de `desde` a 24:00 de `hasta` en `ZONA_DEMO`. */
+const fechasDeRonda = (partido, desde, hasta) => ({
+  stage_id: partido.stage_id,
+  bracket: partido.bracket,
+  round: partido.round,
+  label: partido.label,
+  from_day: desde,
+  to_day: hasta,
+  zone: ZONA_DEMO,
+  ...rangoDeDias(desde, hasta, ZONA_DEMO),
+});
+
+/** Bloque de 20:00 a 23:00, hora de Buenos Aires, de ese día. */
+const nocheDelDia = (dia) => ({
+  starts_at: new Date(instanteLocal(dia, 20 * 60, ZONA_DEMO)).toISOString(),
+  ends_at: new Date(instanteLocal(dia, 23 * 60, ZONA_DEMO)).toISOString(),
+});
+
 const alAzar = (lista, rnd) => lista[Math.floor(rnd() * lista.length)];
 
 /**
@@ -233,16 +246,8 @@ async function sembrarMockup(rnd, organizador) {
     ]),
   });
 
-  // Prime time compartido (mar/jue/dom 22:00–23:30 UTC y sábado a la tarde),
-  // para que el cruce de horarios tenga algo que mostrar.
-  const COMUNES = [
-    { start_min: 1 * 1440 + 22 * 60, end_min: 1 * 1440 + 23 * 60 + 30 },
-    { start_min: 3 * 1440 + 22 * 60, end_min: 3 * 1440 + 23 * 60 + 30 },
-    { start_min: 5 * 1440 + 18 * 60, end_min: 5 * 1440 + 22 * 60 },
-    { start_min: 6 * 1440 + 22 * 60, end_min: 6 * 1440 + 23 * 60 + 30 },
-  ];
   const jugadores = [];
-  for (const n of NOMBRES_MOCK) jugadores.push(await crearUsuario(n, rnd, { availability: COMUNES }));
+  for (const n of NOMBRES_MOCK) jugadores.push(await crearUsuario(n, rnd));
 
   const equipos = [];
   for (const [i, [nombre, tag]] of EQUIPOS_MOCK.entries()) {
@@ -287,6 +292,19 @@ async function sembrarMockup(rnd, organizador) {
   }
   for (const m of (await listarPartidos(t.id)).filter((x) => x.round === 3)) {
     await actualizarPartido(m.id, { scheduled_at: fechaRelativa(6, 23) });
+  }
+
+  // --- fechas de las rondas que quedan y los horarios que cargaron los que
+  // juegan las semis, para que "Buscar horario" tenga algo que cruzar: en la
+  // semi 1 cargaron los cuatro y en la semi 2 falta uno.
+  const final = (await listarPartidos(t.id)).find((m) => m.label === 'Final');
+  await guardarRonda(t.id, rondaIdDe(semis[0]), fechasDeRonda(semis[0], diaRelativo(1), diaRelativo(3)));
+  if (final) await guardarRonda(t.id, rondaIdDe(final), fechasDeRonda(final, diaRelativo(6), diaRelativo(7)));
+  const noches = [nocheDelDia(diaRelativo(1)), nocheDelDia(diaRelativo(3))];
+  for (const [i, m] of semis.entries()) {
+    if (!m.team_a_id || !m.team_b_id) continue;
+    const uids = [...(await leerEquipo(m.team_a_id)).member_ids, ...(await leerEquipo(m.team_b_id)).member_ids];
+    for (const uid of i === 1 ? uids.slice(0, -1) : uids) await guardarHorario(t.id, rondaIdDe(m), uid, noches);
   }
 
   // --- algo de charla para que no se vea vacío
