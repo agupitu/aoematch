@@ -287,10 +287,13 @@ Ola 3  ─ T33                                      · 2 h
 - [ ] Vos: en la consola de Google Cloud del proyecto, IAM → Cuentas de servicio → crear una con el
       rol "Administrador de Firebase", generar una clave JSON y pegarla entera en GitHub →
       Settings → Secrets and variables → Actions → `FIREBASE_SERVICE_ACCOUNT`.
-- [ ] Primer deploy a mano desde la PC (`npm run assets`, `npm run build`, `npx firebase deploy
-      --only hosting,firestore,database --project prod`). Verificar con
-      `curl -I https://aoe-3-draft-2eea7.web.app/assets/flags/Flag_German.png` el `Cache-Control`
-      de T29, y entrar con Google.
+- [x] Primer deploy a mano desde la PC (2026-10-27): Hosting, reglas e índices de Firestore y
+      reglas de Realtime Database en `aoe-3-draft-2eea7`. Verificado: la web carga en
+      https://aoe-3-draft-2eea7.web.app sin errores (lista de torneos vacía), las rutas de la SPA
+      devuelven el `index.html`, `/assets/**` llega con `Cache-Control: public, max-age=604800,
+      immutable`, y las reglas de producción rechazan escrituras anónimas (Firestore 403,
+      Realtime Database 401) y dejan leer torneos.
+- [ ] Vos: entrar con Google en la web publicada (no se puede probar sin tu cuenta).
 
 ### T31 · Dominio propio — dif. 1 · junior · 1 h
 
