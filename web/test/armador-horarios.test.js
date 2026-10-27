@@ -1,14 +1,14 @@
-// Horarios, armador y catálogo sin base de datos (web/src/logica/).
+// Armador de equipos y catálogo sin base de datos (web/src/logica/).
 //
 //   npm --prefix web test
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import * as horarios from '../src/logica/horarios.js';
 import { proponerEquipos } from '../src/logica/armador.js';
 import { civPorId, civs, mapaPorId, maps } from '../src/logica/catalogo.js';
 
-// Lunes 20:00 a 23:00 UTC = minutos 1200 a 1380 de la semana.
+// Horarios semanales de antes (minutos de la semana: lunes 20:00 UTC y martes
+// 20:00 UTC). El armador ya no los mira; las pruebas se los pasan para comprobarlo.
 const LUNES_20 = 1200;
 const MARTES_20 = LUNES_20 + 24 * 60;
 const usuario = (id, availability = [], extra = {}) => ({ id, availability, ...extra });
@@ -18,32 +18,6 @@ function azar(semilla = 7) {
   let x = semilla;
   return () => ((x = (x * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
 }
-
-describe('cruce de horarios', () => {
-  const ana = usuario('ana', [{ start_min: LUNES_20, end_min: LUNES_20 + 180 }]);
-  const beto = usuario('beto', [{ start_min: LUNES_20 + 60, end_min: LUNES_20 + 240 }]);
-  const ciro = usuario('ciro');
-
-  it('minutos en común entre los que están', () => {
-    assert.equal(horarios.minutosEnComun([ana, beto]), 120);
-    assert.equal(horarios.minutosEnComun([ana, beto, ciro]), 0);
-    assert.equal(horarios.minutosEnComun([]), 0);
-  });
-
-  it('ventanas con todos y ventanas en las que falta uno, diciendo quién', () => {
-    const todos = horarios.ventanas([ana, beto], { duracionMin: 90 });
-    assert.deepEqual(todos.map((v) => [v.start_min, v.end_min, v.count]), [[LUNES_20 + 60, LUNES_20 + 180, 2]]);
-
-    const casi = horarios.ventanas([ana, beto, ciro], { duracionMin: 60, minimo: 2 });
-    assert.equal(casi[0].count, 2);
-    assert.deepEqual(casi[0].missing, ['ciro']);
-  });
-
-  it('próxima fecha real de un minuto de semana', () => {
-    const miercoles = new Date('2026-10-21T12:00:00.000Z');
-    assert.equal(horarios.proximaFecha(LUNES_20, miercoles).toISOString(), '2026-10-26T20:00:00.000Z');
-  });
-});
 
 describe('armador', () => {
   const t2v2 = { team_size: 2 };

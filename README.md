@@ -84,22 +84,25 @@ va creciendo con cada pago confirmado.
 
 ### Armador de equipos
 Para los que se anotan sueltos. Reparte en serpiente por rating y después
-mejora con intercambios, optimizando dos cosas a la vez: equipos parejos de
-nivel y **horarios en común entre los compañeros**. Un control deslizante
-decide cuánto pesa cada criterio. La propuesta se puede regenerar las veces que
-haga falta y recién después se confirma.
+mejora con intercambios para que los equipos queden **parejos de nivel**. No
+mira horarios: al armar los equipos todavía no hay ronda. La propuesta se puede
+regenerar las veces que haga falta y recién después se confirma.
 
 ### Horarios
-Cada jugador pinta su semana en una grilla de bloques de 30 minutos. Se guarda
-en UTC y se muestra en la zona de cada uno.
+Los horarios se cargan en el torneo, **por ronda**. El organizador fija desde
+qué día hasta qué día se juega cada ronda (pestaña Llaves) y cada jugador pinta,
+en un calendario con esas fechas, cuándo puede jugar: barras de 30 minutos, de
+00:00 a 24:00, en su zona horaria (pestaña Horarios). Se guarda en UTC. Si su
+equipo pasa a la ronda siguiente, carga de nuevo para esa ronda.
 
-Con eso la app calcula:
+Con eso, desde la sala del partido, "Buscar horario" cruza los horarios de los
+jugadores de los dos equipos en esa ronda y propone:
 
-- el **mapa de calor** del torneo (cuántos pueden en cada franja),
-- las **mejores ventanas** para un partido concreto, con la próxima fecha real,
-- y las ventanas en las que *falta uno solo*, diciendo quién.
+- las **ventanas** en las que pueden todos, con la fecha real,
+- y, si no hay ninguna, las ventanas en las que *falta uno solo*, diciendo quién.
 
-Desde la sala del partido, el capitán agenda con un clic sobre la ventana.
+El capitán agenda con un clic sobre la ventana, o pone la fecha a mano. Sin
+fechas de ronda o sin horarios cargados, el partido se agenda a mano igual.
 
 ### Sala del partido
 Pantalla partida: a la izquierda el chat con dos pestañas —**sala del partido**

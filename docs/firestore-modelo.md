@@ -63,13 +63,13 @@ Para el frontend (T07): todos los ids pasan a texto salvo civ y mapa. `PATCH
 | `rating_1v1`, `rating_team` | entero o null | `users` |
 | `is_admin` | entero `0/1` | `users` (`publicUser` lo devuelve como bool, igual que hoy) |
 | `created_at` | texto ISO | `users` |
-| `availability` | `[{ start_min, end_min }]` | tabla `availability` (máximo 336 bloques de 30 min) |
-| `exceptions` | `[{ id, day, start_min, end_min, available }]` | tabla `availability_exceptions`; `id` corto propio para poder borrar una |
 
 - Desaparecen `pass_hash` (las contraseñas de demo las guarda el emulador de Auth) y la tabla
   `sessions` (la sesión es el ID token de Firebase).
-- Las excepciones vencidas (`day` anterior a hoy) se descartan al leer, como el `day >= date('now')`
-  de hoy, y se limpian en la siguiente escritura.
+- El perfil ya no guarda horarios: `availability` (la semana fija) y `exceptions` se sacaron. Los
+  horarios se cargan por ronda dentro del torneo (`tournaments/{slug}/rondas/{rondaId}/horarios/{uid}`).
+  Un perfil viejo que todavía los tenga los conserva, pero nadie los lee ni las reglas dejan
+  escribirlos.
 - **Hoy la presencia del WebSocket manda `publicUser` completo a todos los de la sala**, con
   `google_email` y `steam_id64`. La presencia nueva (T28) guarda solo `display_name` y `avatar_url`.
 
@@ -125,6 +125,31 @@ retiradas).
 `groups` y `group_teams`) van adentro de la etapa; `id` del grupo es la letra (`A`, `B`…), única
 dentro de la etapa. Las búsquedas de hoy ("la etapa de grupos", "la etapa suiza") leen todas las
 etapas del torneo, que son una o dos, y filtran.
+
+#### `tournaments/{slug}/rondas/{rondaId}`
+
+Las fechas en las que se juega una ronda del cuadro; las fija el staff. Una **ronda** es la terna
+(`stage_id`, `bracket`, `round`) de los partidos, y su id es `{stage_id}_{bracket}{round}` (por ejemplo
+`Zk3…_W2`; ver `web/src/logica/rondas.js`). El tercer puesto comparte ronda con la final y los grupos
+comparten la fecha N. Solo hay documento para las rondas a las que el staff ya les puso fechas.
+
+| Campo | Tipo | Para qué |
+|---|---|---|
+| `stage_id`, `bracket`, `round`, `label` | texto, `W`/`L`/`F`, entero, texto | qué ronda es |
+| `from_day`, `to_day` | `YYYY-MM-DD` | lo que ve y edita el staff |
+| `zone` | texto | zona del staff que guardó: cada día va de 00:00 a 24:00 en esa zona |
+| `starts_at`, `ends_at` | texto ISO UTC | el rango real; `ends_at` es excluyente |
+| `updated_at` | texto ISO | |
+
+#### `tournaments/{slug}/rondas/{rondaId}/horarios/{uid}`
+
+Los horarios que cargó un jugador para esa ronda: `{ user_id, blocks: [{ starts_at, ends_at }],
+updated_at }`, con los instantes en ISO UTC, alineados a la grilla de 30 minutos, ordenados, fusionados
+y recortados al rango de la ronda. Lo escribe cada jugador (inscripto, sin retirarse y solo si la ronda ya
+tiene fechas); lo borra el dueño o el staff. Si el equipo pasa a la ronda siguiente, esa ronda empieza
+sin horarios: se carga de nuevo. Las reglas no pueden recorrer la lista: validan la forma y el tope
+(`blocks.size() <= 800`, 31 días de barras alternadas son 744). Al regenerar las llaves el staff borra
+las rondas con sus horarios.
 
 ### `teams/{teamId}`
 
@@ -212,7 +237,7 @@ propia entrada.
 | `civs`, `maps` | `functions/src/catalogo.js` |
 | `users` | `users/{uid}` |
 | `sessions` | Firebase Auth (ID token) |
-| `availability`, `availability_exceptions` | `users/{uid}.availability` y `.exceptions` |
+| `availability`, `availability_exceptions` | sin destino: los horarios pasaron a ser por ronda, `tournaments/{slug}/rondas/{rondaId}/horarios/{uid}` |
 | `tournaments` | `tournaments/{slug}` |
 | `tournament_maps`, `tournament_civs` | `tournaments/{slug}.map_ids` y `.civ_ids` |
 | `tournament_prizes` | `tournaments/{slug}.prizes` |
@@ -225,7 +250,7 @@ propia entrada.
 | `match_games`, `game_civs` | `matches/{matchId}.games` |
 | `drafts`, `draft_actions` | `matches/{matchId}/drafts/{gameNo}` con `actions` |
 | `chat_rooms`, `chat_messages` | `rooms/{roomId}` y `rooms/{roomId}/messages` |
-| — | `steamIds`, `authStates`, `live` (nuevas) |
+| — | `steamIds`, `authStates`, `live`, `tournaments/{slug}/rondas` y sus `horarios` (nuevas) |
 
 ## Consultas e índices
 
@@ -270,7 +295,8 @@ commit, porque una transacción se puede reintentar.
 
 | Documento | Lo más grande que puede llegar a tener |
 |---|---|
-| `users` | 336 bloques de horario y algunas excepciones |
+| `users` | solo campos de texto y números |
+| `rondas/{rondaId}/horarios/{uid}` | 800 bloques de 30 minutos como mucho (31 días de barras alternadas son 744) |
 | `tournaments` | 174 `map_ids`, 24 `civ_ids`, 20 premios |
 | `matches` | `best_of` partidas con hasta 8 civs cada una, y los votos de horario de 8 jugadores |
 | `drafts` | unos 190 pasos y 190 acciones (pool con todos los mapas) |

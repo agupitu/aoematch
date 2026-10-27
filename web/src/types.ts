@@ -209,14 +209,6 @@ export type MatchDetail = Match & {
   me: { team_id: string | null; is_staff: boolean; can_report: boolean; is_captain: boolean };
 };
 
-export type Window = {
-  start_min: number;
-  end_min: number;
-  count: number;
-  missing: string[];
-  next_utc: string;
-};
-
 /** Franja en la que puede jugar un jugador: instantes UTC en texto ISO. */
 export type Bloque = { starts_at: string; ends_at: string };
 
