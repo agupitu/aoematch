@@ -25,15 +25,7 @@ before(async () => {
     database: { rules: raiz('database.rules.json'), ...hostYPuerto('FIREBASE_DATABASE_EMULATOR_HOST') },
   });
   await env.clearFirestore();
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    const db = ctx.firestore();
-    await db.doc('rooms/torneo_copa').set({ kind: 'torneo', public_read: true, readers: [] });
-    await db.doc('rooms/torneo_copa/messages/m1').set({ body: 'hola a todos' });
-    await db.doc('rooms/equipo_e1').set({ kind: 'equipo', public_read: false, readers: ['miembro', 'staff'] });
-    await db.doc('rooms/equipo_e1/messages/m1').set({ body: 'banean Alaska' });
-    await db.doc('live/p1').set({ draft: 1 });
-    await db.doc('matches/p1').set({ tournament_id: 'copa' });
-  });
+  await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc('live/p1').set({ draft: 1 }));
 });
 
 after(() => env.cleanup());
@@ -42,44 +34,11 @@ const anonimo = () => env.unauthenticatedContext();
 const como = (uid) => env.authenticatedContext(uid);
 
 describe('reglas de Firestore', () => {
+  // Usuarios, torneos y equipos: reglas-torneos.test.js. Partidos, draft y
+  // chat: reglas-partidos.test.js.
   it('cualquiera lee los avisos live, nadie los escribe', async () => {
     await assertSucceeds(anonimo().firestore().doc('live/p1').get());
     await assertFails(como('miembro').firestore().doc('live/p1').set({ draft: 2 }));
-  });
-
-  it('el chat general se lee sin sesión, de a uno y en consulta', async () => {
-    const db = anonimo().firestore();
-    await assertSucceeds(db.doc('rooms/torneo_copa/messages/m1').get());
-    await assertSucceeds(db.collection('rooms/torneo_copa/messages').orderBy('created_at', 'desc').limit(80).get());
-  });
-
-  it('el chat de equipo lo leen los de readers', async () => {
-    for (const uid of ['miembro', 'staff']) {
-      const db = como(uid).firestore();
-      await assertSucceeds(db.doc('rooms/equipo_e1/messages/m1').get());
-      await assertSucceeds(db.collection('rooms/equipo_e1/messages').limit(80).get());
-    }
-  });
-
-  it('el chat de equipo no lo lee el rival ni un anónimo', async () => {
-    await assertFails(como('rival').firestore().doc('rooms/equipo_e1/messages/m1').get());
-    await assertFails(como('rival').firestore().collection('rooms/equipo_e1/messages').get());
-    await assertFails(anonimo().firestore().doc('rooms/equipo_e1/messages/m1').get());
-  });
-
-  it('una sala que no existe no se lee', async () => {
-    await assertFails(anonimo().firestore().collection('rooms/no_existe/messages').get());
-  });
-
-  it('nadie escribe mensajes desde el cliente, ni en su sala', async () => {
-    await assertFails(como('miembro').firestore().collection('rooms/equipo_e1/messages').add({ body: 'hola' }));
-    await assertFails(como('miembro').firestore().collection('rooms/torneo_copa/messages').add({ body: 'hola' }));
-  });
-
-  it('partidos y salas no se leen (T36)', async () => {
-    const db = como('miembro').firestore();
-    await assertFails(db.doc('matches/p1').get());
-    await assertFails(db.doc('rooms/equipo_e1').get());
   });
 });
 

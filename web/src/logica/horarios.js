@@ -50,6 +50,8 @@ export function minutosEnComun(usuarios) {
  * Ventanas donde coinciden al menos `minimo` jugadores durante `duracionMin`.
  * Devuelve [{ start_min, end_min, count, missing: [userId] }] ordenado por
  * cantidad de gente y luego por horario.
+ * @param {{ id: string, availability?: { start_min: number, end_min: number }[] }[]} usuarios
+ * @param {{ duracionMin?: number, minimo?: number | null, limite?: number }} [opciones]
  */
 export function ventanas(usuarios, { duracionMin = 60, minimo = null, limite = 20 } = {}) {
   if (!usuarios.length) return [];

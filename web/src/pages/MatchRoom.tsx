@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { agendar, detallePartido, horariosDelPartido } from '../datos/partidos';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
@@ -18,13 +19,13 @@ export function MatchRoom() {
 
   const cargar = useCallback(async () => {
     try {
-      const d = await api.get<MatchDetail>(`/api/matches/${id}`);
+      const d = await detallePartido(id!, user?.id ?? null);
       setM(d);
       setDraft(d.draft);
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   useEffect(() => {
     void cargar();
@@ -205,19 +206,16 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
 
   useEffect(() => {
     if (!abierto) return;
-    api
-      .get<{ windows: Window[]; partial: Window[]; users: { id: string; display_name: string }[] }>(
-        `/api/matches/${m.id}/schedule?duration=90`
-      )
+    horariosDelPartido(m, 90)
       .then(setData)
       .catch(() => setData(null));
-  }, [abierto, m.id]);
+  }, [abierto, m]);
 
   const offset = offsetZona(tz);
   const puede = m.me.can_report;
 
   const guardar = async (iso: string | null) => {
-    await api.post(`/api/matches/${m.id}/schedule`, { scheduled_at: iso });
+    await agendar(m, iso);
     setAbierto(false);
     onDone();
   };

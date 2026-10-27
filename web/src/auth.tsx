@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { onIdTokenChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { api } from './api';
+import { actualizarPerfil, asegurarPerfil } from './datos/usuarios';
 import { auth } from './firebase';
 import type { User } from './types';
 
@@ -23,15 +23,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refrescar = useCallback(async () => {
     try {
-      const r = await api.get<{ user: User | null }>('/api/auth/me');
-      setUser(r.user);
+      await auth.authStateReady();
+      const cuenta = auth.currentUser;
+      setUser(cuenta ? await asegurarPerfil(cuenta) : null);
+    } catch (err) {
+      console.error('No se pudo leer o crear el perfil:', err);
+      setUser(null);
     } finally {
       setCargando(false);
     }
   }, []);
 
   // Firebase avisa al cargar (con la sesión recuperada o sin sesión), al entrar,
-  // al salir y cada vez que renueva el token: el perfil sale siempre de la API.
+  // al salir y cada vez que renueva el token: el perfil sale de users/{uid}, y
+  // la primera vez se crea.
   useEffect(() => onIdTokenChanged(auth, () => void refrescar()), [refrescar]);
 
   // Vuelta de Steam: la API entra con un token propio que viene en el hash
@@ -66,14 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refrescar();
     },
     logout: async () => {
-      // La cookie vieja (hasta T33) y la sesión de Firebase.
-      await api.post('/api/auth/logout');
       await signOut(auth);
       setUser(null);
     },
     actualizar: async (campos) => {
-      const r = await api.patch<{ user: User }>('/api/auth/me', campos);
-      setUser(r.user);
+      if (!user) return;
+      setUser(await actualizarPerfil(user.id, campos));
     },
   };
 

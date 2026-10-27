@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { listarTorneos } from '../datos/torneos';
 import { useAuth } from '../auth';
 import { Badge, Empty, Spinner } from '../components/ui';
 import { bolsaDe, ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, monto, plata } from '../lib';
@@ -21,7 +21,9 @@ export function Home() {
   const [lista, setLista] = useState<Fila[] | null>(null);
 
   useEffect(() => {
-    api.get<Fila[]>('/api/tournaments').then(setLista).catch(() => setLista([]));
+    listarTorneos()
+      .then((l) => setLista(l as unknown as Fila[]))
+      .catch(() => setLista([]));
   }, []);
 
   return (

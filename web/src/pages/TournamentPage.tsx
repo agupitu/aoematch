@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { actualizarTorneo, detalleTorneo, horariosDelTorneo } from '../datos/torneos';
+import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
+import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
 import { Bracket, MatchCard } from '../components/Bracket';
@@ -13,7 +16,7 @@ import {
   ETIQUETA_CIV, ETIQUETA_ESTADO, ETIQUETA_FORMATO, ETIQUETA_MAPA,
   fechaCorta, horas, monto, plata, rangoSemana, offsetZona, zonaDelNavegador,
 } from '../lib';
-import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, Window } from '../types';
+import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User, Window } from '../types';
 
 type Pestania = 'resumen' | 'inscripciones' | 'equipos' | 'llaves' | 'horarios' | 'chat' | 'config';
 
@@ -26,11 +29,11 @@ export function TournamentPage() {
 
   const cargar = useCallback(async () => {
     try {
-      setT(await api.get<Tournament>(`/api/tournaments/${slug}`));
+      setT(await detalleTorneo(slug!, user?.id ?? null));
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [slug]);
+  }, [slug, user?.id]);
 
   useEffect(() => {
     void cargar();
@@ -96,7 +99,7 @@ function AccionesInscripcion({
   onDone,
 }: {
   t: Tournament;
-  user: { id: string } | null;
+  user: User | null;
   onDone: () => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -119,7 +122,7 @@ function AccionesInscripcion({
   const inscribir = async (kind: 'solo' | 'equipo') => {
     setError('');
     try {
-      await api.post(`/api/tournaments/${t.id}/register`, {
+      await inscribirse(t, user, {
         kind,
         team_name: nombreEquipo || undefined,
         team_id: equipoId || undefined,
@@ -145,7 +148,7 @@ function AccionesInscripcion({
           <button
             className="btn btn-danger"
             onClick={async () => {
-              await api.post(`/api/tournaments/${t.id}/withdraw`);
+              await retirarse(t, user.id);
               onDone();
             }}
           >
@@ -400,7 +403,7 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const filas = t.registrations.filter((r) => r.status !== 'retirada');
 
   const marcar = async (r: Registration, campos: Partial<Registration>) => {
-    await api.patch(`/api/tournaments/${t.id}/registrations/${r.user_id}`, campos);
+    await marcarInscripcion(t, r, campos);
     onDone();
   };
 
@@ -623,7 +626,7 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
                 className="text-xs text-parch-400 hover:text-blood-500"
                 title="Sacar del equipo"
                 onClick={async () => {
-                  await api.del(`/api/tournaments/${t.id}/teams/${team.id}/members/${m.id}`);
+                  await sacarMiembro(t, team.id, m.id);
                   onDone();
                 }}
               >
@@ -776,27 +779,21 @@ function Horarios({ t }: { t: Tournament }) {
   );
 
   useEffect(() => {
-    api
-      .get<{ total: number; windows: Window[] }>(`/api/tournaments/${t.id}/schedule?duration=${duracion}`)
-      .then(setData)
-      .catch(() => setData(null));
-  }, [t.id, duracion]);
-
-  useEffect(() => {
-    if (!ids.length) return;
-    // Mapa de calor: cuántos pueden en cada bloque de 30 min.
-    Promise.all(
-      ids.map((id) => api.get<{ blocks: { start_min: number; end_min: number }[] }>(`/api/availability/${id}`))
-    ).then((todos) => {
-      const c = new Array(336).fill(0);
-      for (const u of todos) {
-        for (const b of u.blocks) {
-          for (let m = b.start_min; m < b.end_min; m += 30) c[Math.floor(m / 30) % 336]++;
+    horariosDelTorneo(t, duracion)
+      .then((r) => {
+        setData(r);
+        // Mapa de calor: cuántos pueden en cada bloque de 30 min.
+        if (!r.horarios.length) return;
+        const c = new Array(336).fill(0);
+        for (const u of r.horarios) {
+          for (const b of u.blocks) {
+            for (let m = b.start_min; m < b.end_min; m += 30) c[Math.floor(m / 30) % 336]++;
+          }
         }
-      }
-      setHeat(c);
-    });
-  }, [ids]);
+        setHeat(c);
+      })
+      .catch(() => setData(null));
+  }, [t, duracion]);
 
   const offset = offsetZona(tz);
 
@@ -887,10 +884,8 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([api.get<GameMap[]>('/api/maps'), api.get<Civ[]>('/api/civs')]).then(([m, c]) => {
-      setMaps(m);
-      setCivs(c);
-    });
+    setMaps(catalogoMapas());
+    setCivs(catalogoCivs());
   }, []);
 
   useEffect(() => {
@@ -947,7 +942,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const guardar = async () => {
     setError('');
     try {
-      await api.patch(`/api/tournaments/${t.id}`, {
+      await actualizarTorneo(t, {
         ...form,
         max_teams: form.max_teams === '' ? null : Number(form.max_teams),
         best_of_final: form.best_of_final === '' ? null : Number(form.best_of_final),

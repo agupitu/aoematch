@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { GoogleAuthProvider, linkWithPopup } from 'firebase/auth';
 import { api } from '../api';
+import { guardarHorario, horarioDe } from '../datos/usuarios';
 import { useAuth } from '../auth';
 import { auth } from '../firebase';
 import { Alerta, Avatar, Badge, Spinner } from '../components/ui';
@@ -37,9 +38,8 @@ export function Profile() {
       rating_1v1: user.rating_1v1?.toString() ?? '',
       rating_team: user.rating_team?.toString() ?? '',
     });
-    api
-      .get<{ blocks: Bloque[] }>(`/api/availability/${user.id}`)
-      .then((r) => setBloques(r.blocks))
+    horarioDe(user.id)
+      .then(setBloques)
       .catch(() => setBloques([]));
   }, [user]);
 
@@ -71,7 +71,8 @@ export function Profile() {
   };
 
   const guardarHorarios = async () => {
-    await api.put('/api/availability', { blocks: bloques ?? [] });
+    if (!user) return;
+    await guardarHorario(user.id, bloques ?? []);
     setSucio(false);
     setMensaje('Horarios guardados.');
     setTimeout(() => setMensaje(''), 2500);

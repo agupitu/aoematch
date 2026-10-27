@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { crearTorneo } from '../datos/torneos';
+import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { useAuth } from '../auth';
 import { Alerta, Spinner } from '../components/ui';
 import {
   BORRADOR_INICIAL, TournamentForm, type Borrador, type PestaniaForm,
 } from '../components/TournamentForm';
-import type { Civ, GameMap, Tournament } from '../types';
+import type { Civ, GameMap } from '../types';
 
 /** Pool competitivo típico, por si querés arrancar con algo cargado. */
 const SUGERIDOS = [
@@ -25,15 +26,15 @@ export function CreateTournament() {
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.get<GameMap[]>('/api/maps'), api.get<Civ[]>('/api/civs')]).then(([m, c]) => {
-      setMaps(m);
-      setCivs(c);
-      setForm((f) => ({
-        ...f,
-        civ_ids: c.map((x) => x.id),
-        map_ids: m.filter((x) => SUGERIDOS.includes(x.slug)).map((x) => x.id),
-      }));
-    });
+    const m: GameMap[] = catalogoMapas();
+    const c: Civ[] = catalogoCivs();
+    setMaps(m);
+    setCivs(c);
+    setForm((f) => ({
+      ...f,
+      civ_ids: c.map((x) => x.id),
+      map_ids: m.filter((x) => SUGERIDOS.includes(x.slug)).map((x) => x.id),
+    }));
   }, []);
 
   if (cargando) return <Spinner />;
@@ -64,7 +65,7 @@ export function CreateTournament() {
     }
     setEnviando(true);
     try {
-      const t = await api.post<Tournament>('/api/tournaments', {
+      const slug = await crearTorneo({
         ...form,
         max_teams: form.max_teams === '' ? null : Number(form.max_teams),
         best_of_final: form.best_of_final === '' ? null : Number(form.best_of_final),
@@ -79,8 +80,8 @@ export function CreateTournament() {
         starts_at: form.starts_at || null,
         prizes: form.prizes,
         first_map_id: form.first_map_id,
-      });
-      navigate(`/t/${t.slug}`);
+      }, user.id);
+      navigate(`/t/${slug}`);
     } catch (err) {
       setError((err as Error).message);
       setEnviando(false);

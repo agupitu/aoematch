@@ -273,26 +273,228 @@ service cloud.firestore {
         && (esStaff(resource.data.tournament_id) || resource.data.member_ids == [yo()]);
     }
 
-    // ------------------------------------------------- chat y avisos (T36)
+    // -------------------------------------------------------------- partidos
 
-    // Avisos de cambios de cada partido: solo contadores, sin datos de nadie.
+    function rutaPartido(matchId) {
+      return /databases/$(database)/documents/matches/$(matchId);
+    }
+
+    function rutaUsuario(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    /** ¿Juega en alguno de los dos equipos del partido? */
+    function juegaElPartido(m) {
+      return conSesion() && (
+        (m.team_a_id != null && yo() in get(rutaEquipo(m.team_a_id)).data.member_ids)
+        || (m.team_b_id != null && yo() in get(rutaEquipo(m.team_b_id)).data.member_ids));
+    }
+
+    /** ¿Es capitán de alguno de los dos equipos del partido? */
+    function capitanDelPartido(m) {
+      return conSesion() && (
+        (m.team_a_id != null && get(rutaEquipo(m.team_a_id)).data.captain_id == yo())
+        || (m.team_b_id != null && get(rutaEquipo(m.team_b_id)).data.captain_id == yo()));
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      // Las llaves y los resultados los escribe el staff desde su navegador.
+      allow create: if esStaff(request.resource.data.tournament_id);
+      allow delete: if esStaff(resource.data.tournament_id);
+      // Los capitanes solo agendan (pendiente pasa a agendado).
+      allow update: if request.resource.data.tournament_id == resource.data.tournament_id
+        && (esStaff(resource.data.tournament_id)
+            || (capitanDelPartido(resource.data)
+                && soloCambian(['scheduled_at', 'status'])
+                && (request.resource.data.status == resource.data.status
+                    || (resource.data.status == 'pendiente' && request.resource.data.status == 'agendado'))));
+
+      // Votos de horario: un documento por jugador, con sus votos.
+      match /votos/{userId} {
+        allow read: if true;
+        allow write: if conSesion() && yo() == userId
+          && (juegaElPartido(get(rutaPartido(matchId)).data)
+              || esStaff(get(rutaPartido(matchId)).data.tournament_id))
+          && request.resource.data.keys().hasOnly(['votes'])
+          && request.resource.data.votes is list
+          && request.resource.data.votes.size() <= 50;
+      }
+
+      // ---------------------------------------------------------------- draft
+      //
+      // drafts/{gameNo} guarda lo que arma `planDeDraft` (web/src/logica/draft.js).
+      // Un jugador del partido lo crea; después cada uno solo puede dar el paso
+      // que le toca: elegir mapa, banear, anotarse como que ya eligió, revelar.
+
+      function partidaAnteriorConGanador(m, gameNo) {
+        return gameNo == 1 || m.games[gameNo - 2].winner_team_id != null;
+      }
+
+      function draftNuevoValido(d, m, gameNo) {
+        return d.game_no == gameNo
+          && d.team_a_id == m.team_a_id && d.team_b_id == m.team_b_id
+          && d.revealed == false
+          && d.state in ['mapa', 'bans', 'picks']
+          && d.banned_civ_ids == []
+          && d.get('picked', []) == []
+          && d.player_ids is list && d.player_ids.size() >= 2 && d.player_ids.size() <= 8;
+      }
+
+      function equipoEnElDraft(d) {
+        return yo() in d.team_of ? d.team_of[yo()] : null;
+      }
+
+      function eligeMapa(r, d) {
+        return r.state == 'mapa'
+          && soloCambian(['map_id', 'state'])
+          && equipoEnElDraft(r) == r.map_chooser_team_id
+          && d.map_id in r.map_pool
+          && d.state == (r.ban_order.size() > 0 ? 'bans' : 'picks');
+      }
+
+      function banea(r, d) {
+        let n = r.banned_civ_ids.size();
+        let civ = d.banned_civ_ids[n];
+        return r.state == 'bans'
+          && soloCambian(['banned_civ_ids', 'state'])
+          && equipoEnElDraft(r) == r.ban_order[n]
+          && d.banned_civ_ids.size() == n + 1
+          && d.banned_civ_ids == r.banned_civ_ids.concat([civ])
+          && civ in r.civ_pool
+          && !(civ in r.banned_civ_ids)
+          && d.state == (n + 1 == r.ban_order.size() ? 'picks' : 'bans');
+      }
+
+      // Se anota en `picked` en el mismo batch en que guarda su pick.
+      function seAnota(r, d, gameNo) {
+        return r.state == 'picks' && !r.revealed
+          && soloCambian(['picked'])
+          && yo() in r.player_ids
+          && !(yo() in r.get('picked', []))
+          && d.picked == r.get('picked', []).concat([yo()])
+          && existsAfter(/databases/$(database)/documents/matches/$(matchId)/drafts/$(gameNo)/picks/$(yo()));
+      }
+
+      // Cualquiera que juega revela cuando están anotados todos.
+      function revela(r, d) {
+        return r.state == 'picks' && !r.revealed
+          && soloCambian(['revealed', 'state'])
+          && d.revealed == true && d.state == 'listo'
+          && yo() in r.player_ids
+          && r.get('picked', []).toSet().hasAll(r.player_ids);
+      }
+
+      match /drafts/{gameNo} {
+        allow read: if true;
+        allow create: if conSesion()
+          && (juegaElPartido(get(rutaPartido(matchId)).data)
+              || esStaff(get(rutaPartido(matchId)).data.tournament_id))
+          && partidaAnteriorConGanador(get(rutaPartido(matchId)).data, int(gameNo))
+          && draftNuevoValido(request.resource.data, get(rutaPartido(matchId)).data, int(gameNo));
+        allow update: if conSesion()
+          && (esStaff(get(rutaPartido(matchId)).data.tournament_id)
+              || eligeMapa(resource.data, request.resource.data)
+              || banea(resource.data, request.resource.data)
+              || seAnota(resource.data, request.resource.data, gameNo)
+              || revela(resource.data, request.resource.data));
+        // Reiniciar el draft: el staff lo borra (sin reloj, D11).
+        allow delete: if esStaff(get(rutaPartido(matchId)).data.tournament_id);
+
+        function rutaDraft() {
+          return /databases/$(database)/documents/matches/$(matchId)/drafts/$(gameNo);
+        }
+
+        // Pick ciego: el ajeno no se lee hasta que el draft se revela.
+        match /picks/{userId} {
+          allow read: if (conSesion() && yo() == userId) || get(rutaDraft()).data.revealed == true;
+          allow create, update: if conSesion() && yo() == userId
+            && pickValido(get(rutaDraft()).data, userId, request.resource.data);
+          allow delete: if esStaff(get(rutaPartido(matchId)).data.tournament_id);
+        }
+
+        function pickValido(d, userId, p) {
+          return d.state == 'picks' && d.revealed == false
+            && userId in d.player_ids
+            && p.keys().hasOnly(['civ_id'])
+            && p.civ_id in d.civ_pool
+            && !(p.civ_id in d.banned_civ_ids)
+            && !(p.civ_id in d.civs_usadas.get(userId, []));
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------ chat
+    //
+    // rooms/torneo_{slug} (pública), rooms/partido_{matchId} (pública) y
+    // rooms/equipo_{teamId} (sus miembros y el staff). La sala de equipo no
+    // guarda quién la lee: sale del equipo, así no hay que mantenerlo al día.
+
+    function rutaSala(roomId) {
+      return /databases/$(database)/documents/rooms/$(roomId);
+    }
+
+    function puedeLeerSala(sala) {
+      return sala.kind != 'equipo' || (conSesion() && (
+        yo() in get(rutaEquipo(sala.team_id)).data.member_ids || esStaff(sala.tournament_id)));
+    }
+
+    function inscriptoVigente(slug) {
+      let ruta = /databases/$(database)/documents/tournaments/$(slug)/registrations/$(yo());
+      return exists(ruta) && get(ruta).data.status != 'retirada';
+    }
+
+    function puedeEscribirSala(sala) {
+      return conSesion() && (
+        esStaff(sala.tournament_id)
+        || (sala.kind == 'torneo' && inscriptoVigente(sala.tournament_id))
+        || (sala.kind == 'partido' && juegaElPartido(get(rutaPartido(sala.match_id)).data))
+        || (sala.kind == 'equipo' && yo() in get(rutaEquipo(sala.team_id)).data.member_ids));
+    }
+
+    // La sala la crea quien la abre primero, con los datos que salen de su id.
+    function salaNuevaValida(roomId, s) {
+      return s.keys().hasOnly(['kind', 'tournament_id', 'match_id', 'team_id', 'name', 'public_read', 'readers', 'created_at'])
+        && textoOpcional(s.get('name', null), 120)
+        && (
+          (s.kind == 'torneo' && roomId == 'torneo_' + s.tournament_id
+            && s.public_read == true && exists(rutaTorneo(s.tournament_id)))
+          || (s.kind == 'partido' && roomId == 'partido_' + s.match_id && s.public_read == true
+            && get(rutaPartido(s.match_id)).data.tournament_id == s.tournament_id)
+          || (s.kind == 'equipo' && roomId == 'equipo_' + s.team_id && s.public_read == false
+            && get(rutaEquipo(s.team_id)).data.tournament_id == s.tournament_id));
+    }
+
+    match /rooms/{roomId} {
+      allow read: if puedeLeerSala(resource.data);
+      allow create: if conSesion() && salaNuevaValida(roomId, request.resource.data);
+      allow update: if false;
+      allow delete: if esStaff(resource.data.tournament_id);
+
+      // Mensajes: el autor va copiado tal como está en su perfil, y desde el
+      // cliente nunca son del sistema.
+      match /messages/{mensaje} {
+        allow read: if puedeLeerSala(get(rutaSala(roomId)).data);
+        allow create: if exists(rutaSala(roomId))
+          && puedeEscribirSala(get(rutaSala(roomId)).data)
+          && mensajeValido(request.resource.data);
+        allow update: if false;
+        allow delete: if esStaff(get(rutaSala(roomId)).data.tournament_id);
+      }
+    }
+
+    function mensajeValido(m) {
+      let perfil = get(rutaUsuario(yo())).data;
+      return m.keys().hasOnly(['body', 'system', 'created_at', 'user'])
+        && texto(m.body, 1, 2000)
+        && m.system == 0
+        && m.created_at == request.time
+        && m.user == { 'id': yo(), 'display_name': perfil.display_name, 'avatar_url': perfil.get('avatar_url', null) };
+    }
+
+    // Avisos de cambios de cada partido (hasta T47): solo contadores.
     match /live/{matchId} {
       allow read: if true;
-    }
-
-    // Mensajes de chat. La sala dice quién los lee: la general del torneo y la
-    // del partido son públicas; la de equipo, solo para los uid de `readers`
-    // (miembros y staff del torneo).
-    match /rooms/{roomId}/messages/{mensaje} {
-      allow read: if puedeLeerSala(roomId);
-    }
-
-    function puedeLeerSala(roomId) {
-      let ruta = /databases/$(database)/documents/rooms/$(roomId);
-      return exists(ruta) && (
-        get(ruta).data.public_read == true ||
-        (request.auth != null && request.auth.uid in get(ruta).data.readers)
-      );
     }
   }
 }
