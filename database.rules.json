@@ -7,10 +7,9 @@
         ".read": true,
         "$uid": {
           ".write": "auth != null && auth.uid === $uid",
-          ".validate": "newData.hasChildren(['display_name', 'at']) && newData.child('display_name').isString() && newData.child('display_name').val().length <= 60",
+          ".validate": "newData.hasChildren(['display_name', 'avatar_url']) && newData.child('display_name').isString() && newData.child('display_name').val().length <= 60 && newData.child('avatar_url').isString() && newData.child('avatar_url').val().length <= 500",
           "display_name": { ".validate": true },
-          "avatar_url": { ".validate": "newData.isString() && newData.val().length <= 500" },
-          "at": { ".validate": "newData.isNumber()" },
+          "avatar_url": { ".validate": true },
           "$otro": { ".validate": false }
         }
       }

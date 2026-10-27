@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onIdTokenChanged, signInWithCustomToken, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { onIdTokenChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { actualizarPerfil, asegurarPerfil } from './datos/usuarios';
 import { auth } from './firebase';
 import type { User } from './types';
@@ -19,7 +18,6 @@ const AuthCtx = createContext<Ctx>(null as unknown as Ctx);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cargando, setCargando] = useState(true);
-  const navigate = useNavigate();
 
   const refrescar = useCallback(async () => {
     try {
@@ -38,18 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // al salir y cada vez que renueva el token: el perfil sale de users/{uid}, y
   // la primera vez se crea.
   useEffect(() => onIdTokenChanged(auth, () => void refrescar()), [refrescar]);
-
-  // Vuelta de Steam: la API entra con un token propio que viene en el hash
-  // (/entrar#token=...). Se saca de la barra antes de usarlo.
-  useEffect(() => {
-    const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
-    if (!token) return;
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    signInWithCustomToken(auth, token).then(
-      () => navigate('/perfil?steam=ok', { replace: true }),
-      () => navigate('/entrar?steam=error', { replace: true })
-    );
-  }, [navigate]);
 
   const value: Ctx = {
     user,

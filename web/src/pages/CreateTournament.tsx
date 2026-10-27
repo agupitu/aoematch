@@ -72,14 +72,12 @@ export function CreateTournament() {
         third_place: form.third_place ? 1 : 0,
         map_repeat: form.map_repeat ? 1 : 0,
         civ_repeat_series: form.civ_repeat_series ? 1 : 0,
-        civ_repeat_team: form.civ_repeat_team ? 1 : 0,
-        civ_mirror: form.civ_mirror ? 1 : 0,
+        civ_bans: Math.max(0, Math.min(3, form.civ_bans || 0)),
         allow_solo: form.allow_solo ? 1 : 0,
-        civ_pattern: form.civ_pattern.trim() || null,
+        first_map_id: form.map_ids.includes(form.first_map_id ?? -1) ? form.first_map_id : null,
         reg_closes_at: form.reg_closes_at || null,
         starts_at: form.starts_at || null,
         prizes: form.prizes,
-        first_map_id: form.first_map_id,
       }, user.id);
       navigate(`/t/${slug}`);
     } catch (err) {

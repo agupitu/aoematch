@@ -4,6 +4,7 @@
 import { type User as FirebaseUser } from 'firebase/auth';
 import { doc, runTransaction, updateDoc } from 'firebase/firestore';
 import { firestore } from '../firebase';
+import { steamUrlValida } from '../lib';
 import type { User } from '../types';
 import { type Doc, ahora, conMensaje, leer, leerPorIds, ordenarPor } from './base';
 
@@ -19,6 +20,7 @@ export function comoUsuario(u: Doc): User {
     discord: u.discord ?? null,
     steam_id64: u.steam_id64 ?? null,
     steam_name: u.steam_name ?? null,
+    steam_url: u.steam_url ?? null,
     google_sub: u.google_sub ?? null,
     google_email: u.google_email ?? null,
     xbox_tag: u.xbox_tag ?? null,
@@ -92,6 +94,13 @@ export async function actualizarPerfil(uid: string, campos: Partial<User>): Prom
     }
   }
   // El nombre no puede quedar vacío.
+  if (campos.steam_url !== undefined) {
+    const url = campos.steam_url === '' || campos.steam_url === null ? null : String(campos.steam_url).trim();
+    if (url !== null && !steamUrlValida(url)) {
+      throw new Error('El link tiene que ser un perfil de steamcommunity.com (id o profiles).');
+    }
+    cambios.steam_url = url;
+  }
   if (cambios.display_name === null) delete cambios.display_name;
   if (typeof cambios.display_name === 'string') {
     const nombre = cambios.display_name.slice(0, 60);

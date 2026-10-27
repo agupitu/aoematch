@@ -35,6 +35,39 @@ service cloud.firestore {
       return v is int && v >= min && v <= max;
     }
 
+    function urlHttp(v) {
+      return v is string && v.size() >= 8 && v.size() <= 500 && v.matches('https?://[^\\s]+');
+    }
+
+    function vodLinkValido(v) {
+      return v is map && v.keys().hasAll(['label', 'url']) && v.keys().hasOnly(['label', 'url'])
+        && texto(v.label, 1, 60) && urlHttp(v.url);
+    }
+
+    function vodLinksValidos(links) {
+      return links is list && links.size() <= 20
+        && (links.size() < 1 || vodLinkValido(links[0]))
+        && (links.size() < 2 || vodLinkValido(links[1]))
+        && (links.size() < 3 || vodLinkValido(links[2]))
+        && (links.size() < 4 || vodLinkValido(links[3]))
+        && (links.size() < 5 || vodLinkValido(links[4]))
+        && (links.size() < 6 || vodLinkValido(links[5]))
+        && (links.size() < 7 || vodLinkValido(links[6]))
+        && (links.size() < 8 || vodLinkValido(links[7]))
+        && (links.size() < 9 || vodLinkValido(links[8]))
+        && (links.size() < 10 || vodLinkValido(links[9]))
+        && (links.size() < 11 || vodLinkValido(links[10]))
+        && (links.size() < 12 || vodLinkValido(links[11]))
+        && (links.size() < 13 || vodLinkValido(links[12]))
+        && (links.size() < 14 || vodLinkValido(links[13]))
+        && (links.size() < 15 || vodLinkValido(links[14]))
+        && (links.size() < 16 || vodLinkValido(links[15]))
+        && (links.size() < 17 || vodLinkValido(links[16]))
+        && (links.size() < 18 || vodLinkValido(links[17]))
+        && (links.size() < 19 || vodLinkValido(links[18]))
+        && (links.size() < 20 || vodLinkValido(links[19]));
+    }
+
     function rutaTorneo(slug) {
       return /databases/$(database)/documents/tournaments/$(slug);
     }
@@ -136,7 +169,10 @@ service cloud.firestore {
       // Etapas (grupos, suizo): las genera el staff desde su navegador.
       match /stages/{stageId} {
         allow read: if true;
-        allow write: if esStaff(slug);
+        allow create, update: if esStaff(slug)
+          && (!request.resource.data.keys().hasAny(['vod_links'])
+              || vodLinksValidos(request.resource.data.vod_links));
+        allow delete: if esStaff(slug);
       }
 
       // ---------------------------------------------------------- inscripciones
@@ -300,10 +336,14 @@ service cloud.firestore {
     match /matches/{matchId} {
       allow read: if true;
       // Las llaves y los resultados los escribe el staff desde su navegador.
-      allow create: if esStaff(request.resource.data.tournament_id);
+      allow create: if esStaff(request.resource.data.tournament_id)
+        && (!request.resource.data.keys().hasAny(['vod_links'])
+            || vodLinksValidos(request.resource.data.vod_links));
       allow delete: if esStaff(resource.data.tournament_id);
-      // Los capitanes solo agendan (pendiente pasa a agendado).
+      // Los capitanes solo agendan (pendiente pasa a agendado). Los links, solo el staff.
       allow update: if request.resource.data.tournament_id == resource.data.tournament_id
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['vod_links'])
+            || (esStaff(resource.data.tournament_id) && vodLinksValidos(request.resource.data.vod_links)))
         && (esStaff(resource.data.tournament_id)
             || (capitanDelPartido(resource.data)
                 && soloCambian(['scheduled_at', 'status'])

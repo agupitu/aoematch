@@ -1,99 +1,202 @@
 import { useEffect, useRef, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query, type DocumentData } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  type DocumentData,
+} from 'firebase/firestore';
 import { onValue, ref } from 'firebase/database';
-import { api } from './api';
-import { database, firestore } from './firebase';
+import { useAuth } from './auth';
+import { mensajeDeError } from './datos/base';
+import { firestore, database } from './firebase';
 import type { ChatMessage } from './types';
 
-// Tiempo real con Firebase (reemplaza el WebSocket): los mensajes del chat y
-// el aviso de cambios de cada partido se escuchan directo en Firestore, con
-// las reglas de firestore.rules; escribir pasa por la API.
+// Tiempo real sin API: el partido y el draft se escuchan en Firestore, y el
+// chat se escribe desde el cliente con las reglas de firestore.rules.
 
 function comoMensaje(id: string, d: DocumentData): ChatMessage {
   return {
     id,
     body: d.body,
     system: !!d.system,
-    // Un mensaje recién mandado llega antes de que el servidor le ponga hora.
     created_at: d.created_at?.toDate().toISOString() ?? new Date().toISOString(),
     user: d.user ?? null,
   };
 }
 
+const PREFIJOS = { tournament: 'torneo', match: 'partido', team: 'equipo' } as const;
+
+function parsearSala(room: string): { tipo: keyof typeof PREFIJOS; id: string; roomId: string } | null {
+  const [tipo, ...resto] = room.split(':');
+  const id = resto.join(':');
+  if (!(tipo in PREFIJOS) || !id || id.includes('/')) return null;
+  const clave = tipo as keyof typeof PREFIJOS;
+  return { tipo: clave, id, roomId: `${PREFIJOS[clave]}_${id}` };
+}
+
+async function datosDeSala(parsed: { tipo: keyof typeof PREFIJOS; id: string }) {
+  if (parsed.tipo === 'tournament') {
+    return {
+      kind: 'torneo',
+      tournament_id: parsed.id,
+      public_read: true,
+      name: 'General',
+      created_at: serverTimestamp(),
+    };
+  }
+  if (parsed.tipo === 'match') {
+    const m = await getDoc(doc(firestore, 'matches', parsed.id));
+    if (!m.exists()) throw new Error('Ese partido no existe.');
+    const d = m.data();
+    return {
+      kind: 'partido',
+      tournament_id: d.tournament_id,
+      match_id: parsed.id,
+      public_read: true,
+      name: String(d.label || `Ronda ${d.round ?? ''}`.trim()).slice(0, 120),
+      created_at: serverTimestamp(),
+    };
+  }
+  const e = await getDoc(doc(firestore, 'teams', parsed.id));
+  if (!e.exists()) throw new Error('Ese equipo no existe.');
+  const d = e.data();
+  return {
+    kind: 'equipo',
+    tournament_id: d.tournament_id,
+    team_id: parsed.id,
+    public_read: false,
+    name: String(d.name || 'Equipo').slice(0, 120),
+    created_at: serverTimestamp(),
+  };
+}
+
+async function asegurarSala(room: string) {
+  const parsed = parsearSala(room);
+  if (!parsed) throw new Error('Sala inválida.');
+  const refSala = doc(firestore, 'rooms', parsed.roomId);
+  if ((await getDoc(refSala)).exists()) return parsed.roomId;
+  try {
+    await setDoc(refSala, await datosDeSala(parsed));
+  } catch (err) {
+    if (!(await getDoc(refSala)).exists()) throw err;
+  }
+  return parsed.roomId;
+}
+
 /**
  * Mensajes en vivo de varias salas ('match:<id>', 'team:<id>',
- * 'tournament:<slug>'). Cada sala se abre primero en la API, que la crea si
- * hace falta (sin el documento de la sala las reglas no dejan leer), y
- * después se escuchan sus últimos 80 mensajes.
+ * 'tournament:<slug>'). Si la sala no existe, la crea quien puede
+ * (salaNuevaValida). Escribir compara el perfil con las reglas.
  */
 export function useChat(salas: string[]) {
+  const { user } = useAuth();
   const [mensajes, setMensajes] = useState<Record<string, ChatMessage[]>>({});
   const [errores, setErrores] = useState<Record<string, string>>({});
   const clave = salas.join('|');
+  const uid = user?.id;
 
   useEffect(() => {
     let vivo = true;
     const cortes: (() => void)[] = [];
     for (const room of clave ? clave.split('|') : []) {
-      api
-        .get<{ id: string }>(`/api/rooms/${encodeURIComponent(room)}`)
-        .then((sala) => {
-          if (!vivo) return;
-          const q = query(collection(firestore, 'rooms', sala.id, 'messages'), orderBy('created_at', 'desc'), limit(80));
-          cortes.push(
-            onSnapshot(
-              q,
-              (snap) => {
-                const lista = snap.docs.map((d) => comoMensaje(d.id, d.data({ serverTimestamps: 'estimate' }))).reverse();
-                setMensajes((p) => ({ ...p, [room]: lista }));
-              },
-              (err) => setErrores((p) => ({ ...p, [room]: err.message }))
-            )
-          );
-        })
-        .catch((err: Error) => vivo && setErrores((p) => ({ ...p, [room]: err.message })));
+      const parsed = parsearSala(room);
+      if (!parsed) {
+        setErrores((p) => ({ ...p, [room]: 'Sala inválida.' }));
+        continue;
+      }
+      const abrir = async () => {
+        if (uid) {
+          try {
+            await asegurarSala(room);
+          } catch (err) {
+            if (vivo) setErrores((p) => ({ ...p, [room]: mensajeDeError(err) }));
+          }
+        }
+        if (!vivo) return;
+        const q = query(
+          collection(firestore, 'rooms', parsed.roomId, 'messages'),
+          orderBy('created_at', 'desc'),
+          limit(80)
+        );
+        const cortar = onSnapshot(
+          q,
+          (snap) => {
+            const lista = snap.docs.map((d) => comoMensaje(d.id, d.data({ serverTimestamps: 'estimate' }))).reverse();
+            setMensajes((p) => ({ ...p, [room]: lista }));
+            setErrores((p) => (p[room] ? { ...p, [room]: '' } : p));
+          },
+          (err) => vivo && setErrores((p) => ({ ...p, [room]: mensajeDeError(err) }))
+        );
+        if (vivo) cortes.push(cortar);
+        else cortar();
+      };
+      void abrir();
     }
     return () => {
       vivo = false;
       cortes.forEach((cortar) => cortar());
     };
-  }, [clave]);
+  }, [clave, uid]);
 
-  const enviar = (room: string, body: string) =>
-    api.post(`/api/rooms/${encodeURIComponent(room)}/messages`, { body });
+  const enviar = async (room: string, body: string) => {
+    const texto = body.trim();
+    if (!texto) return;
+    if (!user) throw new Error('Tenés que entrar para escribir.');
+    const roomId = await asegurarSala(room);
+    await addDoc(collection(firestore, 'rooms', roomId, 'messages'), {
+      body: texto.slice(0, 2000),
+      system: 0,
+      created_at: serverTimestamp(),
+      user: { id: user.id, display_name: user.display_name, avatar_url: user.avatar_url },
+    }).catch((err) => {
+      throw new Error(mensajeDeError(err));
+    });
+  };
 
   return { mensajes, errores, enviar };
 }
 
-export type Cambio = 'draft' | 'match' | 'votes';
-
 /**
- * Escucha live/{matchId}: cada vez que la API cambia el draft, el partido o
- * los votos, avisa el tipo para que la página vuelva a pedir el estado. El
- * aviso no trae datos: lo que ve cada uno lo decide la API.
+ * Vuelve a pedir el partido cuando cambia el documento o un draft. El primero
+ * no dispara: la página ya cargó. No escribe, así que no rearma un loop.
  */
-export function useLive(matchId: string | undefined, onCambio: (tipo: Cambio) => void) {
+export function useLive(matchId: string | undefined, onCambio: () => void) {
   const handler = useRef(onCambio);
   handler.current = onCambio;
 
   useEffect(() => {
     if (!matchId) return;
-    let previo: Record<Cambio, number> | null = null;
-    return onSnapshot(doc(firestore, 'live', matchId), (snap) => {
-      const d = snap.data() ?? {};
-      const actual = { draft: d.draft ?? 0, match: d.match ?? 0, votes: d.votes ?? 0 };
-      // El primero solo marca desde dónde contar: la página ya cargó el estado.
-      if (previo) {
-        for (const tipo of ['draft', 'match', 'votes'] as Cambio[]) {
-          if (actual[tipo] !== previo[tipo]) handler.current(tipo);
+    let listoMatch = false;
+    let listoDraft = false;
+    const avisar = (cual: 'match' | 'draft') => {
+      if (cual === 'match') {
+        if (!listoMatch) {
+          listoMatch = true;
+          return;
         }
+      } else if (!listoDraft) {
+        listoDraft = true;
+        return;
       }
-      previo = actual;
-    });
+      handler.current();
+    };
+    const cortarMatch = onSnapshot(doc(firestore, 'matches', matchId), () => avisar('match'));
+    const cortarDraft = onSnapshot(collection(firestore, 'matches', matchId, 'drafts'), () => avisar('draft'));
+    return () => {
+      cortarMatch();
+      cortarDraft();
+    };
   }, [matchId]);
 }
 
-/** ¿Hay conexión con Firebase? (lo sabe Realtime Database). */
+/** ¿Hay conexión con Firebase? (lo sabe Realtime Database). La lista de quién está es usePresencia. */
 export function useConectado() {
   const [conectado, setConectado] = useState(false);
   useEffect(() => onValue(ref(database, '.info/connected'), (s) => setConectado(!!s.val())), []);

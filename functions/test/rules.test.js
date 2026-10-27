@@ -43,7 +43,7 @@ describe('reglas de Firestore', () => {
 });
 
 describe('reglas de Realtime Database', () => {
-  const presencia = { display_name: 'Miembro', avatar_url: 'https://example.com/a.png', at: 1 };
+  const presencia = { display_name: 'Miembro', avatar_url: 'https://example.com/a.png' };
 
   it('la presencia se lee sin sesión', async () => {
     await assertSucceeds(anonimo().database().ref('presence/torneo_copa').get());
@@ -57,11 +57,14 @@ describe('reglas de Realtime Database', () => {
     await assertFails(anonimo().database().ref('presence/torneo_copa/miembro').set(presencia));
   });
 
-  it('solo nombre, avatar y hora', async () => {
+  it('solo nombre y avatar, los dos de texto', async () => {
     const db = como('miembro').database();
+    await assertFails(db.ref('presence/torneo_copa/miembro').set({ ...presencia, at: 1 }));
     await assertFails(db.ref('presence/torneo_copa/miembro').set({ ...presencia, google_email: 'x@gmail.com' }));
-    await assertFails(db.ref('presence/torneo_copa/miembro').set({ avatar_url: null, at: 1 }));
+    await assertFails(db.ref('presence/torneo_copa/miembro').set({ display_name: 'Miembro' }));
+    await assertFails(db.ref('presence/torneo_copa/miembro').set({ ...presencia, avatar_url: null }));
     await assertFails(db.ref('presence/torneo_copa/miembro').set({ ...presencia, display_name: 'x'.repeat(61) }));
+    await assertSucceeds(db.ref('presence/torneo_copa/miembro').set({ display_name: 'Miembro', avatar_url: '' }));
   });
 
   it('fuera de presence no se lee ni se escribe', async () => {

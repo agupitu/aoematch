@@ -14,9 +14,9 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 11 tareas pendientes, 33 h en total (unos 5,5 días de 6 h para una persona sola; unos 3
-días con un senior y dos juniors). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
-anterior, y T01, T34–T37, T39, T40, T42 y T43 del plan Spark. No hay datos para migrar.
+**Estado.** 5 tareas pendientes, 15 h en total (unos 2,5 días de 6 h para una persona sola; el
+senior entra en T47 y T30). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+anterior, y T01, T28, T34–T46 del plan Spark (faltan T30–T33 y T47). No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
 armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
@@ -184,71 +184,72 @@ Ola 3  ─ T33                                      · 2 h
 
 ### T28 · Presencia — dif. 3 · junior · 2 h
 
-- [ ] `web/src/presence.ts`: al entrar a una sala, escribir `presence/{room}/{uid}` con
+- [x] `web/src/presence.ts`: al entrar a una sala, escribir `presence/{room}/{uid}` con
       `display_name` y `avatar_url` y registrar `onDisconnect().remove()`; al salir, borrarlo.
-- [ ] Hook `usePresencia(room)` que escucha `presence/{room}`; reemplaza a `useConectado` de
+- [x] Hook `usePresencia(room)` que escucha `presence/{room}`; reemplaza a `useConectado` de
       `web/src/live.ts`, que hoy devuelve una lista vacía.
-- [ ] Los anónimos no escriben presencia.
-- [ ] `database.rules.json`: leer `presence/{room}` cualquiera; escribir `presence/{room}/{uid}` solo
+- [x] Los anónimos no escriben presencia.
+- [x] `database.rules.json`: leer `presence/{room}` cualquiera; escribir `presence/{room}/{uid}` solo
       `auth.uid == $uid`, con solo esos dos campos de texto.
 
 ### Fase 6 · Sin servidor
 
 ### T38 · Ingreso y Steam sin verificar — dif. 2 · junior · 2 h
 
-- [ ] `Login.tsx` y `web/src/auth.tsx`: solo el botón de Google. Sacar Steam (el canje del token
+- [x] `Login.tsx` y `web/src/auth.tsx`: solo el botón de Google. Sacar Steam (el canje del token
       de Steam en `auth.tsx` y `/api/auth/steam/start` en `Login.tsx`). El perfil ya lo crea
       `asegurarPerfil` (`web/src/datos/usuarios.ts`, T37).
-- [ ] `Profile.tsx`: campo `steam_url` para pegar el perfil de Steam (sumarlo a `actualizarPerfil`
+- [x] `Profile.tsx`: campo `steam_url` para pegar el perfil de Steam (sumarlo a `actualizarPerfil`
       y a `User` en `types.ts`; las reglas ya lo validan). Aceptar solo
       `https://steamcommunity.com/id/...` o `/profiles/...`; mostrarlo como link en el perfil y en
       los equipos, con el aviso "no verificado".
-- [ ] Sacar de `Profile.tsx` vincular y desvincular Steam y Google.
+- [x] Sacar de `Profile.tsx` vincular y desvincular Steam y Google.
 
 ### T41 · Links de las partidas — dif. 2 · junior · 4 h
 
-- [ ] Campo `vod_links: [{ label, url }]` en `matches/{matchId}` (por llave) y en
+- [x] Campo `vod_links: [{ label, url }]` en `matches/{matchId}` (por llave) y en
       `tournaments/{slug}/stages/{stageId}` (por fase). Máximo 20 por documento.
-- [ ] Editor para el staff: agregar, cambiar y borrar; aceptar solo `http://` y `https://`.
-- [ ] Mostrarlos en `Bracket.tsx` (ícono en cada partido con links), en `MatchRoom.tsx` y en la
+- [x] Editor para el staff: agregar, cambiar y borrar; aceptar solo `http://` y `https://`.
+- [x] Mostrarlos en `Bracket.tsx` (ícono en cada partido con links), en `MatchRoom.tsx` y en la
       cabecera de cada fase en `TournamentPage.tsx`. Abren en otra pestaña con
       `rel="noopener noreferrer"`.
-- [ ] `games[].replay_url` ya existe por partida: mostrarlo junto a estos links, no duplicarlo.
+- [x] `games[].replay_url` ya existe por partida: mostrarlo junto a estos links, no duplicarlo.
 
 ### Fase 7 · Draft nuevo
 
 ### T44 · Pulir la pantalla del draft — dif. 2 · junior · 4 h
 
-- [ ] `DraftBoard.tsx` ya funciona con el draft nuevo (T43): mapa, bans, pick ciego con "eligió" /
+- [x] `DraftBoard.tsx` ya funciona con el draft nuevo (T43): mapa, bans, pick ciego con "eligió" /
       "falta", revelado y reiniciar. Falta el pulido: el mapa elegido grande arriba, el turno con el
       color del equipo, las civs baneadas aparte con el equipo que las baneó, y que en celular la
       grilla de civs no se corte.
-- [ ] Mostrar la civ propia elegida antes de revelar ("Tu civ: …, podés cambiarla hasta que eligan
+- [x] Mostrar la civ propia elegida antes de revelar ("Tu civ: …, podés cambiarla hasta que eligan
       todos").
-- [ ] Sacar el draft viejo: tipos `DraftStep`, `CivPick` y `DraftState` de `types.ts` (y `draft`
+- [x] Sacar el draft viejo: tipos `DraftStep`, `CivPick` y `DraftState` de `types.ts` (y `draft`
       de `MatchDetail`), `ETIQUETA_PASO` de `lib.ts`.
-- [ ] Probar como espectador (sin sesión): ve el tablero sin botones y no ve picks hasta revelar.
+- [x] Probar como espectador (sin sesión): ve el tablero sin botones y no ve picks hasta revelar.
+      Cubierto por el código (sin uid no hay botones ni picks ajenos). Falta la pasada en el navegador (T32).
 
 ### T45 · Formulario del torneo — dif. 2 · junior · 2 h
 
-- [ ] `TournamentForm.tsx`: sacar `map_mode`, `map_bans`, `civ_pattern`, el reloj por paso y la opción
+- [x] `TournamentForm.tsx`: sacar `map_mode`, `map_bans`, `civ_pattern`, el reloj por paso y la opción
       de pick ciego (ahora siempre es ciego).
-- [ ] Sacar `civ_mirror` y `civ_repeat_team` (D6); `civ_repeat_series` queda.
-- [ ] Sumar `civ_bans` (0 a 3 por equipo) y "primer mapa": fijo (`first_map_id`) o al azar.
-- [ ] Mantener `map_repeat` y el pool de mapas y civs (`PoolPicker.tsx`).
+- [x] Sacar `civ_mirror` y `civ_repeat_team` (D6); `civ_repeat_series` queda.
+- [x] Sumar `civ_bans` (0 a 3 por equipo) y "primer mapa": fijo (`first_map_id`) o al azar.
+- [x] Mantener `map_repeat` y el pool de mapas y civs (`PoolPicker.tsx`).
 
 ### T46 · Tiempo real sin API — dif. 3 · junior · 4 h
 
-- [ ] `web/src/live.ts`: `useLive` deja de escuchar `live/{matchId}` y escucha directo
+- [x] `web/src/live.ts`: `useLive` deja de escuchar `live/{matchId}` y escucha directo
       `matches/{matchId}` y el draft abierto con `onSnapshot`.
-- [ ] `useChat`: escribir con `addDoc` en `rooms/{roomId}/messages` con `{ body, system: 0,
+- [x] `useChat`: escribir con `addDoc` en `rooms/{roomId}/messages` con `{ body, system: 0,
       created_at: serverTimestamp(), user: { id, display_name, avatar_url } }` tal como están en el
       perfil (las reglas de T36 lo comparan). Crear la sala con `setDoc` si no existe, con los campos
       que pide `salaNuevaValida` en `firestore.rules`. Quién puede escribir: mismo criterio que
       `puedeEscribirSala`.
-- [ ] Los avisos del sistema que hoy publica la API ("cargó el resultado", "empezó el draft") se
+- [x] Los avisos del sistema que hoy publica la API ("cargó el resultado", "empezó el draft") se
       sacan: el cliente no puede escribir `system: true`.
-- [ ] Cortar las escuchas al salir de la pantalla.
+- [x] Cortar las escuchas al salir de la pantalla.
 
 ### T47 · Sacar el servidor — dif. 3 · senior · 4 h
 

@@ -66,16 +66,13 @@ export async function detallePartido(id: string, uid: string | null): Promise<Ma
     tournament_slug: m.tournament_id,
     tournament: {
       id: torneo.id, slug: torneo.slug, name: torneo.name, team_size: torneo.team_size,
-      best_of: torneo.best_of, map_mode: torneo.map_mode, civ_mode: torneo.civ_mode,
-      draft_timer_s: torneo.draft_timer_s,
+      best_of: torneo.best_of,
     },
     teams: {
       a: a ? { id: a.id, name: a.name, roster: roster(a, usuarios) } : null,
       b: b ? { id: b.id, name: b.name, roster: roster(b, usuarios) } : null,
     },
     games,
-    // El draft nuevo lo lee T43 de matches/{id}/drafts.
-    draft: null,
     me: {
       team_id: miEquipo?.id ?? null,
       is_staff: staff,
@@ -87,6 +84,10 @@ export async function detallePartido(id: string, uid: string | null): Promise<Ma
 }
 
 /** Fija o quita el horario: capitanes y staff. Un partido pendiente pasa a agendado. */
+export function guardarVodPartido(matchId: string, links: { label: string; url: string }[]) {
+  return conMensaje(() => updateDoc(refPartido(matchId), { vod_links: links }));
+}
+
 export function agendar(m: { id: string; status: string }, scheduledAt: string | null) {
   return conMensaje(() =>
     updateDoc(refPartido(m.id), {

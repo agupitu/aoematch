@@ -12,6 +12,7 @@ export function ChatPanel({
   onSend,
   puedeEscribir,
   conectado,
+  onActiva,
 }: {
   salas: SalaChat[];
   mensajes: Record<string, ChatMessage[]>;
@@ -19,6 +20,7 @@ export function ChatPanel({
   onSend: (sala: string, texto: string) => void;
   puedeEscribir: boolean;
   conectado: boolean;
+  onActiva?: (id: string) => void;
 }) {
   const [activa, setActiva] = useState(salas[0]?.id ?? '');
   const [texto, setTexto] = useState('');
@@ -27,6 +29,10 @@ export function ChatPanel({
   useEffect(() => {
     if (!salas.some((s) => s.id === activa) && salas.length) setActiva(salas[0].id);
   }, [salas, activa]);
+
+  useEffect(() => {
+    if (activa) onActiva?.(activa);
+  }, [activa, onActiva]);
 
   const lista = mensajes[activa] ?? [];
 

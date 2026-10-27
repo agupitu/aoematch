@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Match } from '../types';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta } from '../lib';
+import { IconosVod } from './VodLinks';
 
 function Lado({
   nombre,
@@ -26,18 +27,22 @@ function Lado({
 export function MatchCard({ m }: { m: Match }) {
   const listo = ['finalizado', 'walkover'].includes(m.status);
   return (
-    <Link
-      to={`/m/${m.id}`}
-      className="block overflow-hidden rounded-lg border border-ink-700 bg-ink-850 transition-colors hover:border-gold-600"
-    >
+    <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-850 transition-colors hover:border-gold-600">
       <div className="flex items-center justify-between gap-2 border-b border-ink-700 bg-ink-900 px-2.5 py-1 text-[10px] text-parch-400">
-        <span>{m.label ?? `Ronda ${m.round}`}</span>
-        <span>{listo ? ETIQUETA_ESTADO_PARTIDO[m.status] : m.scheduled_at ? fechaCorta(m.scheduled_at) : `BO${m.best_of}`}</span>
+        <Link to={`/m/${m.id}`} className="min-w-0 flex-1 truncate hover:text-gold-400">
+          {m.label ?? `Ronda ${m.round}`}
+        </Link>
+        <span className="flex items-center gap-1.5">
+          <IconosVod links={m.vod_links ?? []} />
+          <span>{listo ? ETIQUETA_ESTADO_PARTIDO[m.status] : m.scheduled_at ? fechaCorta(m.scheduled_at) : `BO${m.best_of}`}</span>
+        </span>
       </div>
-      <Lado nombre={m.team_a_name} score={m.score_a} ganador={m.winner_team_id === m.team_a_id} />
-      <div className="border-t border-ink-800" />
-      <Lado nombre={m.team_b_name} score={m.score_b} ganador={m.winner_team_id === m.team_b_id} />
-    </Link>
+      <Link to={`/m/${m.id}`} className="block">
+        <Lado nombre={m.team_a_name} score={m.score_a} ganador={m.winner_team_id === m.team_a_id} />
+        <div className="border-t border-ink-800" />
+        <Lado nombre={m.team_b_name} score={m.score_b} ganador={m.winner_team_id === m.team_b_id} />
+      </Link>
+    </div>
   );
 }
 

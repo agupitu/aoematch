@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { agendar, detallePartido, horariosDelPartido } from '../datos/partidos';
+import { agendar, detallePartido, guardarVodPartido, horariosDelPartido } from '../datos/partidos';
 import { type EstadoDraft, civsDeLaPartida, partidaActual, useDraft } from '../datos/drafts';
 import { cargarPartida, walkover } from '../datos/resultados';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
+import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado, useLive } from '../live';
+import { usePresencia } from '../presence';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, offsetZona, rangoSemana, zonaDelNavegador } from '../lib';
 import type { MatchDetail, Window } from '../types';
 
@@ -43,10 +45,10 @@ export function MatchRoom() {
     setTimeout(() => setAviso(''), 4000);
   };
 
-  const { mensajes, enviar } = useChat(salas);
+  const { mensajes, errores, enviar } = useChat(salas);
   const conectado = useConectado();
-  // Resultado u horario cambiados por la API vieja vuelven a pedir el partido;
-  // el draft se escucha aparte (useDraft). T46 pasa esto a una escucha directa.
+  const [salaActiva, setSalaActiva] = useState(salas[0] ?? '');
+  const gente = usePresencia(salaActiva || null);
   useLive(id, () => void cargar());
 
   const mandar = async (room: string, body: string) => {
@@ -98,6 +100,26 @@ export function MatchRoom() {
         </div>
       </header>
 
+      {(m.vod_links?.length || m.me.is_staff || m.games.some((g) => g.replay_url)) && (
+        <section className="mb-4 space-y-2">
+          <ListaVod links={m.vod_links ?? []} />
+          {m.games.some((g) => g.replay_url) && (
+            <ul className="flex flex-wrap gap-2">
+              {m.games.filter((g) => g.replay_url).map((g) => (
+                <li key={g.id}>
+                  <a href={g.replay_url!} target="_blank" rel="noopener noreferrer" className="text-sm text-gold-400 underline">
+                    Replay partida {g.game_no}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {m.me.is_staff && (
+            <EditorVod links={m.vod_links ?? []} onGuardar={(links) => guardarVodPartido(m.id, links).then(cargar)} />
+          )}
+        </section>
+      )}
+
       {aviso && <div className="mb-3"><Alerta>{aviso}</Alerta></div>}
       {faltanEquipos && (
         <div className="mb-3">
@@ -106,14 +128,18 @@ export function MatchRoom() {
       )}
 
       <div className="grid h-[calc(100vh-14rem)] min-h-[34rem] gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <ChatPanel
-          salas={salasChat}
-          mensajes={mensajes}
-          presencia={{}}
-          onSend={(room, body) => void mandar(room, body)}
-          puedeEscribir={!!user && (!!m.me.team_id || m.me.is_staff)}
-          conectado={conectado}
-        />
+        <div className="flex h-full min-h-0 flex-col gap-2">
+          {errores[salaActiva] && <Alerta>{errores[salaActiva]}</Alerta>}
+          <ChatPanel
+            salas={salasChat}
+            mensajes={mensajes}
+            presencia={salaActiva ? { [salaActiva]: gente } : {}}
+            onSend={(room, body) => void mandar(room, body)}
+            puedeEscribir={!!user && (!!m.me.team_id || m.me.is_staff)}
+            conectado={conectado}
+            onActiva={setSalaActiva}
+          />
+        </div>
 
         <div className="min-h-0">
           {faltanEquipos ? (

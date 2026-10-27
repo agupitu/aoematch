@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
 } from '../datos/llaves';
-import { actualizarTorneo, detalleTorneo, horariosDelTorneo } from '../datos/torneos';
+import { actualizarTorneo, detalleTorneo, guardarVodFase, horariosDelTorneo } from '../datos/torneos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { useAuth } from '../auth';
@@ -13,9 +13,11 @@ import { AvailabilityGrid } from '../components/AvailabilityGrid';
 import { MatchCalendar } from '../components/MatchCalendar';
 import { TournamentForm, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
+import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado } from '../live';
+import { usePresencia } from '../presence';
 import {
-  ETIQUETA_CIV, ETIQUETA_ESTADO, ETIQUETA_FORMATO, ETIQUETA_MAPA,
+  ETIQUETA_ESTADO, ETIQUETA_FORMATO,
   fechaCorta, horas, monto, plata, rangoSemana, offsetZona, zonaDelNavegador,
 } from '../lib';
 import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User, Window } from '../types';
@@ -257,21 +259,10 @@ function Resumen({ t }: { t: Tournament }) {
         <section className="card p-5">
           <h3 className="title mb-3 text-lg">Reglas del draft</h3>
           <dl className="grid gap-3 sm:grid-cols-2">
-            <Dato k="Mapa" v={ETIQUETA_MAPA[t.map_mode]} />
-            {t.first_map && (
-              <Dato
-                k={t.map_mode === 'fijo' ? 'Mapa fijo' : 'Mapa de la partida 1'}
-                v={t.first_map.name_es}
-              />
-            )}
-            <Dato
-              k="Civilizaciones"
-              v={`${ETIQUETA_CIV[t.civ_mode]}${t.civ_mode === 'snake' ? ` (${t.civ_pattern_efectivo})` : ''}`}
-            />
+            <Dato k="Primer mapa" v={t.first_map ? t.first_map.name_es : 'Al azar'} />
+            <Dato k="Mapas siguientes" v="Los elige el que perdió la partida anterior" />
             <Dato k="Bans de civ por equipo" v={t.civ_bans ? String(t.civ_bans) : 'sin bans'} />
-            <Dato k="Reloj por paso" v={t.draft_timer_s ? `${t.draft_timer_s} s` : 'sin reloj'} />
-            <Dato k="Misma civ en un equipo" v={t.civ_repeat_team ? 'permitida' : 'prohibida'} />
-            <Dato k="Espejos entre equipos" v={t.civ_mirror ? 'permitidos' : 'prohibidos'} />
+            <Dato k="Pick de civs" v="Ciego" />
             <Dato k="Repetir civ en la serie" v={t.civ_repeat_series ? 'permitido' : 'prohibido'} />
             <Dato k="Repetir mapa en la serie" v={t.map_repeat ? 'permitido' : 'prohibido'} />
           </dl>
@@ -626,6 +617,17 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
           <li key={m.id} className="flex items-center gap-2 text-sm">
             <Avatar src={m.avatar_url} name={m.display_name} size={22} />
             <span className="min-w-0 flex-1 truncate text-parch-200">{m.display_name}</span>
+            {m.steam_url && (
+              <a
+                className="shrink-0 text-xs text-gold-400 underline"
+                href={m.steam_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Steam, no verificado"
+              >
+                Steam · no verificado
+              </a>
+            )}
             {m.role === 'capitan' && <Badge>capitán</Badge>}
             <span className="text-xs text-parch-400">{m.rating_team ?? m.rating_1v1 ?? '—'}</span>
             {(staff || esMio) && (
@@ -709,15 +711,27 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
       {t.standings && t.standings.length > 0 && <Tabla filas={t.standings} titulo="Posiciones" />}
 
-      {t.stages
-        .filter((s) => s.groups.length)
-        .map((s) => (
-          <div key={s.id} className="grid gap-4 md:grid-cols-2">
-            {s.groups.map((g) => (
-              <Tabla key={g.id} filas={g.standings} titulo={g.name} />
-            ))}
-          </div>
-        ))}
+      {t.stages.map((s) => (
+        <section key={s.id} className="space-y-3">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="title text-base">{s.name}</h3>
+            <ListaVod links={s.vod_links ?? []} />
+          </header>
+          {staff && (
+            <EditorVod
+              links={s.vod_links ?? []}
+              onGuardar={(links) => guardarVodFase(t.id, s.id, links).then(onDone)}
+            />
+          )}
+          {s.groups.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {s.groups.map((g) => (
+                <Tabla key={g.id} filas={g.standings} titulo={g.name} />
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
 
       {t.matches.length === 0 ? (
         <Empty>Las llaves todavía no están generadas.</Empty>
@@ -875,15 +889,21 @@ function ChatTorneo({ t, puedeEscribir }: { t: Tournament; puedeEscribir: boolea
   const sala = `tournament:${t.id}`;
   const { mensajes, errores, enviar } = useChat([sala]);
   const conectado = useConectado();
+  const gente = usePresencia(sala);
+  const [fallo, setFallo] = useState('');
 
   return (
     <div className="h-[32rem]">
       {errores[sala] && <Alerta>{errores[sala]}</Alerta>}
+      {fallo && <Alerta>{fallo}</Alerta>}
       <ChatPanel
         salas={[{ id: sala, label: 'General del torneo' }]}
         mensajes={mensajes}
-        presencia={{}}
-        onSend={(room, body) => void enviar(room, body).catch(() => {})}
+        presencia={{ [sala]: gente }}
+        onSend={(room, body) => {
+          setFallo('');
+          void enviar(room, body).catch((err: Error) => setFallo(err.message));
+        }}
         puedeEscribir={puedeEscribir}
         conectado={conectado}
       />
@@ -921,17 +941,10 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       group_advance: t.group_advance,
       swiss_rounds: t.swiss_rounds || 5,
       third_place: !!t.third_place,
-      map_mode: t.map_mode,
-      map_bans: t.map_bans,
       map_repeat: !!t.map_repeat,
       first_map_id: t.first_map_id,
-      civ_mode: t.civ_mode,
-      civ_bans: t.civ_bans,
-      civ_pattern: t.civ_pattern ?? '',
+      civ_bans: t.civ_bans ?? 0,
       civ_repeat_series: !!t.civ_repeat_series,
-      civ_repeat_team: !!t.civ_repeat_team,
-      civ_mirror: !!t.civ_mirror,
-      draft_timer_s: t.draft_timer_s,
       entry_fee_cents: t.entry_fee_cents,
       currency: t.currency,
       payment_link: t.payment_link ?? '',
@@ -967,14 +980,12 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
         third_place: form.third_place ? 1 : 0,
         map_repeat: form.map_repeat ? 1 : 0,
         civ_repeat_series: form.civ_repeat_series ? 1 : 0,
-        civ_repeat_team: form.civ_repeat_team ? 1 : 0,
-        civ_mirror: form.civ_mirror ? 1 : 0,
+        civ_bans: Math.max(0, Math.min(3, form.civ_bans || 0)),
         allow_solo: form.allow_solo ? 1 : 0,
-        civ_pattern: form.civ_pattern.trim() || null,
+        first_map_id: form.map_ids.includes(form.first_map_id ?? -1) ? form.first_map_id : null,
         reg_closes_at: form.reg_closes_at || null,
         starts_at: form.starts_at || null,
         prizes: form.prizes,
-        first_map_id: form.first_map_id,
       });
       setMensaje('Guardado.');
       setTimeout(() => setMensaje(''), 2500);

@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  deleteField,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -60,16 +61,15 @@ export async function listarTorneos() {
 const CAMPOS_EDITABLES = [
   'name', 'description', 'rules_md', 'banner_url', 'status', 'format', 'team_size',
   'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance', 'swiss_rounds',
-  'third_place', 'map_mode', 'map_bans', 'map_repeat', 'first_map_id', 'civ_mode', 'civ_bans', 'civ_pattern',
-  'civ_repeat_series', 'civ_repeat_team', 'civ_mirror', 'draft_timer_s', 'entry_fee_cents',
+  'third_place', 'map_repeat', 'first_map_id', 'civ_bans', 'civ_repeat_series', 'entry_fee_cents',
   'currency', 'payment_link', 'payment_notes', 'allow_solo', 'reg_opens_at', 'reg_closes_at',
   'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes',
 ];
 
 const CAMPOS_NUMERICOS = [
   'team_size', 'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance',
-  'swiss_rounds', 'third_place', 'map_bans', 'map_repeat', 'civ_bans', 'civ_repeat_series',
-  'civ_repeat_team', 'civ_mirror', 'draft_timer_s', 'entry_fee_cents', 'allow_solo',
+  'swiss_rounds', 'third_place', 'map_repeat', 'civ_bans', 'civ_repeat_series',
+  'entry_fee_cents', 'allow_solo',
   'prize_pool_cents', 'prize_pool_pct', 'first_map_id',
 ];
 
@@ -92,6 +92,7 @@ export function camposDe(body: Record<string, unknown>) {
   }
   if (cambios.name === null) delete cambios.name;
   if (cambios.name !== undefined) cambios.name = String(cambios.name).slice(0, 120);
+  if (typeof cambios.civ_bans === 'number') cambios.civ_bans = Math.max(0, Math.min(3, Math.round(cambios.civ_bans)));
 
   if (Array.isArray(body.prizes)) cambios.prizes = premiosLimpios(body.prizes);
   if (Array.isArray(body.map_ids)) cambios.map_ids = idsLimpios(body.map_ids);
@@ -131,9 +132,8 @@ function slugify(s: string) {
 const POR_DEFECTO = {
   description: null, rules_md: null, banner_url: null, status: 'borrador', format: 'eliminacion_simple',
   team_size: 1, max_teams: null, best_of: 3, best_of_final: null, group_count: 0, group_advance: 2,
-  swiss_rounds: 0, third_place: 0, map_mode: 'ban_hasta_uno', map_bans: 1, map_repeat: 0, first_map_id: null,
-  civ_mode: 'snake', civ_bans: 0, civ_pattern: null, civ_repeat_series: 1, civ_repeat_team: 0, civ_mirror: 1,
-  draft_timer_s: 60, entry_fee_cents: 0, currency: 'ARS', payment_link: null, payment_notes: null,
+  swiss_rounds: 0, third_place: 0, map_repeat: 0, first_map_id: null,
+  civ_bans: 0, civ_repeat_series: 1, entry_fee_cents: 0, currency: 'ARS', payment_link: null, payment_notes: null,
   allow_solo: 1, reg_opens_at: null, reg_closes_at: null, starts_at: null, prize_pool_mode: 'ninguno',
   prize_pool_cents: 0, prize_pool_pct: 100, prize_notes: null, admin_ids: [], map_ids: [], civ_ids: [], prizes: [],
 };
@@ -166,9 +166,16 @@ export async function crearTorneo(body: Record<string, unknown>, organizerId: st
   );
 }
 
-/** Cambios del staff. `orden` sigue a `starts_at`. */
+const CAMPOS_VIEJOS = ['map_mode', 'map_bans', 'civ_mode', 'civ_pattern', 'civ_repeat_team', 'civ_mirror', 'draft_timer_s'];
+
+export function guardarVodFase(slug: string, stageId: string, links: { label: string; url: string }[]) {
+  return conMensaje(() => updateDoc(doc(firestore, 'tournaments', slug, 'stages', stageId), { vod_links: links }));
+}
+
+/** Cambios del staff. `orden` sigue a `starts_at`. Saca los modos del draft viejo. */
 export async function actualizarTorneo(t: Doc | Tournament, body: Record<string, unknown>) {
   const cambios = camposDe(body);
+  for (const c of CAMPOS_VIEJOS) cambios[c] = deleteField();
   if (!Object.keys(cambios).length) return;
   if (cambios.starts_at !== undefined) cambios.orden = cambios.starts_at ?? (t as Doc).created_at;
   await conMensaje(() => updateDoc(refTorneo(t.id), cambios));
@@ -208,9 +215,6 @@ function premiosDe(t: Doc, pagas: number) {
     },
   };
 }
-
-/** Patrón serpiente por defecto (hasta T45, que saca el patrón del formulario). */
-const patronPorDefecto = (n: number) => ['1', ...Array.from({ length: n - 1 }, () => '2'), '1'].join('-');
 
 /** Equipo con sus jugadores (capitán primero, después por nombre) y las horas en común. */
 function equipoCompleto(equipo: Doc, usuarios: Map<string, Doc>) {
@@ -304,7 +308,6 @@ export async function detalleTorneo(slug: string, uid: string | null): Promise<T
   return {
     ...t,
     organizer: organizador ? { id: organizador.id, display_name: organizador.display_name } : null,
-    civ_pattern_efectivo: t.civ_pattern || patronPorDefecto(t.team_size),
     first_map: t.first_map_id ? mapaPorId(t.first_map_id) : null,
     ...premiosDe(t, pagas),
     maps: poolMapas(t),

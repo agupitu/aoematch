@@ -99,6 +99,22 @@ describe('partidos', () => {
     await assertFails(como('org').doc('matches/m2').update({ tournament_id: 'otro' }));
   });
 
+  it('los links de las partidas los escribe solo el staff', async () => {
+    const ok = [{ label: 'Final', url: 'https://youtu.be/abc' }];
+    await assertSucceeds(como('org').doc('matches/m1').update({ vod_links: ok }));
+    await assertSucceeds(como('adm').doc('matches/m1').update({ vod_links: [{ label: 'Crudo', url: 'http://example.com/v' }] }));
+    await assertFails(como('a1').doc('matches/m1').update({ vod_links: ok }));
+    await assertFails(como('a2').doc('matches/m1').update({ vod_links: ok }));
+    await assertFails(como('b1').doc('matches/m1').update({ vod_links: ok, scheduled_at: '2026-11-02T22:00:00.000Z', status: 'agendado' }));
+    await assertFails(como('org').doc('matches/m1').update({ vod_links: [{ label: 'x', url: 'ftp://no' }] }));
+    await assertFails(como('org').doc('matches/m1').update({ vod_links: [{ label: '', url: 'https://youtu.be/abc' }] }));
+    await assertFails(como('org').doc('matches/m1').update({
+      vod_links: Array.from({ length: 21 }, (_, i) => ({ label: `v${i}`, url: 'https://youtu.be/a' })),
+    }));
+    await assertSucceeds(como('org').doc('tournaments/copa/stages/grupos').set({ name: 'Grupos', vod_links: ok }));
+    await assertFails(como('a1').doc('tournaments/copa/stages/grupos').set({ name: 'Grupos', vod_links: ok }));
+  });
+
   it('los capitanes agendan; los demás jugadores no', async () => {
     const agenda = { scheduled_at: '2026-11-02T22:00:00.000Z', status: 'agendado' };
     await assertSucceeds(como('b1').doc('matches/m1').update(agenda));

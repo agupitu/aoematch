@@ -6,6 +6,7 @@ export type User = {
   discord: string | null;
   steam_id64: string | null;
   steam_name: string | null;
+  steam_url: string | null;
   google_sub: string | null;
   google_email: string | null;
   xbox_tag: string | null;
@@ -34,6 +35,7 @@ export type Member = {
   rating_1v1?: number | null;
   rating_team?: number | null;
   role?: string;
+  steam_url?: string | null;
 };
 
 export type Team = {
@@ -86,6 +88,7 @@ export type Match = {
   best_of: number;
   status: string;
   scheduled_at: string | null;
+  vod_links?: VodLink[];
 };
 
 export type StandingRow = {
@@ -119,11 +122,14 @@ export type PrizePool = {
   assigned_pct: number;
 };
 
+export type VodLink = { label: string; url: string };
+
 export type Stage = {
   id: string;
   name: string;
   type: string;
   idx: number;
+  vod_links?: VodLink[];
   groups: { id: string; name: string; standings: StandingRow[] }[];
 };
 
@@ -145,19 +151,11 @@ export type Tournament = {
   group_advance: number;
   swiss_rounds: number;
   third_place: number;
-  map_mode: string;
-  map_bans: number;
   map_repeat: number;
   first_map_id: number | null;
   first_map: GameMap | null;
-  civ_mode: string;
   civ_bans: number;
-  civ_pattern: string | null;
-  civ_pattern_efectivo: string;
   civ_repeat_series: number;
-  civ_repeat_team: number;
-  civ_mirror: number;
-  draft_timer_s: number;
   entry_fee_cents: number;
   currency: string;
   payment_link: string | null;
@@ -183,57 +181,6 @@ export type Tournament = {
   me: { is_staff: boolean; registration: Registration | null; team_id: string | null } | null;
 };
 
-export type DraftStep = {
-  idx: number;
-  kind: 'ban_mapa' | 'pick_mapa' | 'ban_civ' | 'pick_civ';
-  side: 'a' | 'b' | null;
-  slot: number | null;
-  auto: boolean;
-  blind?: boolean;
-};
-
-export type CivPick = {
-  step_idx: number;
-  team_id: string;
-  side: 'a' | 'b' | null;
-  slot: number | null;
-  user_id: string | null;
-  civ_id: number | null;
-  hidden: boolean;
-  auto: boolean;
-};
-
-export type DraftState = {
-  id: string;
-  match_id: string;
-  game_no: number;
-  state: 'espera' | 'en_curso' | 'finalizado';
-  current_step: number;
-  total_steps: number;
-  deadline_at: string | null;
-  timer_s: number;
-  ready: { a: boolean; b: boolean };
-  first_team_id: string | null;
-  teams: { a: { id: string; roster: Member[] }; b: { id: string; roster: Member[] } };
-  steps: DraftStep[];
-  step: DraftStep | null;
-  turn_team_id: string | null;
-  pools: { maps: GameMap[]; civs: Civ[] };
-  maps_banned: number[];
-  map_picked: number | null;
-  civs_banned: number[];
-  civ_picks: CivPick[];
-  rules: {
-    map_mode: string;
-    civ_mode: string;
-    civ_pattern: string;
-    civ_repeat_team: boolean;
-    civ_mirror: boolean;
-    civ_repeat_series: boolean;
-    team_size: number;
-  };
-};
-
 export type ChatMessage = {
   id: string;
   body: string;
@@ -249,9 +196,6 @@ export type MatchDetail = Match & {
     name: string;
     team_size: number;
     best_of: number;
-    map_mode: string;
-    civ_mode: string;
-    draft_timer_s: number;
   };
   teams: {
     a: { id: string; name: string; roster: Member[] } | null;
@@ -266,7 +210,6 @@ export type MatchDetail = Match & {
     replay_url: string | null;
     civs: { user_id: string; team_id: string; civ_id: number; name_es: string; flag: string; display_name: string }[];
   }[];
-  draft: DraftState | null;
   me: { team_id: string | null; is_staff: boolean; can_report: boolean; is_captain: boolean };
 };
 

@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { GoogleAuthProvider, linkWithPopup } from 'firebase/auth';
-import { api } from '../api';
+import { Link } from 'react-router-dom';
 import { guardarHorario, horarioDe } from '../datos/usuarios';
 import { useAuth } from '../auth';
-import { auth } from '../firebase';
-import { Alerta, Avatar, Badge, Spinner } from '../components/ui';
+import { Alerta, Avatar, Spinner } from '../components/ui';
 import { AvailabilityGrid, type Bloque } from '../components/AvailabilityGrid';
-import { horas, popupCerrado, zonaDelNavegador } from '../lib';
+import { horas, steamUrlValida, zonaDelNavegador } from '../lib';
 
 const ZONAS = [
   'America/Argentina/Buenos_Aires', 'America/Santiago', 'America/Bogota', 'America/Mexico_City',
@@ -16,14 +13,13 @@ const ZONAS = [
 ];
 
 export function Profile() {
-  const { user, actualizar, cargando, refrescar } = useAuth();
-  const [params] = useSearchParams();
+  const { user, actualizar, cargando } = useAuth();
   const [bloques, setBloques] = useState<Bloque[] | null>(null);
   const [sucio, setSucio] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    display_name: '', timezone: 'UTC', discord: '', xbox_tag: '', aoe3_profile: '',
+    display_name: '', timezone: 'UTC', discord: '', xbox_tag: '', aoe3_profile: '', steam_url: '',
     rating_1v1: '', rating_team: '',
   });
 
@@ -35,6 +31,7 @@ export function Profile() {
       discord: user.discord ?? '',
       xbox_tag: user.xbox_tag ?? '',
       aoe3_profile: user.aoe3_profile ?? '',
+      steam_url: user.steam_url ?? '',
       rating_1v1: user.rating_1v1?.toString() ?? '',
       rating_team: user.rating_team?.toString() ?? '',
     });
@@ -57,6 +54,10 @@ export function Profile() {
 
   const guardarPerfil = async () => {
     setError('');
+    const steam = form.steam_url.trim();
+    if (steam && !steamUrlValida(steam)) {
+      return setError('El link tiene que ser https://steamcommunity.com/id/… o /profiles/…');
+    }
     try {
       await actualizar({
         ...form,
@@ -78,44 +79,8 @@ export function Profile() {
     setTimeout(() => setMensaje(''), 2500);
   };
 
-  const vincularGoogle = async () => {
-    setError('');
-    const actual = auth.currentUser;
-    if (!actual) {
-      setError('Para vincular Google, salí y volvé a entrar.');
-      return;
-    }
-    try {
-      await linkWithPopup(actual, new GoogleAuthProvider());
-      // Token nuevo con la cuenta de Google: la API la anota en el perfil.
-      await actual.getIdToken(true);
-      await refrescar();
-      setMensaje('Cuenta de Google vinculada.');
-      setTimeout(() => setMensaje(''), 2500);
-    } catch (err) {
-      if (popupCerrado(err)) return;
-      const code = (err as { code?: string }).code;
-      setError(
-        code === 'auth/credential-already-in-use'
-          ? 'Esa cuenta de Google ya está en uso por otro usuario.'
-          : 'No se pudo vincular Google. Probá de nuevo.'
-      );
-    }
-  };
-
   const totalMin = (bloques ?? []).reduce((s, b) => s + (b.end_min - b.start_min), 0);
-  const estadoSteam = params.get('steam');
-  const estadoGoogle = params.get('google');
-
-  const vincularSteam = async () => {
-    setError('');
-    try {
-      const { url } = await api.post<{ url: string }>('/api/auth/steam/start', { link: true });
-      window.location.assign(url);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
+  const steamGuardado = user.steam_url && steamUrlValida(user.steam_url) ? user.steam_url : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
@@ -127,10 +92,6 @@ export function Profile() {
         </div>
       </div>
 
-      {estadoSteam === 'ok' && <Alerta tone="good">Cuenta de Steam vinculada.</Alerta>}
-      {estadoSteam === 'ocupado' && <Alerta>Esa cuenta de Steam ya está en uso por otro usuario.</Alerta>}
-      {estadoSteam === 'error' && <Alerta>No se pudo verificar con Steam. Probá de nuevo.</Alerta>}
-      {estadoGoogle === 'ok' && <Alerta tone="good">Cuenta de Google vinculada.</Alerta>}
       {mensaje && <Alerta tone="good">{mensaje}</Alerta>}
       {error && <Alerta>{error}</Alerta>}
 
@@ -177,6 +138,26 @@ export function Profile() {
             />
           </div>
           <div>
+            <label className="label">Perfil de Steam</label>
+            <input
+              className="field"
+              value={form.steam_url}
+              onChange={(e) => setForm({ ...form, steam_url: e.target.value })}
+              placeholder="https://steamcommunity.com/id/…"
+            />
+            <p className="hint mt-1 text-xs">No verificado. Solo steamcommunity.com/id/… o /profiles/…</p>
+            {steamGuardado && (
+              <a
+                className="mt-1 inline-block text-sm text-gold-400 underline"
+                href={steamGuardado}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ver perfil · no verificado
+              </a>
+            )}
+          </div>
+          <div>
             <label className="label">Perfil de AoE III (id de leaderboard)</label>
             <input
               className="field"
@@ -209,80 +190,6 @@ export function Profile() {
         <button className="btn btn-primary mt-4" onClick={guardarPerfil}>
           Guardar datos
         </button>
-      </section>
-
-      <section className="card p-5">
-        <h2 className="title mb-1 text-lg">Steam</h2>
-        {user.steam_id64 ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="good">Vinculada</Badge>
-            <span className="text-sm text-parch-200">{user.steam_name ?? user.steam_id64}</span>
-            <a
-              className="text-sm text-gold-400 underline"
-              href={`https://steamcommunity.com/profiles/${user.steam_id64}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver perfil
-            </a>
-            <button
-              className="btn btn-ghost ml-auto"
-              onClick={async () => {
-                try {
-                  await api.post('/api/auth/steam/unlink');
-                  location.reload();
-                } catch (err) {
-                  setError((err as Error).message);
-                }
-              }}
-            >
-              Desvincular
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="hint text-sm">
-              Vinculá Steam para que los organizadores confirmen tu identidad y tus partidas.
-            </p>
-            <button type="button" className="btn btn-primary ml-auto" onClick={vincularSteam}>
-              Vincular Steam
-            </button>
-          </div>
-        )}
-      </section>
-
-      <section className="card p-5">
-        <h2 className="title mb-1 text-lg">Google</h2>
-        {user.google_sub ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="good">Vinculada</Badge>
-            <span className="text-sm text-parch-200">{user.google_email ?? 'cuenta de Google'}</span>
-            <button
-              className="btn btn-ghost ml-auto"
-              onClick={async () => {
-                try {
-                  await api.post('/api/auth/google/unlink');
-                  // El token viejo todavía trae la cuenta de Google.
-                  await auth.currentUser?.getIdToken(true);
-                  location.reload();
-                } catch (err) {
-                  setError((err as Error).message);
-                }
-              }}
-            >
-              Desvincular
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="hint text-sm">
-              Vincular Google te deja entrar sin depender de Steam.
-            </p>
-            <button type="button" className="btn btn-ghost ml-auto" onClick={vincularGoogle}>
-              Vincular Google
-            </button>
-          </div>
-        )}
       </section>
 
       <section className="card p-5">

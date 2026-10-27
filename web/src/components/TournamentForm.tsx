@@ -1,6 +1,6 @@
 import type { Civ, GameMap } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
-import { bolsaDe, ETIQUETA_CIV, ETIQUETA_FORMATO, ETIQUETA_MAPA, monto } from '../lib';
+import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
 import { Tabs } from './ui';
 
 export type PremioBorrador = {
@@ -25,17 +25,10 @@ export type Borrador = {
   group_advance: number;
   swiss_rounds: number;
   third_place: boolean;
-  map_mode: string;
-  map_bans: number;
   map_repeat: boolean;
   first_map_id: number | null;
-  civ_mode: string;
   civ_bans: number;
-  civ_pattern: string;
   civ_repeat_series: boolean;
-  civ_repeat_team: boolean;
-  civ_mirror: boolean;
-  draft_timer_s: number;
   entry_fee_cents: number;
   currency: string;
   payment_link: string;
@@ -66,17 +59,10 @@ export const BORRADOR_INICIAL: Borrador = {
   group_advance: 2,
   swiss_rounds: 5,
   third_place: false,
-  map_mode: 'ban_hasta_uno',
-  map_bans: 2,
   map_repeat: false,
   first_map_id: null,
-  civ_mode: 'snake',
   civ_bans: 0,
-  civ_pattern: '',
   civ_repeat_series: true,
-  civ_repeat_team: false,
-  civ_mirror: true,
-  draft_timer_s: 60,
   entry_fee_cents: 0,
   currency: 'ARS',
   payment_link: '',
@@ -95,12 +81,6 @@ export const BORRADOR_INICIAL: Borrador = {
 
 export type PestaniaForm =
   | 'basico' | 'formato' | 'draft' | 'premios' | 'inscripcion' | 'mapas' | 'civs';
-
-/** Patrón serpiente sugerido: los bordes eligen de a uno y el medio de a dos. */
-export function patronSugerido(teamSize: number): string {
-  if (teamSize <= 1) return '1-1';
-  return ['1', ...Array.from({ length: teamSize - 1 }, () => '2'), '1'].join('-');
-}
 
 /** Reparto inicial cuando el organizador suma el primer puesto. */
 const PREMIOS_SUGERIDOS: PremioBorrador[] = [
@@ -257,10 +237,7 @@ export function TournamentForm({
                 <select
                   className="field"
                   value={value.team_size}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    onChange({ ...value, team_size: n, civ_pattern: '' });
-                  }}
+                  onChange={(e) => set('team_size', Number(e.target.value))}
                 >
                   {[1, 2, 3, 4].map((n) => (
                     <option key={n} value={n}>
@@ -358,44 +335,22 @@ export function TournamentForm({
           <section className="card p-5">
             <h3 className="title mb-1 text-lg">Draft</h3>
             <p className="hint mb-4 text-sm">
-              Cómo se decide el mapa y las civilizaciones en la sala del partido.
+              La primera partida sale al azar o con el mapa que fijes. Después elige el mapa el equipo
+              que perdió la anterior. Los picks de civ son siempre ciegos, se puede espejar y se puede
+              repetir civ en el equipo. No hay reloj: se espera a que elijan todos.
             </p>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Campo label="Mapa">
-                <select className="field" value={value.map_mode} onChange={(e) => set('map_mode', e.target.value)}>
-                  {Object.entries(ETIQUETA_MAPA).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-              {value.map_mode === 'ban_pick' && (
-                <Campo label="Bans de mapa por equipo">
-                  <input
-                    className="field"
-                    type="number"
-                    min={0}
-                    value={value.map_bans}
-                    onChange={(e) => set('map_bans', Number(e.target.value))}
-                  />
-                </Campo>
-              )}
+            <div className="grid gap-4 sm:grid-cols-2">
               <Campo
-                label={value.map_mode === 'fijo' ? 'Mapa de todas las partidas' : 'Mapa de la primera partida'}
-                hint={
-                  value.map_mode === 'fijo'
-                    ? 'Se juega siempre el mismo mapa.'
-                    : 'En series impares conviene fijarlo: nadie arranca con ventaja de mapa. De la partida 2 en adelante manda la regla de arriba.'
-                }
+                label="Primer mapa"
+                hint="Al azar, o uno fijo del pool. De la partida 2 en adelante lo elige el que perdió."
               >
                 <select
                   className="field"
                   value={value.first_map_id ?? ''}
                   onChange={(e) => set('first_map_id', e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">Lo decide el draft</option>
+                  <option value="">Al azar</option>
                   {maps
                     .filter((m) => value.map_ids.includes(m.id))
                     .map((m) => (
@@ -405,71 +360,24 @@ export function TournamentForm({
                     ))}
                 </select>
               </Campo>
-
-              <Campo label="Reloj por paso (segundos)" hint="0 = sin reloj. Al vencerse se elige al azar.">
+              <Campo label="Bans de civ por equipo" hint="De 0 a 3. Arranca el equipo A en la primera partida.">
                 <input
                   className="field"
                   type="number"
                   min={0}
-                  step={5}
-                  value={value.draft_timer_s}
-                  onChange={(e) => set('draft_timer_s', Number(e.target.value))}
+                  max={3}
+                  value={value.civ_bans}
+                  onChange={(e) => set('civ_bans', Math.max(0, Math.min(3, Number(e.target.value) || 0)))}
                 />
               </Campo>
-
-              <Campo label="Civilizaciones">
-                <select className="field" value={value.civ_mode} onChange={(e) => set('civ_mode', e.target.value)}>
-                  {Object.entries(ETIQUETA_CIV).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-              {value.civ_mode === 'snake' && (
-                <>
-                  <Campo label="Bans de civ por equipo">
-                    <input
-                      className="field"
-                      type="number"
-                      min={0}
-                      value={value.civ_bans}
-                      onChange={(e) => set('civ_bans', Number(e.target.value))}
-                    />
-                  </Campo>
-                  <Campo
-                    label="Orden de picks"
-                    hint={`Vacío usa el sugerido: ${patronSugerido(value.team_size)}. La suma tiene que dar ${value.team_size * 2}.`}
-                  >
-                    <input
-                      className="field"
-                      value={value.civ_pattern}
-                      onChange={(e) => set('civ_pattern', e.target.value)}
-                      placeholder={patronSugerido(value.team_size)}
-                    />
-                  </Campo>
-                </>
-              )}
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Check
-                checked={value.civ_repeat_team}
-                onChange={(v) => set('civ_repeat_team', v)}
-                label="Permitir la misma civ dos veces en un equipo"
-                hint="Apagado: cada jugador del equipo juega una civ distinta."
-              />
-              <Check
-                checked={value.civ_mirror}
-                onChange={(v) => set('civ_mirror', v)}
-                label="Permitir espejos entre equipos"
-                hint="Apagado: si un equipo toma España, el rival no puede."
-              />
-              <Check
                 checked={value.civ_repeat_series}
                 onChange={(v) => set('civ_repeat_series', v)}
                 label="Permitir repetir civ entre partidas de la serie"
-                hint="Apagado: en un BO3 cada equipo usa civs distintas en cada partida."
+                hint="Apagado: en un BO3 cada jugador usa civs distintas en cada partida."
               />
               <Check
                 checked={value.map_repeat}
@@ -542,11 +450,7 @@ export function TournamentForm({
         {tab === 'mapas' && (
           <section className="card p-5">
             <h3 className="title mb-1 text-lg">Pool de mapas</h3>
-            <p className="hint mb-4 text-sm">
-              {value.map_mode === 'ban_hasta_uno'
-                ? `Con bans alternados hasta que queda uno, el draft tendrá ${Math.max(0, value.map_ids.length - 1)} bans.`
-                : 'Los mapas que van a estar disponibles en el draft.'}
-            </p>
+            <p className="hint mb-4 text-sm">Los mapas que van a estar disponibles en el draft.</p>
             <MapPicker maps={maps} value={value.map_ids} onChange={(v) => set('map_ids', v)} />
           </section>
         )}
