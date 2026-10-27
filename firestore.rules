@@ -166,6 +166,57 @@ service cloud.firestore {
         allow delete: if esStaff(slug);
       }
 
+      // ------------------------------------------------- rondas y sus horarios
+      //
+      // Cada ronda del cuadro tiene sus fechas, que fija el staff, y adentro los
+      // horarios de cada jugador para esa ronda, cada uno el suyo. La clave de la
+      // ronda es `{stage_id}_{bracket}{round}` (web/src/logica/rondas.js). Las
+      // reglas no tienen bucles: de los horarios se valida el tope y la forma, no
+      // cada bloque; la web recorta lo que cae fuera del rango al leer.
+
+      function rutaRonda(rondaId) {
+        return /databases/$(database)/documents/tournaments/$(slug)/rondas/$(rondaId);
+      }
+
+      function rondaValida(d) {
+        return d.keys().hasOnly(['stage_id', 'bracket', 'round', 'label', 'from_day', 'to_day', 'zone',
+                                 'starts_at', 'ends_at', 'updated_at'])
+          && d.keys().hasAll(['stage_id', 'bracket', 'round', 'from_day', 'to_day', 'zone', 'starts_at', 'ends_at'])
+          && texto(d.stage_id, 1, 40)
+          && d.bracket in ['W', 'L', 'F']
+          && enteroEntre(d.round, 1, 64)
+          && textoOpcional(d.get('label', null), 60)
+          && texto(d.from_day, 10, 10) && texto(d.to_day, 10, 10)
+          && texto(d.zone, 1, 60)
+          && texto(d.starts_at, 20, 30) && texto(d.ends_at, 20, 30)
+          && d.starts_at < d.ends_at;
+      }
+
+      // Hasta 800 bloques: 31 días de barras alternadas son 744.
+      function horarioValido(d, userId) {
+        return d.keys().hasOnly(['user_id', 'blocks', 'updated_at'])
+          && d.keys().hasAll(['user_id', 'blocks'])
+          && d.user_id == userId
+          && d.blocks is list && d.blocks.size() <= 800;
+      }
+
+      match /rondas/{rondaId} {
+        allow read: if true;
+        allow create, update: if esStaff(slug) && rondaValida(request.resource.data);
+        allow delete: if esStaff(slug);
+
+        match /horarios/{userId} {
+          allow read: if true;
+          // Solo en una ronda que ya tiene fechas, y solo inscripto y sin retirarse.
+          allow create, update: if conSesion() && yo() == userId
+            && inscriptoVigente(slug)
+            && exists(rutaRonda(rondaId))
+            && horarioValido(request.resource.data, userId);
+          // Al regenerar las llaves el staff los borra con la ronda.
+          allow delete: if conSesion() && (yo() == userId || esStaff(slug));
+        }
+      }
+
       // ---------------------------------------------------------- inscripciones
 
       // Equipo del torneo que, después de esta escritura, incluye al usuario.
