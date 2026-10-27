@@ -68,13 +68,12 @@ describe('armador', () => {
     assert.equal(p.teams[0].avg_rating, 1200);
   });
 
-  it('con el mismo nivel, junta a los que comparten horario', () => {
+  it('con el mismo nivel reparte en serpiente sin mirar horarios', () => {
     const sueltos = [['ah1', LUNES_20], ['ah2', MARTES_20], ['ah3', LUNES_20], ['ah4', MARTES_20]]
       .map(([id, dia]) => nivel(id, 1500, [{ start_min: dia, end_min: dia + 180 }]));
     const p = proponerEquipos(t2v2, sueltos, { rnd: azar() });
-    const parejas = p.teams.map((t) => t.members.map((m) => m.id).sort().join('+')).sort();
-    assert.deepEqual(parejas, ['ah1+ah3', 'ah2+ah4']);
-    assert.deepEqual(p.teams.map((t) => t.overlap_min), [180, 180]);
+    assert.deepEqual(p.teams.map((t) => t.members.map((m) => m.id)), [['ah1', 'ah4'], ['ah2', 'ah3']]);
+    assert.equal(p.teams[0].overlap_min, undefined);
   });
 
   it('no cambia los perfiles que recibe', () => {

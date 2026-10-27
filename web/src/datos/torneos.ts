@@ -15,7 +15,6 @@ import {
 import { firestore } from '../firebase';
 import { mapaPorId, civs as todasLasCivs } from '../logica/catalogo.js';
 import { poolCivs, poolMapas } from '../logica/draft.js';
-import { minutosEnComun } from '../logica/horarios.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
@@ -216,9 +215,9 @@ function premiosDe(t: Doc, pagas: number) {
   };
 }
 
-/** Equipo con sus jugadores (capitán primero, después por nombre) y las horas en común. */
+/** Equipo con sus jugadores (capitán primero, después por nombre). */
 function equipoCompleto(equipo: Doc, usuarios: Map<string, Doc>) {
-  const { member_ids, ...resto } = equipo;
+  const { member_ids: _ids, ...resto } = equipo;
   const jugadores = (equipo.members ?? []).map((m: Doc) => {
     const u = usuarios.get(m.user_id) ?? ({} as Doc);
     return {
@@ -234,12 +233,7 @@ function equipoCompleto(equipo: Doc, usuarios: Map<string, Doc>) {
     };
   });
   const members = ordenarPor(jugadores, (p: Doc) => (p.role === 'capitan' ? 0 : 1), 'display_name');
-  const conHorario = (id: string) => usuarios.get(id) ?? { id, availability: [] };
-  return {
-    ...resto,
-    members,
-    overlap_min: members.length > 1 ? minutosEnComun((member_ids ?? []).map(conHorario)) : null,
-  };
+  return { ...resto, members };
 }
 
 /** Todo lo que muestra la página del torneo, con la forma que daba la API. */

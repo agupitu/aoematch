@@ -149,7 +149,7 @@ export function siguienteRondaSuiza(slug: string) {
 // ------------------------------------------------------------------ armador
 
 /** Propuesta de equipos para los inscriptos solos (no retirados, sin equipo). No escribe nada. */
-export function proponerEquiposDelTorneo(t: Tournament, pesoSolape: number) {
+export function proponerEquiposDelTorneo(t: Tournament) {
   return conMensaje(async () => {
     const inscripciones = await consultar(collection(firestore, 'tournaments', t.id, 'registrations'));
     const sueltas = ordenarPor(
@@ -157,7 +157,7 @@ export function proponerEquiposDelTorneo(t: Tournament, pesoSolape: number) {
       'user_id'
     );
     const usuarios = await mapaDeUsuarios(sueltas.map((r) => r.user_id));
-    return proponerEquipos(t, sueltas.map((r) => ({ ...usuarios.get(r.user_id), id: r.user_id })), { pesoSolape });
+    return proponerEquipos(t, sueltas.map((r) => ({ ...usuarios.get(r.user_id), id: r.user_id })));
   });
 }
 

@@ -45,7 +45,6 @@ export type Team = {
   seed: number | null;
   auto_built: number;
   members: Member[];
-  overlap_min: number | null;
 };
 
 export type Registration = {

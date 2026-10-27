@@ -19,7 +19,7 @@ import { useChat, useConectado } from '../live';
 import { usePresencia } from '../presence';
 import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
-  fechaCorta, horas, monto, plata, zonaDelNavegador,
+  fechaCorta, monto, plata, zonaDelNavegador,
 } from '../lib';
 import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User } from '../types';
 
@@ -477,7 +477,7 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
 type Propuesta = {
   score: number;
-  teams: { name: string; avg_rating: number; overlap_min: number; members: { id: string; display_name: string; rating: number | null }[] }[];
+  teams: { name: string; avg_rating: number; members: { id: string; display_name: string; rating: number | null }[] }[];
   leftovers: { id: string; display_name: string }[];
   note?: string;
 };
@@ -485,7 +485,6 @@ type Propuesta = {
 function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const staff = !!t.me?.is_staff;
   const [propuesta, setPropuesta] = useState<Propuesta | null>(null);
-  const [peso, setPeso] = useState(1.5);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -495,7 +494,7 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
     setError('');
     setCargando(true);
     try {
-      setPropuesta((await proponerEquiposDelTorneo(t, peso)) as Propuesta);
+      setPropuesta((await proponerEquiposDelTorneo(t)) as Propuesta);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -509,26 +508,11 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
         <section className="card p-5">
           <h3 className="title mb-1 text-lg">Armador de equipos</h3>
           <p className="mb-4 text-sm text-parch-400">
-            Reparte a los {sueltos.length} jugadores sueltos buscando equipos parejos de nivel y con horarios en
-            común. Podés regenerar hasta que te guste y recién ahí confirmás.
+            Reparte a los {sueltos.length} jugadores sueltos buscando equipos parejos de nivel. Podés regenerar
+            hasta que te guste y recién ahí confirmás.
           </p>
 
           <div className="mb-4 flex flex-wrap items-end gap-4">
-            <label className="flex-1">
-              <span className="label">Prioridad</span>
-              <input
-                type="range"
-                min={0}
-                max={4}
-                step={0.5}
-                value={peso}
-                onChange={(e) => setPeso(Number(e.target.value))}
-                className="w-full accent-[var(--color-gold-500)]"
-              />
-              <span className="mt-1 block text-xs text-parch-400">
-                {peso === 0 ? 'Solo nivel parejo' : peso < 2 ? 'Nivel parejo, mirando horarios' : 'Horarios en común por encima del nivel'}
-              </span>
-            </label>
             <button className="btn btn-primary" onClick={proponer} disabled={cargando || sueltos.length < t.team_size}>
               {propuesta ? 'Regenerar' : 'Proponer equipos'}
             </button>
@@ -569,7 +553,6 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-parch-400">Cruce semanal: {horas(p.overlap_min)}</p>
                 </div>
               ))}
               {propuesta.leftovers.length > 0 && (
@@ -640,12 +623,6 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
           </li>
         ))}
       </ul>
-
-      {team.overlap_min !== null && (
-        <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-parch-400">
-          Horario en común del equipo: <span className="text-parch-200">{horas(team.overlap_min)}</span>
-        </p>
-      )}
     </div>
   );
 }

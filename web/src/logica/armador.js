@@ -1,12 +1,10 @@
 // Armador de equipos para jugadores sueltos, sin base de datos: corre en el
 // navegador del staff (plan Spark) y en las pruebas.
 //
-// Reparte a los inscriptos solos en equipos del tamaño del torneo buscando dos
-// cosas a la vez: que los equipos queden parejos de nivel y que sus integrantes
-// tengan horarios en común. Primero reparto en serpiente por rating y después
-// afino con intercambios mientras el puntaje mejore.
-
-import { mascaraUsuario, BLOQUES_SEMANA, BLOQUE_MIN } from './horarios.js';
+// Reparte a los inscriptos solos en equipos del tamaño del torneo buscando
+// equipos parejos de nivel. Primero reparto en serpiente por rating y después
+// afino con intercambios mientras el puntaje mejore. No mira horarios: al armar
+// los equipos todavía no hay ronda, y los horarios se cargan por ronda.
 
 const RATING_BASE = 1000;
 
@@ -15,32 +13,12 @@ function ratingDe(u, torneo) {
   return r ?? RATING_BASE;
 }
 
-/** Minutos semanales en los que coincide todo un equipo. */
-function solapeEquipo(miembros, cache) {
-  if (miembros.length < 2) return 24 * 60;
-  let n = 0;
-  for (let i = 0; i < BLOQUES_SEMANA; i++) {
-    let todos = true;
-    for (const m of miembros) {
-      if (!cache.get(m.id)[i]) { todos = false; break; }
-    }
-    if (todos) n++;
-  }
-  return n * BLOQUE_MIN;
-}
-
-function puntaje(equipos, cache, pesoSolape) {
+/** Cuanto más parejas las medias de rating de los equipos, más alto (cero es lo parejo). */
+function puntaje(equipos) {
   const medias = equipos.map((e) => e.reduce((s, m) => s + m._rating, 0) / Math.max(1, e.length));
   const prom = medias.reduce((a, b) => a + b, 0) / Math.max(1, medias.length);
   const desvio = Math.sqrt(medias.reduce((s, m) => s + (m - prom) ** 2, 0) / Math.max(1, medias.length));
-
-  const solapes = equipos.map((e) => solapeEquipo(e, cache));
-  const solapeMin = Math.min(...solapes);
-  const solapeProm = solapes.reduce((a, b) => a + b, 0) / Math.max(1, solapes.length);
-
-  // Penaliza el desvío de rating y premia el solape (en horas), dando más peso
-  // al equipo peor servido para que nadie quede sin horario posible.
-  return -desvio + pesoSolape * (solapeMin / 60) * 2 + pesoSolape * (solapeProm / 60) * 0.5;
+  return -desvio;
 }
 
 /**
@@ -50,20 +28,16 @@ function puntaje(equipos, cache, pesoSolape) {
  * equipo, en el orden en que se reparten los empates. `rnd` elige los
  * intercambios (las pruebas pasan uno fijo).
  */
-export function proponerEquipos(torneo, sueltosLeidos, { pesoSolape = 1.5, iteraciones = 4000, rnd = Math.random } = {}) {
+export function proponerEquipos(torneo, sueltosLeidos, { iteraciones = 4000, rnd = Math.random } = {}) {
   const size = torneo.team_size;
   if (size < 2) throw new Error('El armador de equipos es para torneos por equipos.');
-  const sueltos = sueltosLeidos.map((u) => ({ display_name: 'Jugador', availability: [], ...u }));
+  const sueltos = sueltosLeidos.map((u) => ({ display_name: 'Jugador', ...u }));
 
   if (sueltos.length < size) {
     return { teams: [], leftovers: sueltos.map(resumen), score: 0, note: 'No alcanzan los jugadores para un equipo.' };
   }
 
-  const cache = new Map();
-  for (const u of sueltos) {
-    cache.set(u.id, mascaraUsuario(u));
-    u._rating = ratingDe(u, torneo);
-  }
+  for (const u of sueltos) u._rating = ratingDe(u, torneo);
 
   const cantidad = Math.floor(sueltos.length / size);
   const ordenados = [...sueltos].sort((a, b) => b._rating - a._rating);
@@ -80,7 +54,7 @@ export function proponerEquipos(torneo, sueltosLeidos, { pesoSolape = 1.5, itera
   });
 
   // Afinado por intercambios.
-  let mejor = puntaje(equipos, cache, pesoSolape);
+  let mejor = puntaje(equipos);
   for (let it = 0; it < iteraciones && cantidad > 1; it++) {
     const t1 = Math.floor(rnd() * cantidad);
     let t2 = Math.floor(rnd() * cantidad);
@@ -89,7 +63,7 @@ export function proponerEquipos(torneo, sueltosLeidos, { pesoSolape = 1.5, itera
     const i2 = Math.floor(rnd() * equipos[t2].length);
 
     [equipos[t1][i1], equipos[t2][i2]] = [equipos[t2][i2], equipos[t1][i1]];
-    const nuevo = puntaje(equipos, cache, pesoSolape);
+    const nuevo = puntaje(equipos);
     if (nuevo > mejor) {
       mejor = nuevo;
     } else {
@@ -102,7 +76,6 @@ export function proponerEquipos(torneo, sueltosLeidos, { pesoSolape = 1.5, itera
     teams: equipos.map((miembros, i) => ({
       name: `Equipo ${i + 1}`,
       avg_rating: Math.round(miembros.reduce((s, m) => s + m._rating, 0) / miembros.length),
-      overlap_min: solapeEquipo(miembros, cache),
       members: miembros.map(resumen),
     })),
     leftovers: sobran.map(resumen),
