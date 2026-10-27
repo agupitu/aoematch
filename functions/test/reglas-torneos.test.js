@@ -118,15 +118,6 @@ describe('usuarios', () => {
     await assertFails(db.doc('users/miembro').delete());
   });
 
-  it('el link de Steam tiene que ser un perfil de steamcommunity.com', async () => {
-    const db = como('miembro');
-    await assertSucceeds(db.doc('users/miembro').update({ steam_url: 'https://steamcommunity.com/id/agu_pitu' }));
-    await assertSucceeds(db.doc('users/miembro').update({ steam_url: 'https://steamcommunity.com/profiles/76561198000000000/' }));
-    await assertSucceeds(db.doc('users/miembro').update({ steam_url: null }));
-    await assertFails(db.doc('users/miembro').update({ steam_url: 'https://steamcommunity.com.evil.io/id/x' }));
-    await assertFails(db.doc('users/miembro').update({ steam_url: 'javascript:alert(1)' }));
-  });
-
   it('los datos privados los ve y escribe solo el dueño', async () => {
     await assertSucceeds(como('miembro').doc('users/miembro/privado/datos').set({ google_email: 'x@gmail.com' }));
     await assertSucceeds(como('miembro').doc('users/miembro/privado/datos').get());

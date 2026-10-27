@@ -48,7 +48,7 @@ export function Login() {
       <h1 className="title mb-1 text-2xl">Entrar</h1>
       <p className="hint mb-6 text-sm">
         Entrás con tu cuenta de Google. No hay registro ni contraseñas: la primera vez se te crea el
-        perfil solo. El de Steam lo pegás después, a mano.
+        perfil solo.
       </p>
 
       {errorGoogle && (

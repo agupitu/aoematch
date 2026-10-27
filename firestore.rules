@@ -93,18 +93,11 @@ service cloud.firestore {
     // Lo que el dueño puede escribir de su perfil. `is_admin` no está.
     function camposDePerfil() {
       return ['display_name', 'display_name_lower', 'avatar_url', 'timezone', 'discord', 'xbox_tag',
-              'aoe3_profile', 'steam_url', 'rating_1v1', 'rating_team', 'availability', 'exceptions'];
+              'rating_1v1', 'rating_team', 'availability', 'exceptions'];
     }
 
     function ratingValido(v) {
       return v == null || enteroEntre(v, 0, 5000);
-    }
-
-    // El link de Steam se pega a mano y no se verifica: solo se exige que sea
-    // un perfil de steamcommunity.com.
-    function steamValido(v) {
-      return v == null || (v is string && v.size() <= 120
-        && v.matches('https://steamcommunity[.]com/(id|profiles)/[A-Za-z0-9_-]{2,64}/?'));
     }
 
     function perfilValido(d) {
@@ -114,8 +107,6 @@ service cloud.firestore {
         && textoOpcional(d.get('timezone', null), 60)
         && textoOpcional(d.get('discord', null), 200)
         && textoOpcional(d.get('xbox_tag', null), 200)
-        && textoOpcional(d.get('aoe3_profile', null), 200)
-        && steamValido(d.get('steam_url', null))
         && ratingValido(d.get('rating_1v1', null))
         && ratingValido(d.get('rating_team', null))
         && d.get('availability', []) is list && d.get('availability', []).size() <= 336

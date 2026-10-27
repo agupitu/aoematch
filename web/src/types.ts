@@ -6,11 +6,9 @@ export type User = {
   discord: string | null;
   steam_id64: string | null;
   steam_name: string | null;
-  steam_url: string | null;
   google_sub: string | null;
   google_email: string | null;
   xbox_tag: string | null;
-  aoe3_profile: string | null;
   rating_1v1: number | null;
   rating_team: number | null;
   is_admin: boolean;
@@ -35,7 +33,6 @@ export type Member = {
   rating_1v1?: number | null;
   rating_team?: number | null;
   role?: string;
-  steam_url?: string | null;
 };
 
 export type Team = {

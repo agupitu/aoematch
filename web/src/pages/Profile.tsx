@@ -4,7 +4,7 @@ import { guardarHorario, horarioDe } from '../datos/usuarios';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Spinner } from '../components/ui';
 import { AvailabilityGrid, type Bloque } from '../components/AvailabilityGrid';
-import { horas, steamUrlValida, zonaDelNavegador } from '../lib';
+import { horas, zonaDelNavegador } from '../lib';
 
 const ZONAS = [
   'America/Argentina/Buenos_Aires', 'America/Santiago', 'America/Bogota', 'America/Mexico_City',
@@ -19,7 +19,7 @@ export function Profile() {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    display_name: '', timezone: 'UTC', discord: '', xbox_tag: '', aoe3_profile: '', steam_url: '',
+    display_name: '', timezone: 'UTC', discord: '', xbox_tag: '',
     rating_1v1: '', rating_team: '',
   });
 
@@ -30,8 +30,6 @@ export function Profile() {
       timezone: user.timezone || zonaDelNavegador(),
       discord: user.discord ?? '',
       xbox_tag: user.xbox_tag ?? '',
-      aoe3_profile: user.aoe3_profile ?? '',
-      steam_url: user.steam_url ?? '',
       rating_1v1: user.rating_1v1?.toString() ?? '',
       rating_team: user.rating_team?.toString() ?? '',
     });
@@ -54,10 +52,6 @@ export function Profile() {
 
   const guardarPerfil = async () => {
     setError('');
-    const steam = form.steam_url.trim();
-    if (steam && !steamUrlValida(steam)) {
-      return setError('El link tiene que ser https://steamcommunity.com/id/… o /profiles/…');
-    }
     try {
       await actualizar({
         ...form,
@@ -80,7 +74,6 @@ export function Profile() {
   };
 
   const totalMin = (bloques ?? []).reduce((s, b) => s + (b.end_min - b.start_min), 0);
-  const steamGuardado = user.steam_url && steamUrlValida(user.steam_url) ? user.steam_url : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
@@ -135,35 +128,6 @@ export function Profile() {
               className="field"
               value={form.xbox_tag}
               onChange={(e) => setForm({ ...form, xbox_tag: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Perfil de Steam</label>
-            <input
-              className="field"
-              value={form.steam_url}
-              onChange={(e) => setForm({ ...form, steam_url: e.target.value })}
-              placeholder="https://steamcommunity.com/id/…"
-            />
-            <p className="hint mt-1 text-xs">No verificado. Solo steamcommunity.com/id/… o /profiles/…</p>
-            {steamGuardado && (
-              <a
-                className="mt-1 inline-block text-sm text-gold-400 underline"
-                href={steamGuardado}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Ver perfil · no verificado
-              </a>
-            )}
-          </div>
-          <div>
-            <label className="label">Perfil de AoE III (id de leaderboard)</label>
-            <input
-              className="field"
-              value={form.aoe3_profile}
-              onChange={(e) => setForm({ ...form, aoe3_profile: e.target.value })}
-              placeholder="ej. 1234567"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">

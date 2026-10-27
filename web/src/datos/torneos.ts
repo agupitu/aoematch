@@ -227,7 +227,6 @@ function equipoCompleto(equipo: Doc, usuarios: Map<string, Doc>) {
       avatar_url: u.avatar_url || u.steam_avatar || null,
       steam_avatar: u.steam_avatar ?? null,
       steam_name: u.steam_name ?? null,
-      steam_url: u.steam_url ?? null,
       timezone: u.timezone ?? 'UTC',
       rating_1v1: u.rating_1v1 ?? null,
       rating_team: u.rating_team ?? null,

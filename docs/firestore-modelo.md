@@ -54,7 +54,7 @@ Para el frontend (T07): todos los ids pasan a texto salvo civ y mapa. `PATCH
 
 | Campo | Tipo | Viene de |
 |---|---|---|
-| `display_name`, `avatar_url`, `timezone`, `discord`, `xbox_tag`, `aoe3_profile` | texto | `users` |
+| `display_name`, `avatar_url`, `timezone`, `discord`, `xbox_tag` | texto | `users` |
 | `display_name_lower` | texto | nuevo, para el buscador (T13) |
 | `steam_id64`, `steam_name`, `steam_avatar` | texto o null | `users` |
 | `google_sub`, `google_email` | texto o null | `users` |

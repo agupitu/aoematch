@@ -32,7 +32,6 @@ export function guardarUsuario(uid, datos, w) {
     google_email: null,
     email: null,
     xbox_tag: null,
-    aoe3_profile: null,
     rating_1v1: null,
     rating_team: null,
     is_admin: 0,

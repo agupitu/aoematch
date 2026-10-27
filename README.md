@@ -154,8 +154,8 @@ antes de empezar. Se puede escribir hoy mismo como patrón sin tocar código.
 ### Cuentas
 Se entra con **Steam** (OpenID 2.0, sin dependencias) o con **Google** (OAuth 2.0).
 No hay registro ni contraseñas: la primera vez se crea el perfil solo, y las dos
-cuentas se pueden vincular entre sí. Hay campos para Discord, gamertag de Xbox,
-id de perfil del leaderboard y elo 1v1 / equipos.
+cuentas se pueden vincular entre sí. Hay campos para Discord, gamertag de Xbox
+y elo 1v1 / equipos.
 
 ## Cómo está armado
 

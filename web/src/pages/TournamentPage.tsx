@@ -617,17 +617,6 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
           <li key={m.id} className="flex items-center gap-2 text-sm">
             <Avatar src={m.avatar_url} name={m.display_name} size={22} />
             <span className="min-w-0 flex-1 truncate text-parch-200">{m.display_name}</span>
-            {m.steam_url && (
-              <a
-                className="shrink-0 text-xs text-gold-400 underline"
-                href={m.steam_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Steam, no verificado"
-              >
-                Steam · no verificado
-              </a>
-            )}
             {m.role === 'capitan' && <Badge>capitán</Badge>}
             <span className="text-xs text-parch-400">{m.rating_team ?? m.rating_1v1 ?? '—'}</span>
             {(staff || esMio) && (

@@ -130,11 +130,6 @@ export const ETIQUETA_CIV: Record<string, string> = {
   ciega: 'Pick ciego simultáneo',
 };
 
-/** Link de perfil de Steam pegado a mano. Misma forma que `steamValido` en firestore.rules. */
-export function steamUrlValida(v: string): boolean {
-  return v.length <= 120 && /^https:\/\/steamcommunity\.com\/(id|profiles)\/[A-Za-z0-9_-]{2,64}\/?$/.test(v);
-}
-
 export const ETIQUETA_ESTADO_PARTIDO: Record<string, string> = {
   pendiente: 'Pendiente',
   agendado: 'Agendado',
