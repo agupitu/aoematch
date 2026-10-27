@@ -3,9 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "src/index.js",
   "engines": {
-    "node": "22"
+    "node": ">=22"
   },
   "scripts": {
     "seed": "node scripts/seed.js",
@@ -13,10 +12,7 @@
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "cookie-parser": "^1.4.7",
-    "express": "^5.1.0",
-    "firebase-admin": "^14.5.0",
-    "firebase-functions": "^7.4.0"
-  }
+    "firebase-admin": "^14.5.0"
+  },
+  "description": "Herramientas con el Admin SDK para los emuladores: la demo (npm run seed) y las pruebas de datos y reglas. No se despliega: el plan Spark no corre funciones."
 }

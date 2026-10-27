@@ -534,9 +534,5 @@ service cloud.firestore {
         && m.user == { 'id': yo(), 'display_name': perfil.display_name, 'avatar_url': perfil.get('avatar_url', null) };
     }
 
-    // Avisos de cambios de cada partido (hasta T47): solo contadores.
-    match /live/{matchId} {
-      allow read: if true;
-    }
   }
 }

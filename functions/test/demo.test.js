@@ -16,7 +16,7 @@ const { firestore } = await import('../src/data/base.js');
 const { listarTorneos, leerTorneo } = await import('../src/data/torneos.js');
 const { listarEquipos } = await import('../src/data/equipos.js');
 const { listarPartidos } = await import('../src/data/partidos.js');
-const { ultimoDraft } = await import('../src/data/drafts.js');
+const { leerDraft } = await import('../src/data/drafts.js');
 const { historial } = await import('../src/data/salas.js');
 const { listarInscripciones } = await import('../src/data/inscripciones.js');
 
@@ -47,21 +47,25 @@ describe('demo', () => {
     assert.equal(datos.localId, 'demo-kaiser');
   });
 
-  it('cada torneo queda en su estado, con sus contadores', async () => {
+  it('cada torneo queda en su estado, con sus inscriptos y equipos', async () => {
     const t = Object.fromEntries((await listarTorneos()).map((x) => [x.id, x]));
     assert.deepEqual(
       Object.keys(t).sort(),
       ['clan-wars-2v2', 'copa-aoematch-mockup', 'copa-sudamericana-3v3', 'ladder-1v1-de-otono']
     );
-    assert.deepEqual([t['copa-sudamericana-3v3'].status, t['copa-sudamericana-3v3'].inscriptos], ['inscripcion', 15]);
-    assert.deepEqual([t['ladder-1v1-de-otono'].status, t['ladder-1v1-de-otono'].equipos], ['en_curso', 8]);
-    assert.deepEqual([t['clan-wars-2v2'].status, t['clan-wars-2v2'].equipos, t['clan-wars-2v2'].inscriptos], ['armado', 6, 12]);
-    assert.deepEqual([t['copa-aoematch-mockup'].equipos, t['copa-aoematch-mockup'].pagos], [8, 16]);
+    const cuantos = async (slug) => [(await listarInscripciones(slug)).length, (await listarEquipos(slug)).length];
+    assert.equal(t['copa-sudamericana-3v3'].status, 'inscripcion');
+    assert.deepEqual(await cuantos('copa-sudamericana-3v3'), [15, 0]);
+    assert.equal(t['ladder-1v1-de-otono'].status, 'en_curso');
+    assert.deepEqual(await cuantos('ladder-1v1-de-otono'), [8, 8]);
+    assert.equal(t['clan-wars-2v2'].status, 'armado');
+    assert.deepEqual(await cuantos('clan-wars-2v2'), [12, 6]);
+    assert.deepEqual(await cuantos('copa-aoematch-mockup'), [16, 8]);
     assert.equal((await listarPartidos('ladder-1v1-de-otono')).length, 7);
     assert.equal((await listarInscripciones('copa-sudamericana-3v3')).filter((r) => r.kind === 'solo').length, 15);
   });
 
-  it('la copa de muestra: cuartos jugados con drafts, semis agendadas y una con el draft abierto', async () => {
+  it('la copa de muestra: cuartos jugados con drafts ciegos, semis agendadas y una con el draft abierto', async () => {
     const partidos = await listarPartidos('copa-aoematch-mockup');
     const cuartos = partidos.filter((m) => m.bracket === 'W' && m.round === 1);
     assert.equal(cuartos.length, 4);
@@ -69,11 +73,15 @@ describe('demo', () => {
       assert.equal(m.status, 'finalizado');
       assert.ok(m.games.length >= 2);
       assert.ok(m.games.every((g) => g.map_id && g.civs.length === 4));
+      // Cada partida dejó su draft revelado, con los picks de los cuatro.
+      const d = await leerDraft(m.id, m.games.length);
+      assert.deepEqual([d.state, d.revealed, d.picked.length], ['listo', true, 4]);
     }
     const semis = partidos.filter((m) => m.bracket === 'W' && m.round === 2).sort((a, b) => a.position - b.position);
     assert.ok(semis.every((m) => m.status === 'agendado' && m.team_a_id && m.team_b_id && m.scheduled_at));
-    assert.equal((await ultimoDraft(semis[0].id)).state, 'espera');
-    assert.equal(await ultimoDraft(semis[1].id), null);
+    // Mapa fijo (Decán) en la primera: arranca por los bans.
+    assert.equal((await leerDraft(semis[0].id, 1)).state, 'bans');
+    assert.equal(await leerDraft(semis[1].id, 1), null);
     // La primera partida de cada serie se jugó en Decán.
     assert.ok(cuartos.every((m) => m.games[0].map_id === cuartos[0].games[0].map_id));
   });
@@ -83,7 +91,7 @@ describe('demo', () => {
     assert.equal(general.length, 4);
     assert.ok(general[0].created_at < general[3].created_at);
     const semi = (await listarPartidos('copa-aoematch-mockup')).find((m) => m.round === 2 && m.position === 1);
-    assert.deepEqual((await historial(`partido_${semi.id}`)).map((m) => m.body), ['Arrancamos el draft, ¿listos?', 'Dale, baneamos y vamos.']);
+    assert.deepEqual((await historial(`partido_${semi.id}`)).map((m) => m.body), ['Arrancamos el draft, ¿listos?', 'Dale, baneamos y elegimos a ciegas.']);
   });
 
   it('los equipos por equipos tienen su sala privada', async () => {

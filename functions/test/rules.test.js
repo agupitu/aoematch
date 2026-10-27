@@ -1,4 +1,5 @@
-// Reglas de seguridad de Firestore y Realtime Database, contra los emuladores.
+// Reglas de Realtime Database (presencia), contra los emuladores. Las de
+// Firestore están en reglas-torneos.test.js y reglas-partidos.test.js.
 //
 //   npm test        (desde la raíz)
 
@@ -25,22 +26,12 @@ before(async () => {
     database: { rules: raiz('database.rules.json'), ...hostYPuerto('FIREBASE_DATABASE_EMULATOR_HOST') },
   });
   await env.clearFirestore();
-  await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc('live/p1').set({ draft: 1 }));
 });
 
 after(() => env.cleanup());
 
 const anonimo = () => env.unauthenticatedContext();
 const como = (uid) => env.authenticatedContext(uid);
-
-describe('reglas de Firestore', () => {
-  // Usuarios, torneos y equipos: reglas-torneos.test.js. Partidos, draft y
-  // chat: reglas-partidos.test.js.
-  it('cualquiera lee los avisos live, nadie los escribe', async () => {
-    await assertSucceeds(anonimo().firestore().doc('live/p1').get());
-    await assertFails(como('miembro').firestore().doc('live/p1').set({ draft: 2 }));
-  });
-});
 
 describe('reglas de Realtime Database', () => {
   const presencia = { display_name: 'Miembro', avatar_url: 'https://example.com/a.png' };

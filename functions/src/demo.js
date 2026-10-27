@@ -1,22 +1,24 @@
 // Datos de demostración para los emuladores: jugadores con cuentas de prueba y
 // horarios, un torneo abierto a inscripción, otro con las llaves armadas, otro
 // listo para armar y la copa de muestra con drafts jugados, semis agendadas y
-// chat. Usa las mismas funciones que la API (llaves, draft, cierre de partido).
+// chat. Usa la misma lógica que la web (web/src/logica/: llaves, draft y
+// resultados) y escribe con el Admin SDK, sin pasar por las reglas.
 //
 // Las cuentas entran con email y contraseña desde el formulario de prueba,
 // que solo aparece contra el emulador: kaiser@demo.aoematch / demo1234.
 // Lo corre scripts/seed.js (npm run seed).
 
 import { getAuth } from 'firebase-admin/auth';
-import { cerrarMatch, generarLlaves } from './brackets.js';
-import { civs, maps } from './catalogo.js';
-import { civsBloqueadas } from './draft-core.js';
-import { aplicarAccion, crearDraft, estadoDelPartido, marcarListo } from './draft.js';
-import { listarEquipos, guardarEquipo, leerEquipo } from './data/equipos.js';
-import { guardarInscripcion, listarInscripciones, vigente } from './data/inscripciones.js';
-import { actualizarPartido, leerPartido, listarPartidos } from './data/partidos.js';
+import { civs, maps } from '../../web/src/logica/catalogo.js';
+import { banear, civsPermitidas, elegirMapa, planDeDraft, revelar, turnoDeBan } from '../../web/src/logica/draft.js';
+import { cargarPartidas, generarCuadro } from '../../web/src/logica/llaves.js';
+import { escribirEnLotes } from './data/base.js';
+import { guardarDraft, guardarPick } from './data/drafts.js';
+import { actualizarEquipo, listarEquipos, guardarEquipo, leerEquipo } from './data/equipos.js';
+import { guardarInscripcion } from './data/inscripciones.js';
+import { actualizarPartido, guardarPartido, leerPartido, listarPartidos, refPartido } from './data/partidos.js';
 import { guardarSala, guardarSalaDeEquipo, publicarMensaje } from './data/salas.js';
-import { actualizarTorneo, guardarTorneo, leerTorneo } from './data/torneos.js';
+import { actualizarTorneo, guardarEtapa, guardarTorneo, leerTorneo, refEtapa } from './data/torneos.js';
 import { guardarUsuario, leerUsuario } from './data/usuarios.js';
 
 export const CLAVE_DEMO = 'demo1234';
@@ -110,24 +112,35 @@ async function crearEquipo(torneo, { name, tag = null, seed, jugadores, paid = 1
   return id;
 }
 
-/** Los contadores del torneo, contados de nuevo. */
-async function recontar(slug) {
-  const [regs, equipos, torneo] = await Promise.all([listarInscripciones(slug), listarEquipos(slug), leerTorneo(slug)]);
-  const activas = regs.filter(vigente);
-  await actualizarTorneo(torneo, {
-    inscriptos: activas.length,
-    pagos: activas.filter((r) => r.paid).length,
-    equipos: equipos.length,
-  });
+/** Llaves del torneo con la lógica de la web; lo pasa a 'en_curso'. */
+async function armarLlaves(slug) {
+  const torneo = await leerTorneo(slug);
+  const equipos = await listarEquipos(slug);
+  const ids = { nuevoId: () => refPartido().id, nuevoIdEtapa: () => refEtapa(slug).id };
+  const cuadro = generarCuadro(torneo, equipos, ids);
+  const sinId = ({ id, ...resto }) => resto;
+  await escribirEnLotes([
+    ...cuadro.partidos.map((m) => (w) => guardarPartido(sinId(m), w, refPartido(m.id))),
+    ...cuadro.etapas.map((e) => (w) => guardarEtapa(slug, sinId(e), w, refEtapa(slug, e.id))),
+    ...cuadro.seeds.map((x) => (w) => actualizarEquipo(x.id, { seed: x.seed }, w)),
+    (w) => actualizarTorneo(torneo, { status: 'en_curso' }, w),
+  ]);
+}
+
+/** Carga las partidas de una serie como lo hace el staff (datos/resultados.ts). */
+async function cargarSerie(slug, matchId, games) {
+  const { cambios, terminado } = cargarPartidas(await listarPartidos(slug), matchId, games);
+  for (const { id, ...campos } of cambios) await actualizarPartido(id, campos);
+  if (terminado) await actualizarTorneo(await leerTorneo(slug), { status: 'finalizado' });
 }
 
 // ------------------------------------------------------------- copa de muestra
 
 const REGLAS_MOCK = [
   '- Series al mejor de 3, final al mejor de 5.',
-  '- Mapa de la primera partida fijo (Decán); el resto sale de bans alternados.',
-  '- Un ban de civilización por equipo y draft en serpiente 1-2-1.',
-  '- Sin espejos y sin repetir civilización entre partidas de la misma serie.',
+  '- Mapa de la primera partida fijo (Decán); después elige el que perdió la anterior.',
+  '- Un ban de civilización por equipo y después pick ciego: se ven todas juntas.',
+  '- Sin repetir civilización entre partidas de la misma serie.',
 ].join('\n');
 
 const NOMBRES_MOCK = [
@@ -157,35 +170,27 @@ function fechaRelativa(dias, horaUtc) {
 
 const capitanDe = async (teamId) => ({ id: (await leerEquipo(teamId)).captain_id });
 
-/** Un objetivo válido para el paso actual del draft. */
-function objetivoLegal(st, step, partido, rnd) {
-  if (step.kind === 'ban_mapa' || step.kind === 'pick_mapa') {
-    const baneados = new Set(st.maps_banned);
-    const libres = st.pools.maps.filter((m) => !baneados.has(m.id));
-    return libres[Math.floor(rnd() * libres.length)].id;
-  }
-  const bloqueadas = civsBloqueadas(st, step, partido);
-  const libres = st.pools.civs.filter((c) => !bloqueadas.has(c.id));
-  return libres[Math.floor(rnd() * libres.length)].id;
-}
+const alAzar = (lista, rnd) => lista[Math.floor(rnd() * lista.length)];
 
-/** Corre un draft con acciones reales, las mismas que haría un capitán. */
-async function correrDraft(matchId, gameNo, rnd) {
-  const m = await leerPartido(matchId);
-  await crearDraft(matchId, gameNo, { rnd });
-  await marcarListo(matchId, await capitanDe(m.team_a_id), { rnd });
-  await marcarListo(matchId, await capitanDe(m.team_b_id), { rnd });
-
-  for (let guard = 0; guard < 300; guard++) {
-    const st = await estadoDelPartido(matchId);
-    if (!st || st.state !== 'en_curso' || !st.step || st.step.auto) break;
-    const teamId = st.step.side === 'a' ? st.teams.a.id : st.teams.b.id;
-    const partido = await leerPartido(matchId);
-    await aplicarAccion(matchId, await capitanDe(teamId), {
-      kind: st.step.kind,
-      targetId: objetivoLegal(st, st.step, partido, rnd),
-    }, { rnd });
+/**
+ * Juega el draft de una partida con los mismos pasos que la web: mapa (si le
+ * toca a alguien), bans y un pick por jugador. Lo deja revelado y devuelve
+ * el mapa y las civs para `games[]`.
+ */
+async function correrDraft(slug, matchId, gameNo, rnd) {
+  const [torneo, m] = await Promise.all([leerTorneo(slug), leerPartido(matchId)]);
+  const equipos = { a: await leerEquipo(m.team_a_id), b: await leerEquipo(m.team_b_id) };
+  let d = planDeDraft(torneo, m, equipos, gameNo);
+  if (d.state === 'mapa') d = elegirMapa(d, d.map_chooser_team_id, alAzar(d.map_pool, rnd));
+  while (d.state === 'bans') {
+    const libres = d.civ_pool.filter((c) => !d.banned_civ_ids.includes(c));
+    d = banear(d, turnoDeBan(d), alAzar(libres, rnd));
   }
+  const picks = Object.fromEntries(d.player_ids.map((uid) => [uid, alAzar(civsPermitidas(d, uid), rnd)]));
+  const { draft, civs: elegidas } = revelar(d, picks);
+  await guardarDraft(matchId, gameNo, { ...draft, picked: d.player_ids });
+  for (const [uid, civ] of Object.entries(picks)) await guardarPick(matchId, gameNo, uid, civ);
+  return { map_id: draft.map_id, civs: elegidas };
 }
 
 /** Mensaje en una sala con la hora de hace `minutosAtras` minutos. */
@@ -207,16 +212,10 @@ async function sembrarMockup(rnd, organizador) {
     best_of: 3,
     best_of_final: 5,
     third_place: 1,
-    map_mode: 'ban_hasta_uno',
     first_map_id: decan.id,
     map_repeat: 0,
-    civ_mode: 'snake',
     civ_bans: 1,
-    civ_pattern: '1-2-1',
-    civ_repeat_team: 0,
-    civ_mirror: 0,
     civ_repeat_series: 0,
-    draft_timer_s: 60,
     entry_fee_cents: 300000,
     currency: 'ARS',
     payment_link: 'https://link.mercadopago.com.ar/ejemplo',
@@ -251,9 +250,7 @@ async function sembrarMockup(rnd, organizador) {
     const id = await crearEquipo(t, { name: nombre, tag, seed: i + 1, jugadores: integrantes, paid_at: fechaRelativa(-10, 12) });
     equipos.push({ id, jugadores: integrantes });
   }
-  await recontar(t.id);
-  await generarLlaves(t.id);
-  // generarLlaves lo pasa a 'en_curso', como ya estaba.
+  await armarLlaves(t.id);
 
   // --- cuartos: jugados de verdad, con un draft por partida
   const fuerza = (teamId) => equipos.find((e) => e.id === teamId).jugadores.reduce((s, u) => s + (u.rating_team || 1000), 0);
@@ -264,19 +261,30 @@ async function sembrarMockup(rnd, organizador) {
     if (!m.team_a_id || !m.team_b_id) continue;
     await actualizarPartido(m.id, { scheduled_at: fechaRelativa(-6 + Math.floor(i / 2), 22 + (i % 2)) });
     const ganaA = fuerza(m.team_a_id) + rnd() * 600 >= fuerza(m.team_b_id) + rnd() * 600;
-    const apretado = rnd() < 0.5;
-    const partidas = apretado ? 3 : 2;
-    for (let g = 1; g <= partidas; g++) await correrDraft(m.id, g, rnd);
-    await cerrarMatch(m.id, ganaA ? m.team_a_id : m.team_b_id, ganaA ? 2 : apretado ? 1 : 0, ganaA ? (apretado ? 1 : 0) : 2);
+    const [ganador, perdedor] = ganaA ? [m.team_a_id, m.team_b_id] : [m.team_b_id, m.team_a_id];
+    // 2-0 o 2-1: en la apretada el perdedor gana la segunda.
+    const orden = rnd() < 0.5 ? [ganador, perdedor, ganador] : [ganador, ganador];
+    const games = [];
+    for (const [i, winner] of orden.entries()) {
+      // El draft de cada partida necesita la anterior cargada (elige mapa el que perdió).
+      const delDraft = await correrDraft(t.id, m.id, i + 1, rnd);
+      games.push({ game_no: i + 1, winner_team_id: winner, replay_url: null, notes: null, ...delDraft });
+      await actualizarPartido(m.id, { games });
+    }
+    await cargarSerie(t.id, m.id, games);
   }
 
-  // --- semis agendadas; la primera con el draft abierto pero sin arrancar:
-  // el que entra lo empieza y ve la secuencia paso a paso.
+  // --- semis agendadas; la primera con el draft abierto (mapa fijo y bans
+  // por hacer): el que entra lo sigue paso a paso.
   const semis = (await listarPartidos(t.id)).filter((m) => m.bracket === 'W' && m.round === 2).sort((a, b) => a.position - b.position);
   for (const [i, m] of semis.entries()) {
     await actualizarPartido(m.id, { scheduled_at: fechaRelativa(2 + i, 23), status: 'agendado' });
   }
-  if (semis[0]?.team_a_id && semis[0]?.team_b_id) await crearDraft(semis[0].id, 1, { rnd });
+  if (semis[0]?.team_a_id && semis[0]?.team_b_id) {
+    const m = await leerPartido(semis[0].id);
+    const equipos2 = { a: await leerEquipo(m.team_a_id), b: await leerEquipo(m.team_b_id) };
+    await guardarDraft(m.id, 1, planDeDraft(await leerTorneo(t.id), m, equipos2, 1));
+  }
   for (const m of (await listarPartidos(t.id)).filter((x) => x.round === 3)) {
     await actualizarPartido(m.id, { scheduled_at: fechaRelativa(6, 23) });
   }
@@ -292,7 +300,7 @@ async function sembrarMockup(rnd, organizador) {
     await guardarSala(sala, { kind: 'partido', tournament_id: t.id, match_id: semis[0].id, name: 'Semifinal 1', public_read: true });
     const usuarioDe = async (teamId) => leerUsuario((await capitanDe(teamId)).id);
     await decir(sala, await usuarioDe(semis[0].team_a_id), 'Arrancamos el draft, ¿listos?', 45);
-    await decir(sala, await usuarioDe(semis[0].team_b_id), 'Dale, baneamos y vamos.', 40);
+    await decir(sala, await usuarioDe(semis[0].team_b_id), 'Dale, baneamos y elegimos a ciegas.', 40);
   }
   return t;
 }
@@ -314,22 +322,16 @@ export async function sembrarDemo() {
   // --- torneo 1: 3v3, inscripción abierta, con sueltos para el armador
   const t1 = await crearTorneo('copa-sudamericana-3v3', {
     name: 'Copa Sudamericana 3v3',
-    description: 'Torneo por equipos con draft de civilizaciones en serpiente y pool de mapas competitivo.',
-    rules_md: '- Al mejor de 3.\n- Sin repetir civ dentro del equipo.\n- Deadline de draft: 60 s por pick.',
+    description: 'Torneo por equipos con pick ciego de civilizaciones y pool de mapas competitivo.',
+    rules_md: '- Al mejor de 3.\n- Un ban de civ por equipo y pick ciego.\n- Sin repetir civ en la serie.',
     organizer_id: organizador.id,
     status: 'inscripcion',
     format: 'eliminacion_simple',
     team_size: 3,
     best_of: 3,
     best_of_final: 5,
-    map_mode: 'ban_hasta_uno',
-    civ_mode: 'snake',
     civ_bans: 1,
-    civ_pattern: '1-2-2-1',
-    civ_repeat_team: 0,
-    civ_mirror: 1,
     civ_repeat_series: 0,
-    draft_timer_s: 60,
     entry_fee_cents: 500000,
     currency: 'ARS',
     payment_link: 'https://link.mercadopago.com.ar/ejemplo',
@@ -348,22 +350,17 @@ export async function sembrarDemo() {
     const paid = rnd() < 0.6 ? 1 : 0;
     await guardarInscripcion(t1.id, u.id, { kind: 'solo', status: 'confirmada', paid, paid_at: paid ? new Date().toISOString() : null });
   }
-  await recontar(t1.id);
 
   // --- torneo 2: 1v1 en curso, con llaves listas
   const t2 = await crearTorneo('ladder-1v1-de-otono', {
     name: 'Ladder 1v1 de Otoño',
-    description: 'Eliminación simple a 8, ban de mapas hasta que queda uno y civs a elección libre.',
+    description: 'Eliminación simple a 8. Primer mapa al azar, después elige el que perdió; pick ciego.',
     organizer_id: organizador.id,
     status: 'inscripcion',
     format: 'eliminacion_simple',
     team_size: 1,
     best_of: 3,
-    map_mode: 'ban_hasta_uno',
-    civ_mode: 'snake',
-    civ_pattern: '1-1',
-    civ_mirror: 1,
-    draft_timer_s: 45,
+    civ_bans: 0,
     entry_fee_cents: 0,
     currency: 'ARS',
     allow_solo: 1,
@@ -377,13 +374,12 @@ export async function sembrarDemo() {
   for (const [i, u] of usuarios.slice(0, 8).entries()) {
     await crearEquipo(t2, { name: u.display_name, seed: i + 1, jugadores: [u] });
   }
-  await recontar(t2.id);
-  await generarLlaves(t2.id);
+  await armarLlaves(t2.id);
 
   // --- torneo 3: 2v2 por equipos ya inscriptos, listo para armar llaves
   const t3 = await crearTorneo('clan-wars-2v2', {
     name: 'Clan Wars 2v2',
-    description: 'Formato de grupos y playoff. Draft de civs ciego para que nadie contrapickee.',
+    description: 'Formato de grupos y playoff. Dos bans de civ por equipo y pick ciego.',
     organizer_id: organizador.id,
     status: 'armado',
     format: 'grupos_playoff',
@@ -391,12 +387,7 @@ export async function sembrarDemo() {
     best_of: 3,
     group_count: 2,
     group_advance: 2,
-    map_mode: 'ban_pick',
-    map_bans: 2,
-    civ_mode: 'ciega',
-    civ_mirror: 1,
-    civ_repeat_team: 0,
-    draft_timer_s: 90,
+    civ_bans: 2,
     entry_fee_cents: 0,
     allow_solo: 0,
   });
@@ -404,7 +395,6 @@ export async function sembrarDemo() {
   for (const [i, nombre] of CLANES.entries()) {
     await crearEquipo(t3, { name: nombre, seed: i + 1, jugadores: [usuarios[i * 2], usuarios[i * 2 + 1]] });
   }
-  await recontar(t3.id);
 
   const mock = await sembrarMockup(rnd, organizador);
   return { creada: true, organizador, torneos: [mock.id, t1.id, t2.id, t3.id] };

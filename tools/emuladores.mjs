@@ -1,7 +1,7 @@
 // Emuladores de Firebase.
 //
-//   npm run emuladores   -> levanta todos (auth, firestore, database, functions,
-//                           hosting, tasks) con la UI en :4000
+//   npm run emuladores   -> levanta todos (auth, firestore, database, hosting) con
+//                           la UI en :4000
 //   npm test             -> levanta auth, firestore y database, corre las pruebas de
 //                           functions/ y las de lógica de web/, y los apaga
 //
@@ -21,10 +21,6 @@ if (java && existsSync(java)) {
   const clave = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
   env[clave] = `${java}${delimiter}${env[clave] ?? ''}`;
 }
-
-// Firebase da 10 s para cargar el código de las funciones; con los emuladores
-// de Java arrancando a la vez, en Windows a veces no alcanza.
-env.FUNCTIONS_DISCOVERY_TIMEOUT ??= '30';
 
 const [modo, ...extra] = process.argv.slice(2);
 let args;

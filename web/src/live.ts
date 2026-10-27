@@ -132,7 +132,16 @@ export function useChat(salas: string[]) {
             setMensajes((p) => ({ ...p, [room]: lista }));
             setErrores((p) => (p[room] ? { ...p, [room]: '' } : p));
           },
-          (err) => vivo && setErrores((p) => ({ ...p, [room]: mensajeDeError(err) }))
+          (err) => {
+            if (!vivo) return;
+            // Sin sesión no se puede crear la sala: si nadie la abrió todavía,
+            // las reglas no dejan leerla. Para un anónimo es una sala vacía.
+            if (!uid && (err as { code?: string }).code === 'permission-denied') {
+              setMensajes((p) => ({ ...p, [room]: [] }));
+              return;
+            }
+            setErrores((p) => ({ ...p, [room]: mensajeDeError(err) }));
+          }
         );
         if (vivo) cortes.push(cortar);
         else cortar();

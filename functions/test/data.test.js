@@ -196,20 +196,12 @@ describe('partidos', () => {
 });
 
 describe('drafts', () => {
-  it('uno por partida y el último es el de la partida más alta', async () => {
-    await drafts.guardarDraft('m1', 1, { steps: [{ idx: 0, kind: 'ban_mapa' }] });
-    await drafts.guardarDraft('m1', 2, {});
-    await assert.rejects(drafts.guardarDraft('m1', 2, {}));
-    const d = await drafts.ultimoDraft('m1');
-    assert.deepEqual([d.id, d.game_no, d.state], ['2', 2, 'espera']);
-    assert.equal(await drafts.ultimoDraft('sin-drafts'), null);
-  });
-
-  it('las acciones van dentro del draft', async () => {
-    await drafts.actualizarDraft('m1', 1, { actions: [{ step_idx: 0, kind: 'ban_mapa', target_id: 7 }], current_step: 1 });
+  it('el draft va por número de partida y los picks aparte', async () => {
+    await drafts.guardarDraft('m1', 1, { state: 'picks', player_ids: ['u1'], revealed: false });
+    await drafts.guardarPick('m1', 1, 'u1', 7);
     const d = await drafts.leerDraft('m1', 1);
-    assert.equal(d.actions[0].target_id, 7);
-    assert.equal(d.steps[0].kind, 'ban_mapa');
+    assert.deepEqual([d.id, d.game_no, d.state, d.picked], ['1', 1, 'picks', []]);
+    assert.equal((await drafts.refPick('m1', 1, 'u1').get()).data().civ_id, 7);
   });
 });
 

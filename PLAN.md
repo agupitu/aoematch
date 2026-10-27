@@ -14,8 +14,8 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 5 tareas pendientes, 15 h en total (unos 2,5 días de 6 h para una persona sola; el
-senior entra en T47 y T30). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+**Estado.** 4 tareas pendientes, 11 h en total (unos 2 días de 6 h para una persona sola; el
+senior entra en T30). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
 anterior, y T01, T28, T34–T46 del plan Spark (faltan T30–T33 y T47). No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
@@ -251,17 +251,24 @@ Ola 3  ─ T33                                      · 2 h
       sacan: el cliente no puede escribir `system: true`.
 - [x] Cortar las escuchas al salir de la pantalla.
 
-### T47 · Sacar el servidor — dif. 3 · senior · 4 h
+### T47 · Sacar el servidor — dif. 3 · senior · 4 h · hecha
 
-- [ ] Borrar `functions/src/app.js`, `index.js`, `routes/`, `relojes.js`, `live.js`, `config.js`,
-      `auth.js`, `draft.js`, `draft-core.js` y lo que quede sin uso; en `firebase.json`, la sección
-      `functions`, el rewrite `/api/**` y los emuladores `functions` y `tasks`.
-- [ ] Borrar `web/src/api.ts` y el proxy de `/api` de Vite.
-- [ ] Demo: rehacer `functions/src/demo.js` y `functions/scripts/seed.js` sobre el modelo nuevo
-      (draft con picks y `picked`, votos en `votos/{uid}`, `vod_links`, sin `live` ni `readers`). El seed sigue con el Admin SDK contra el emulador;
-      puede pasar a `tools/`.
-- [ ] `npm test` corre las pruebas de lógica (`web/test/`) y de reglas (T35, T36); borrar las que
-      probaban rutas y los reexports de `functions/src` hacia `web/src/logica/`.
+- [x] Borrados la API (`app.js`, `index.js`, `routes/`, `auth.js`, `config.js`), el reloj
+      (`relojes.js`), `live.js`, el draft viejo (`draft.js`, `draft-core.js`), `chat.js`, los
+      reexports hacia la web (`brackets.js`, `teambuilder.js`, `availability.js`, `catalogo.js`) y
+      también SQLite (`db.js`, `schema.sql`, `brackets-sqlite.js`). En `functions/src` quedan
+      `data/` (Admin SDK) y `demo.js`. `firebase.json` sin `functions`, sin `/api/**` y sin los
+      emuladores `functions` y `tasks`; `firestore.rules` sin `live/{matchId}`.
+- [x] Borrados `web/src/api.ts` y el proxy de Vite.
+- [x] Demo sobre el modelo nuevo con la lógica de la web: llaves con `generarCuadro`, cada partida
+      de los cuartos con su draft (mapa, bans, picks ciegos, revelado, `picked`) y la serie cerrada
+      con `cargarPartidas`; la primera semi con el draft abierto en bans. Sin contadores ni `live`.
+      `functions/data/drafts.js` pasa a `guardarDraft` / `guardarPick`. El seed sigue en
+      `functions/scripts/seed.js`.
+- [x] `npm test`: 89 pruebas en `functions/` (datos, demo y reglas) y 48 de lógica en `web/test/`.
+      Borradas las pruebas de rutas. `functions/package.json` queda solo con `firebase-admin`.
+- [x] De paso: en `web/src/live.ts`, un anónimo en un partido cuya sala de chat nadie abrió veía
+      "No tenés permiso"; ahora ve la sala vacía.
 
 ### Fase 5 · Publicación y cierre
 

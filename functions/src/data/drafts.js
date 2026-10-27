@@ -1,45 +1,24 @@
-// matches/{matchId}/drafts/{gameNo} (docs/firestore-modelo.md). El id es el
-// número de partida: reemplaza el UNIQUE (match_id, game_no). Las acciones van
-// adentro del draft.
+// matches/{matchId}/drafts/{gameNo} y sus picks/{uid} (plan Spark). El
+// documento es lo que arma `planDeDraft` (web/src/logica/draft.js); acá solo
+// se guarda, para la demo y las pruebas. En la web escribe datos/drafts.ts.
 
-import { ahora, consultar, escritor, leer } from './base.js';
+import { leer, escritor } from './base.js';
 import { refPartido } from './partidos.js';
 
-const drafts = (matchId) => refPartido(matchId).collection('drafts');
+export const refDraft = (matchId, gameNo) => refPartido(matchId).collection('drafts').doc(String(gameNo));
 
-export const refDraft = (matchId, gameNo) => drafts(matchId).doc(String(gameNo));
+export const refPick = (matchId, gameNo, uid) => refDraft(matchId, gameNo).collection('picks').doc(String(uid));
 
 export function leerDraft(matchId, gameNo, tx) {
   return leer(refDraft(matchId, gameNo), tx);
 }
 
-/** El draft de la partida más alta del partido, o null. */
-export async function ultimoDraft(matchId, tx) {
-  const q = drafts(matchId).orderBy('game_no', 'desc').limit(1);
-  return (await consultar(q, tx))[0] ?? null;
-}
-
-/**
- * Alta con los valores por defecto de la tabla `drafts`. Falla si esa partida
- * ya tiene draft.
- */
+/** Guarda el draft de una partida tal como viene. */
 export function guardarDraft(matchId, gameNo, datos, w) {
-  return escritor(w).create(refDraft(matchId, gameNo), {
-    state: 'espera',
-    steps: [],
-    current_step: 0,
-    first_team_id: null,
-    deadline_at: null,
-    ready_a: 0,
-    ready_b: 0,
-    actions: [],
-    created_at: ahora(),
-    finished_at: null,
-    ...datos,
-    game_no: Number(gameNo),
-  });
+  return escritor(w).set(refDraft(matchId, gameNo), { picked: [], ...datos, game_no: Number(gameNo) });
 }
 
-export function actualizarDraft(matchId, gameNo, cambios, w) {
-  return escritor(w).update(refDraft(matchId, gameNo), cambios);
+/** Pick ciego de un jugador. */
+export function guardarPick(matchId, gameNo, uid, civId, w) {
+  return escritor(w).set(refPick(matchId, gameNo, uid), { civ_id: civId });
 }
