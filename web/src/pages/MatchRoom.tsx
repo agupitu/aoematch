@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '../api';
 import { agendar, detallePartido, horariosDelPartido } from '../datos/partidos';
-import { partidaActual, useDraft } from '../datos/drafts';
+import { type EstadoDraft, civsDeLaPartida, partidaActual, useDraft } from '../datos/drafts';
+import { cargarPartida, walkover } from '../datos/resultados';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
@@ -94,7 +94,7 @@ export function MatchRoom() {
           {m.me.team_id && <Badge tone="gold">Jugás este partido</Badge>}
           {m.me.is_staff && <Badge>Organizador</Badge>}
           <Agendar m={m} onDone={cargar} />
-          {m.me.can_report && <Reportar m={m} onDone={cargar} />}
+          {m.me.is_staff && <Reportar m={m} estado={estadoDraft} onDone={cargar} />}
         </div>
       </header>
 
@@ -180,7 +180,7 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
   }, [abierto, m]);
 
   const offset = offsetZona(tz);
-  const puede = m.me.can_report;
+  const puede = m.me.is_staff || m.me.is_captain;
 
   const guardar = async (iso: string | null) => {
     await agendar(m, iso);
@@ -288,20 +288,25 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
 
 // --------------------------------------------------------------- reportar
 
-function Reportar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
+function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; onDone: () => void }) {
   const [abierto, setAbierto] = useState(false);
-  const [gameNo, setGameNo] = useState(String(Math.max(1, m.score_a + m.score_b + 1)));
+  const [gameNo, setGameNo] = useState(String(Math.min(m.best_of, m.score_a + m.score_b + 1)));
   const [ganador, setGanador] = useState('');
   const [replay, setReplay] = useState('');
+  const [wo, setWo] = useState('');
   const [error, setError] = useState('');
 
-  const enviar = async () => {
+  // Mapa y civs del draft de esa partida, si ya se reveló.
+  const { draft, picks } = estado;
+  const delDraft =
+    draft && draft.revealed && picks && draft.game_no === Number(gameNo)
+      ? { map_id: draft.map_id, civs: civsDeLaPartida(draft, picks) }
+      : null;
+
+  const hacer = async (fn: () => Promise<unknown>) => {
     setError('');
     try {
-      await api.post(`/api/matches/${m.id}/games/${Number(gameNo)}`, {
-        winner_team_id: ganador,
-        replay_url: replay || null,
-      });
+      await fn();
       setAbierto(false);
       setReplay('');
       onDone();
@@ -310,12 +315,22 @@ function Reportar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
     }
   };
 
+  const terminado = ['finalizado', 'walkover'].includes(m.status);
+
   return (
     <>
-      <button className="btn btn-primary" onClick={() => setAbierto(true)}>
-        Reportar resultado
+      <button
+        className="btn btn-primary"
+        onClick={() => {
+          setGameNo(String(Math.min(m.best_of, m.score_a + m.score_b + 1)));
+          setGanador('');
+          setError('');
+          setAbierto(true);
+        }}
+      >
+        Cargar resultado
       </button>
-      <Modal open={abierto} onClose={() => setAbierto(false)} title="Reportar una partida">
+      <Modal open={abierto} onClose={() => setAbierto(false)} title="Cargar una partida">
         <div className="space-y-4">
           <div>
             <label className="label">Partida</label>
@@ -323,6 +338,7 @@ function Reportar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
               {Array.from({ length: m.best_of }, (_, i) => (
                 <option key={i} value={i + 1}>
                   Partida {i + 1}
+                  {m.games.some((g) => g.game_no === i + 1 && g.winner_team_id) ? ' (cargada)' : ''}
                 </option>
               ))}
             </select>
@@ -333,16 +349,48 @@ function Reportar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
               <option value="">Elegir…</option>
               {m.teams.a && <option value={m.teams.a.id}>{m.teams.a.name}</option>}
               {m.teams.b && <option value={m.teams.b.id}>{m.teams.b.name}</option>}
+              <option value="ninguno">Sin ganador (borrar esta partida)</option>
             </select>
           </div>
           <div>
             <label className="label">Link del replay (opcional)</label>
             <input className="field" value={replay} onChange={(e) => setReplay(e.target.value)} placeholder="https://…" />
           </div>
+          {delDraft && (
+            <p className="hint text-xs">Se guardan el mapa y las civs del draft de esta partida.</p>
+          )}
           {error && <Alerta>{error}</Alerta>}
-          <button className="btn btn-primary w-full" disabled={!ganador} onClick={enviar}>
+          <button
+            className="btn btn-primary w-full"
+            disabled={!ganador}
+            onClick={() =>
+              hacer(() =>
+                cargarPartida(m.id, Number(gameNo), {
+                  winner_team_id: ganador === 'ninguno' ? null : ganador,
+                  replay_url: replay || undefined,
+                  ...(delDraft ?? {}),
+                })
+              )
+            }
+          >
             Guardar
           </button>
+
+          {!terminado && (
+            <div className="border-t border-ink-700 pt-4">
+              <label className="label">Walkover (el rival no se presentó)</label>
+              <div className="flex gap-2">
+                <select className="field" value={wo} onChange={(e) => setWo(e.target.value)}>
+                  <option value="">Gana…</option>
+                  {m.teams.a && <option value={m.teams.a.id}>{m.teams.a.name}</option>}
+                  {m.teams.b && <option value={m.teams.b.id}>{m.teams.b.name}</option>}
+                </select>
+                <button className="btn" disabled={!wo} onClick={() => hacer(() => walkover(m.id, wo))}>
+                  Dar walkover
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </>

@@ -14,9 +14,9 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 12 tareas pendientes, 39 h en total (unos 6,5 días de 6 h para una persona sola; unos 3
-días con un senior y un junior). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
-anterior, y T01, T34–T37, T39, T42 y T43 del plan Spark. No hay datos para migrar.
+**Estado.** 11 tareas pendientes, 33 h en total (unos 5,5 días de 6 h para una persona sola; unos 3
+días con un senior y dos juniors). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+anterior, y T01, T34–T37, T39, T40, T42 y T43 del plan Spark. No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
 armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
@@ -114,6 +114,7 @@ las rutas y pasa a `firestore.rules`.
 | T36 | `firestore.rules` de `matches` (leer todos; escribir el staff; los capitanes solo agendan), `matches/{id}/votos/{uid}` (cada jugador del partido, solo lo suyo: reemplaza a `schedule_votes`, que las reglas no pueden proteger por entrada), `drafts/{gameNo}` (lo crea un jugador o el staff con la partida anterior cerrada; después solo se puede elegir mapa, banear, anotarse en `picked` y revelar, cada uno en su turno), `drafts/{gameNo}/picks/{uid}` (el ajeno no se lee hasta `revealed`) y el chat (`rooms` y `messages`). **Cambios contra el plan:** revelar exige que `picked` tenga a todos los de `player_ids`, y anotarse exige que exista el pick propio (`existsAfter`), en vez de 8 `exists`; la sala de equipo no usa `readers`: quién lee sale del equipo y del staff; un mensaje lleva `created_at == request.time` y el `user` igual al perfil del autor; desde el cliente no hay mensajes del sistema. 21 pruebas en `functions/test/reglas-partidos.test.js`, con drafts armados por `planDeDraft`. | `firestore.rules`, `functions/test/reglas-partidos.test.js` |
 | T37 | `web/src/datos/`: `base.ts` (leer, consultar, `leerPorIds` de a 30, `Rechazo`, `mensajeDeError`, `conMensaje`), `usuarios.ts` (`asegurarPerfil` crea el perfil la primera vez en una transacción, `actualizarPerfil`, horario), `torneos.ts` (`listarTorneos` con `getCountFromServer`, `crearTorneo` con slug libre en transacción, `detalleTorneo` con la forma de la API, `actualizarTorneo`, `horariosDelTorneo`), `inscripciones.ts` (`inscribirse`, `retirarse`, `sacarMiembro`, `marcarInscripcion`; si se va el capitán, el primero que queda pasa a serlo) y `partidos.ts` (`detallePartido`, `horariosDelPartido`, `agendar`). Ya no usan la API: `auth.tsx` (perfil), `Home`, `CreateTournament`, `TournamentPage` (detalle, inscripción, retiro, pagos, sacar miembro, horarios, configuración), `Profile` (horario) y `MatchRoom` (detalle y agenda). Probado en el navegador con la demo: listado, detalle, alta de perfil, inscripción con equipo nuevo, retiro, volver suelto, perfil, configuración y alta de torneo como Kaiser. Quedan en la API, para sus tareas: llaves y armador (T39), resultados (T40), draft (T43: el detalle del partido devuelve `draft: null` hasta entonces), chat (T46) y Steam (T38). | `web/src/datos/`, `web/src/pages/` |
 | T39 | `web/src/datos/llaves.ts`: `generarLlaves` (borra partidos con sus drafts, picks y votos, salas de partido con sus mensajes y etapas; escribe el cuadro, las siembras y pasa el torneo a `en_curso`, en tandas de 450), `generarPlayoffs`, `siguienteRondaSuiza`, `proponerEquiposDelTorneo` y `confirmarEquipos` (en una transacción; ahora deja la inscripción con `kind: 'equipo'`). `TournamentPage.tsx` los usa en Llaves y Equipos; regenerar pide confirmación. Las reglas suman que el staff borre votos ajenos (al regenerar). Probado en el navegador como Kaiser: grupos de Clan Wars, regenerar el Ladder 1v1 (borró partido, draft y picks viejos, creó 7 partidos) y armador de la Copa Sudamericana (5 equipos). | `web/src/datos/llaves.ts`, `web/src/pages/TournamentPage.tsx` |
+| T40 | Resultados solo del staff. Lógica pura en `web/src/logica/llaves.js`: `cargarPartidas` (guarda las partidas de la serie; con la serie definida la cierra y pasa ganador y perdedor; si una corrección cambia o borra el ganador, la reabre y saca al equipo de los partidos siguientes que no se jugaron, y si ya se jugaron avisa), `darWalkover` y `paraGanar`; 7 pruebas en `web/test/llaves.test.js`. `web/src/datos/resultados.ts`: `cargarPartida` y `walkover` en una transacción que relee todos los partidos del torneo; el torneo pasa a `finalizado` o vuelve a `en_curso`. En `MatchRoom.tsx`, "Cargar resultado" solo para el staff (partida, ganador o "sin ganador" para borrar, replay, walkover); si el draft de esa partida está revelado, guarda su mapa y sus civs. Los capitanes siguen pudiendo agendar. Probado en el navegador como Kaiser: dos partidas cierran la serie y el ganador pasa a la semi; corregir una la reabre y lo saca de la semi; walkover. Sin probar en el navegador: la copia de mapa y civs desde un draft revelado (lo cubre la lógica de T42). | `web/src/logica/llaves.js`, `web/src/datos/resultados.ts`, `web/src/pages/MatchRoom.tsx` |
 
 **Fase 7 · Draft nuevo**
 
@@ -145,13 +146,12 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | T28 | Presencia con Realtime Database | 3 | J | 2 h | — | 0 |
 | **Fase 6 · Sin servidor** |||||||
 | T38 | Ingreso solo con Google; link de Steam sin verificar en el perfil | 2 | J | 2 h | — | 0 |
-| T40 | Resultados por el creador: ganador por partida, cerrar serie y avanzar la llave | 4 | S | 1 d | — | 0 |
 | T41 | Links de las partidas por partido y por fase (`vod_links`) | 2 | J | 4 h | — | 0 |
 | **Fase 7 · Draft nuevo** |||||||
 | T44 | Pulir `DraftBoard.tsx` y sacar el draft viejo de `types.ts` y `lib.ts` | 2 | J | 4 h | — | 0 |
 | T45 | `TournamentForm.tsx`: quitar modos viejos, sumar bans de civ y primer mapa fijo o al azar | 2 | J | 2 h | — | 0 |
 | T46 | Tiempo real sin API: escuchas del partido y del draft; chat escrito desde el cliente | 3 | J | 4 h | — | 0 |
-| T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T40, T44, T46 | 1 |
+| T47 | Borrar la función `api`, Cloud Tasks y `live`; demo y `npm test` sobre el modelo nuevo | 3 | S | 4 h | T38, T44, T46 | 1 |
 | **Fase 5 · Publicación y cierre** |||||||
 | T30 | Deploy automático de Hosting y reglas con GitHub Actions | 3 | S | 4 h | T47 | 1 |
 | T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 2 |
@@ -164,18 +164,17 @@ número no se reusa.
 ## Olas de ejecución
 
 ```
-Ola 0  ─ T40 ∥ T28 ∥ T38 ∥ T41 ∥ T44 ∥ T45 ∥ T46   · 1 d    (T40 senior; el resto junior, 18 h)
+Ola 0  ─ T28 ∥ T38 ∥ T41 ∥ T44 ∥ T45 ∥ T46        · 4 h    (todas junior, 18 h en total)
 Ola 1  ─ T47 → T30                                · 1 d
 Ola 2  ─ T32 ∥ T31                                · 4 h
 Ola 3  ─ T33                                      · 2 h
 ```
 
-- **Camino crítico:** T40 → T47 → T30 → T32 → T33 = 20 h (unos 3 días).
-- **Equipo mínimo:** 1 senior y 1 junior. La ola 0 tiene un solo senior (T40) y 18 h de junior;
-  con dos juniors la ola 0 baja a un día. Un segundo senior no acelera: T47 y T30 van en fila.
+- **Camino crítico:** T46 → T47 → T30 → T32 → T33 = 18 h (unos 3 días).
+- **Equipo mínimo:** 1 senior y 2 juniors. La ola 0 es toda junior (18 h): con dos juniors son
+  9 h cada uno; el senior entra en la ola 1 (T47 y T30 van en fila).
 - **Una sola persona:** seguir las olas en orden.
-- **Duración total:** con un senior y dos juniors, unas 20 h (suma de las olas); con una sola
-  persona, 39 h.
+- **Duración total:** unos 3 días con el equipo mínimo; 33 h con una sola persona.
 
 ## Detalle de cada tarea
 
@@ -205,20 +204,6 @@ Ola 3  ─ T33                                      · 2 h
       `https://steamcommunity.com/id/...` o `/profiles/...`; mostrarlo como link en el perfil y en
       los equipos, con el aviso "no verificado".
 - [ ] Sacar de `Profile.tsx` vincular y desvincular Steam y Google.
-
-### T40 · Resultados por el creador — dif. 4 · senior · 1 d
-
-- [ ] En la llave y en `MatchRoom.tsx` (hoy `Reportar` llama a `/api/matches/:id/games/:n`), solo
-      para el staff: cargar el ganador de cada partida de la serie y copiar el mapa y las civs del
-      draft revelado a `games[]` (`civsDeLaPartida` de `web/src/datos/drafts.ts`, con los picks que
-      da `useDraft`).
-- [ ] Al llegar al mejor de N, cerrar la serie y avanzar ganador y perdedor (`next_match_id`,
-      `loser_match_id`) en una `runTransaction` con `cerrarPartido` de `web/src/logica/llaves.js`, que devuelve los
-      cambios de cada partido y si el torneo terminó. Cambiar un resultado
-      cerrado reabre la serie y saca al equipo del partido siguiente si no empezó (como
-      `recalcularSerie` en `functions/src/routes/matches.js`).
-- [ ] Byes: el avance del partido con bye va en la misma transacción.
-- [ ] Sacar el reporte de los capitanes y el "resultado forzado": todo resultado lo carga el staff.
 
 ### T41 · Links de las partidas — dif. 2 · junior · 4 h
 

@@ -528,3 +528,92 @@ export function rondaSuiza(torneo, etapas, equipos, partidos, ids) {
   );
   return { ronda, partidos: [...c.partidos.values()], bye: libres[0] ?? null };
 }
+
+// ------------------------------------------------- partidas de una serie
+
+/** Partidas que necesita un equipo para ganar la serie al mejor de `bestOf`. */
+export const paraGanar = (bestOf) => Math.floor(bestOf / 2) + 1;
+
+/**
+ * Saca de los partidos siguientes al ganador y al perdedor de un partido que
+ * se reabre. Si alguno de esos ya tiene resultado, no se puede: hay que
+ * corregir ese primero.
+ */
+function reabrir(mapa, m) {
+  for (const [destino, slot] of [[m.next_match_id, m.next_slot], [m.loser_match_id, m.loser_slot]]) {
+    const d = destino && mapa.get(destino);
+    if (!d) continue;
+    const campo = slot === 'b' ? 'team_b_id' : 'team_a_id';
+    if (d[campo] == null) continue;
+    if (terminado(d) || (d.games ?? []).some((g) => g.winner_team_id)) {
+      throw new Error('El partido siguiente ya tiene resultado: corregí ese primero.');
+    }
+    d[campo] = null;
+  }
+  m.winner_team_id = null;
+  m.status = 'en_juego';
+}
+
+const CAMPOS_DE_SERIE = [...CAMPOS_DE_RESULTADO, 'games'];
+
+/**
+ * Guarda las partidas de una serie (cargadas o corregidas por el staff) y deja
+ * la llave coherente: con la serie definida, la cierra y pasa ganador y
+ * perdedor; si una corrección cambia o borra el ganador, la reabre y saca al
+ * equipo de los partidos siguientes que todavía no se jugaron.
+ * `partidos` son todos los del torneo, sin tocar. Devuelve { cambios: [{ id,
+ * ...campos }], partido, terminado } como `cerrarPartido`.
+ */
+export function cargarPartidas(partidos, matchId, games) {
+  const antes = new Map(partidos.map((p) => [p.id, p]));
+  const mapa = new Map(partidos.map((p) => [p.id, { ...p }]));
+  const m = mapa.get(matchId);
+  if (!m) throw new Error('Partido inexistente.');
+  if (!m.team_a_id || !m.team_b_id) throw new Error('Faltan equipos en el partido.');
+  if (games.some((g) => g.winner_team_id && ![m.team_a_id, m.team_b_id].includes(g.winner_team_id))) {
+    throw new Error('Ese equipo no juega este partido.');
+  }
+
+  const lista = ordenarPor(games, 'game_no');
+  const ganadas = (teamId) => lista.filter((g) => g.winner_team_id === teamId).length;
+  const a = ganadas(m.team_a_id);
+  const b = ganadas(m.team_b_id);
+  if (a + b > m.best_of) throw new Error(`La serie es al mejor de ${m.best_of}.`);
+  const necesarias = paraGanar(m.best_of);
+  const ganador = a >= necesarias ? m.team_a_id : b >= necesarias ? m.team_b_id : null;
+
+  const ganadorAntes = terminado(m) ? m.winner_team_id : null;
+  if (ganadorAntes && ganadorAntes !== ganador) reabrir(mapa, m);
+
+  m.games = lista;
+  m.score_a = a;
+  m.score_b = b;
+  if (ganador && ganadorAntes !== ganador) {
+    cerrarEnMemoria(mapa, matchId, ganador, a, b);
+  } else if (!ganador && a + b > 0) {
+    m.status = 'en_juego';
+  }
+
+  const cambios = [];
+  for (const p of mapa.values()) {
+    const campos = {};
+    for (const c of CAMPOS_DE_SERIE) {
+      const viejo = antes.get(p.id)[c];
+      const distinto = c === 'games' ? JSON.stringify(p[c] ?? []) !== JSON.stringify(viejo ?? []) : p[c] !== viejo;
+      if (distinto) campos[c] = p[c];
+    }
+    if (Object.keys(campos).length) cambios.push({ id: p.id, ...campos });
+  }
+  return { cambios, partido: m, terminado: [...mapa.values()].every(terminado) };
+}
+
+/** Walkover: gana `winnerTeamId` sin jugar (el rival no se presentó). */
+export function darWalkover(partidos, matchId, winnerTeamId) {
+  const m = partidos.find((p) => p.id === matchId);
+  if (!m) throw new Error('Partido inexistente.');
+  if (![m.team_a_id, m.team_b_id].includes(winnerTeamId)) throw new Error('Ese equipo no juega este partido.');
+  if (terminado(m)) throw new Error('El partido ya tiene resultado.');
+  const n = paraGanar(m.best_of);
+  const a = winnerTeamId === m.team_a_id ? n : 0;
+  return cerrarPartido(partidos, matchId, winnerTeamId, a, n - a, true);
+}

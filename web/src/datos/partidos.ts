@@ -79,7 +79,8 @@ export async function detallePartido(id: string, uid: string | null): Promise<Ma
     me: {
       team_id: miEquipo?.id ?? null,
       is_staff: staff,
-      can_report: staff || capitan,
+      // Los resultados los carga solo el staff (pedido del 2026-10-26).
+      can_report: staff,
       is_captain: capitan,
     },
   } as unknown as MatchDetail;
