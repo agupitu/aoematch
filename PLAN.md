@@ -16,7 +16,7 @@ en el draft: se espera a que elijan todos.
 
 **Estado.** 4 tareas pendientes, 11 h en total (unos 2 días de 6 h para una persona sola; el
 senior entra en T30). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
-anterior, y T01, T28, T34–T46 del plan Spark (faltan T30–T33 y T47). No hay datos para migrar.
+anterior, y T01, T28, T34–T47 del plan Spark (falta cerrar T30, y T31–T33). No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
 armador y horarios (T18–T20), la demo (T24), el chat sobre Firestore (T25) y la web (T12, T27). Se
@@ -274,17 +274,23 @@ Ola 3  ─ T33                                      · 2 h
 
 ### T30 · Deploy automático — dif. 3 · senior · 4 h
 
-- [ ] `.github/workflows/deploy.yml`: en cada push a `master`, Node 22, `npm ci`, `npm run assets`,
-      `npm run build` y `firebase deploy --only hosting,firestore,database --project prod`. Sin
-      `functions`: Spark no las deja publicar.
-- [ ] La config de la app web ya está en `web/src/firebase.ts` (T01): el build no necesita
-      variables.
-- [ ] Autenticación con una cuenta de servicio en el secreto `FIREBASE_SERVICE_ACCOUNT`, con los
-      roles de Hosting y reglas.
-- [ ] Si falla la descarga de `npm run assets`, el deploy sigue.
-- [ ] Primer deploy a mano desde la PC. Verificar con
-      `curl -I https://PROYECTO.web.app/assets/flags/Flag_German.png` que llegue el `Cache-Control`
-      de T29.
+- [x] `.github/workflows/deploy.yml`: en cada push y PR, Node 22 + Java 21, `npm ci`, `npm test`
+      (emuladores) y `npm run build`; en push a `master`, además `npm run assets` (si falla,
+      sigue), `npm run build` y `firebase deploy --only hosting,firestore,database --project prod`.
+      El job de publicar usa el entorno `produccion` de GitHub.
+- [x] Sin variables de build: la config de la app web está en `web/src/firebase.ts` (T01).
+- [x] `firestore.indexes.json`: fuera el TTL de `authStates` (ya no existe) y dos índices para las
+      consultas del cliente (`registrations` por `status` + `paid`, `rooms` por `tournament_id` +
+      `kind`). `engines` de la raíz pasa a `>=22` (era por `node:sqlite`).
+- [x] Deploy en seco contra `prod` desde la PC: reglas de Firestore y Realtime Database compilan en
+      el proyecto real.
+- [ ] Vos: en la consola de Google Cloud del proyecto, IAM → Cuentas de servicio → crear una con el
+      rol "Administrador de Firebase", generar una clave JSON y pegarla entera en GitHub →
+      Settings → Secrets and variables → Actions → `FIREBASE_SERVICE_ACCOUNT`.
+- [ ] Primer deploy a mano desde la PC (`npm run assets`, `npm run build`, `npx firebase deploy
+      --only hosting,firestore,database --project prod`). Verificar con
+      `curl -I https://aoe-3-draft-2eea7.web.app/assets/flags/Flag_German.png` el `Cache-Control`
+      de T29, y entrar con Google.
 
 ### T31 · Dominio propio — dif. 1 · junior · 1 h
 

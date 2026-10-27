@@ -1,0 +1,77 @@
+# Pruebas y publicación en Firebase (plan Spark: Hosting y reglas, sin funciones).
+#
+# En cada push a master: corre `npm test` contra los emuladores y, si pasa,
+# arma la web y publica Hosting, las reglas e índices de Firestore y las
+# reglas de Realtime Database en el proyecto `prod` (.firebaserc).
+#
+# Necesita el secreto FIREBASE_SERVICE_ACCOUNT: el JSON de una cuenta de
+# servicio del proyecto con el rol "Administrador de Firebase" (o Hosting
+# Admin + Firebase Rules Admin + Cloud Datastore Index Admin + Firebase
+# Realtime Database Admin). La config de la app web va en web/src/firebase.ts.
+
+name: Publicar
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: publicar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+            web/package-lock.json
+      # Los emuladores de Firestore y Realtime Database corren en Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  publicar:
+    needs: pruebas
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: produccion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      # Banderas y minimapas (no se versionan). Si la descarga falla, se publica igual.
+      - run: npm run assets
+        continue-on-error: true
+      - run: npm run build
+      # Por variable de entorno y no interpolado en el script: el JSON no se
+      # mezcla con el shell.
+      - name: Credenciales de la cuenta de servicio
+        env:
+          CUENTA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$CUENTA" > "$RUNNER_TEMP/cuenta.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/cuenta.json" >> "$GITHUB_ENV"
+      - run: npx firebase deploy --only hosting,firestore,database --project prod --non-interactive
+      - name: Borrar credenciales
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cuenta.json"

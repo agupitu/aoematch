@@ -5,7 +5,7 @@
   "description": "Plataforma de torneos de Age of Empires III: inscripciones, armado de equipos, disponibilidad horaria, salas de chat y draft de mapa/civilizaciones.",
   "type": "module",
   "engines": {
-    "node": ">=23.4.0"
+    "node": ">=22"
   },
   "scripts": {
     "postinstall": "npm --prefix functions install && npm --prefix web install",

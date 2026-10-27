@@ -4,25 +4,58 @@
       "collectionGroup": "tournaments",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "orden", "order": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "orden",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "teams",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tournament_id", "order": "ASCENDING" },
-        { "fieldPath": "member_ids", "arrayConfig": "CONTAINS" }
+        {
+          "fieldPath": "tournament_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "member_ids",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "registrations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "paid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tournament_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
-  "fieldOverrides": [
-    {
-      "collectionGroup": "authStates",
-      "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
-    }
-  ]
+  "fieldOverrides": []
 }
