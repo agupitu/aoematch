@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Draft suelto - maqueta</title><style>body{margin:0;padding:16px;background:#0b0d10;color:#f3e7cd;font-family:ui-sans-serif,system-ui,sans-serif}h2{color:#d9b25f}.subtitle{color:#8a8f99}.mockup{margin:0 0 24px;border:1px solid #2a313e;border-radius:12px;overflow:hidden;max-width:1180px}.mockup-header{padding:8px 14px;background:#161a22;color:#c6a96b;font-size:12px;letter-spacing:.08em;text-transform:uppercase}</style></head><body>
+<style>
+  .dk { background:#0b0d10; color:#f3e7cd; font-size:13px; line-height:1.4; }
+  .dk * { box-sizing:border-box; }
+  .dk h4 { margin:0 0 8px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:#c6a96b; font-weight:600; }
+  .dk .disp { font-family:'Cinzel','Trajan Pro',Georgia,serif; color:#d9b25f; letter-spacing:.04em; }
+  .dk .nav { display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid #2a313e; background:#0b0d10; }
+  .dk .nav img { width:28px; height:28px; border-radius:3px; object-fit:cover; }
+  .dk .nav a { padding:5px 12px; border-radius:8px; color:#e3d3ae; font-size:13px; }
+  .dk .nav a.on { background:#1c212b; color:#d9b25f; }
+  .dk .wrap { padding:16px; }
+  .dk .card { border:1px solid #2a313e; background:#161a22; border-radius:12px; }
+  .dk .pad { padding:14px 16px; }
+  .dk .note { color:#8a8f99; font-size:11px; }
+  .dk .muted { color:#c6a96b; }
+  .dk .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .dk .sp { justify-content:space-between; }
+  .dk .seg { display:inline-flex; border:1px solid #2a313e; border-radius:9px; overflow:hidden; background:#11141a; }
+  .dk .seg span { padding:5px 12px; color:#e3d3ae; border-right:1px solid #2a313e; font-size:12px; }
+  .dk .seg span:last-child { border-right:0; }
+  .dk .seg span.on { background:rgba(194,151,63,.18); color:#d9b25f; }
+  .dk .tog { display:inline-block; width:34px; height:18px; border-radius:99px; background:#2a313e; position:relative; flex:none; }
+  .dk .tog::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#c6a96b; }
+  .dk .tog.on { background:#c2973f; } .dk .tog.on::after { left:18px; background:#0b0d10; }
+  .dk .btn { display:inline-block; background:#c2973f; color:#0b0d10; border-radius:9px; padding:8px 16px; font-weight:600; font-size:13px; }
+  .dk .btn.g { background:transparent; border:1px solid #2a313e; color:#e3d3ae; font-weight:400; }
+  .dk .btn.d { background:transparent; border:1px solid rgba(166,61,61,.6); color:#a63d3d; font-weight:400; }
+  .dk .btn.off { opacity:.4; }
+  .dk .form { display:grid; grid-template-columns:1fr 290px; gap:14px; }
+  .dk .opt { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:9px 0; border-top:1px solid #1c212b; }
+  .dk .opt:first-of-type { border-top:0; }
+  .dk .opt small { display:block; color:#8a8f99; font-size:11px; }
+  .dk .thumbs { display:flex; gap:8px; }
+  .dk .thumbs img { width:64px; height:64px; border-radius:8px; object-fit:cover; border:1px solid #2a313e; }
+  .dk .thumbs .more { width:64px; height:64px; border-radius:8px; border:1px dashed #2a313e; display:grid; place-items:center; color:#8a8f99; font-size:11px; }
+  .dk .sum div { display:flex; justify-content:space-between; padding:5px 0; border-top:1px solid #1c212b; color:#e3d3ae; }
+  .dk .sum div span:first-child { color:#8a8f99; }
+  .dk .room { display:grid; grid-template-columns:1fr 290px; gap:14px; align-items:start; }
+  .dk .bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .dk .chip { padding:3px 11px; border-radius:99px; border:1px solid #2a313e; color:#8a8f99; font-size:11px; }
+  .dk .chip.ok { color:#6fa268; border-color:#4f7a4a; } .dk .chip.now { color:#0b0d10; background:#d9b25f; border-color:#d9b25f; font-weight:600; }
+  .dk .hero { position:relative; height:150px; border-radius:12px; overflow:hidden; border:1px solid #2a313e; margin-bottom:12px; }
+  .dk .hero.s { height:104px; }
+  .dk .hero img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .dk .hero::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgba(11,13,16,.92) 0%,rgba(11,13,16,.55) 55%,rgba(11,13,16,.1) 100%); }
+  .dk .hero .t { position:absolute; z-index:1; left:18px; top:0; bottom:0; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  .dk .hero .t b { font-family:'Cinzel','Trajan Pro',Georgia,serif; font-size:28px; color:#d9b25f; font-weight:600; }
+  .dk .hero.s .t b { font-size:22px; }
+  .dk .teams { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .dk .team { border:1px solid #2a313e; background:#161a22; border-radius:12px; overflow:hidden; }
+  .dk .team .h { padding:8px 14px; display:flex; justify-content:space-between; align-items:center; font-weight:600; }
+  .dk .team.a .h { background:rgba(194,151,63,.14); color:#d9b25f; border-bottom:1px solid rgba(194,151,63,.35); }
+  .dk .team.b .h { background:rgba(79,122,74,.16); color:#6fa268; border-bottom:1px solid rgba(79,122,74,.4); }
+  .dk .pl { display:flex; align-items:center; gap:10px; padding:9px 14px; border-top:1px solid #1c212b; }
+  .dk .pl:first-of-type { border-top:0; }
+  .dk .av { width:28px; height:28px; border-radius:50%; background:#2a313e; display:grid; place-items:center; font-size:12px; color:#e3d3ae; flex:none; }
+  .dk .pl .n { flex:1; min-width:0; }
+  .dk .pl.turn { background:rgba(217,178,95,.08); box-shadow:inset 3px 0 0 #d9b25f; }
+  .dk .fl { width:34px; height:22px; border-radius:3px; object-fit:cover; border:1px solid #2a313e; flex:none; }
+  .dk .fl.big { width:46px; height:30px; }
+  .dk .st { font-size:11px; padding:2px 9px; border-radius:99px; white-space:nowrap; }
+  .dk .st.ok { background:rgba(79,122,74,.2); color:#6fa268; }
+  .dk .st.wait { background:#1c212b; color:#8a8f99; }
+  .dk .st.draft { background:rgba(194,151,63,.16); color:#d9b25f; }
+  .dk .hid { width:34px; height:22px; border-radius:3px; background:repeating-linear-gradient(45deg,#1c212b,#1c212b 4px,#2a313e 4px,#2a313e 8px); border:1px solid #2a313e; flex:none; }
+  .dk .bans { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .dk .bn { display:flex; gap:8px; align-items:center; }
+  .dk .bn .x { position:relative; }
+  .dk .bn .x img { filter:grayscale(1); opacity:.55; }
+  .dk .bn .x::after { content:'✕'; position:absolute; inset:0; display:grid; place-items:center; color:#a63d3d; font-weight:700; }
+  .dk .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; }
+  .dk .civ { border:1px solid #2a313e; background:#11141a; border-radius:10px; padding:9px 6px 8px; text-align:center; font-size:12px; color:#e3d3ae; position:relative; }
+  .dk .civ img { width:52px; height:34px; object-fit:cover; border-radius:3px; display:block; margin:0 auto 6px; border:1px solid #2a313e; }
+  .dk .civ.sel { border-color:#d9b25f; background:rgba(217,178,95,.12); box-shadow:0 0 0 1px #d9b25f; color:#d9b25f; }
+  .dk .civ.ban { opacity:.38; border-color:rgba(166,61,61,.6); } .dk .civ.ban img { filter:grayscale(1); }
+  .dk .civ.tk { opacity:.38; } .dk .civ.tk img { filter:grayscale(1); }
+  .dk .civ .tag { display:block; margin-top:3px; font-size:10px; color:#8a8f99; }
+  .dk .act { position:sticky; bottom:0; margin-top:12px; display:flex; align-items:center; gap:12px; justify-content:space-between; padding:10px 14px; border:1px solid #c2973f; background:rgba(194,151,63,.1); border-radius:12px; }
+  .dk .chat { display:flex; flex-direction:column; height:640px; }
+  .dk .tabs { display:flex; border-bottom:1px solid #2a313e; }
+  .dk .tabs span { flex:1; text-align:center; padding:9px 6px; color:#8a8f99; font-size:12px; }
+  .dk .tabs span.on { color:#d9b25f; box-shadow:inset 0 -2px 0 #d9b25f; }
+  .dk .msgs { flex:1; padding:12px; display:flex; flex-direction:column; gap:9px; overflow:hidden; }
+  .dk .m b { color:#e3d3ae; font-size:12px; } .dk .m b.a { color:#d9b25f; } .dk .m b.b { color:#6fa268; }
+  .dk .m p { margin:1px 0 0; color:#f3e7cd; }
+  .dk .m.sys { color:#8a8f99; font-size:11px; text-align:center; }
+  .dk .inp { padding:10px; border-top:1px solid #2a313e; }
+  .dk .inp div { border:1px solid #2a313e; background:#11141a; border-radius:9px; padding:8px 10px; color:#5b6370; }
+  .dk .order { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .dk .order .o { display:flex; align-items:center; gap:7px; padding:5px 10px; border:1px solid #2a313e; border-radius:9px; background:#161a22; }
+  .dk .order .o.a { border-bottom:2px solid #c2973f; } .dk .order .o.b { border-bottom:2px solid #4f7a4a; }
+  .dk .order .o.now { outline:2px solid #d9b25f; background:rgba(217,178,95,.1); }
+  .dk .order .ar { color:#5b6370; }
+  .dk .top { display:grid; grid-template-columns:220px 1fr; gap:12px; margin-bottom:12px; align-items:start; }
+  .dk .top > div > .teams, .dk .top > div > .bans { margin-bottom:12px; }
+  .dk .top > div > :last-child { margin-bottom:0; }
+  .dk .mapcard { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:1px solid #c2973f; background-size:cover; background-position:center; box-shadow:0 0 0 1px rgba(194,151,63,.25), 0 8px 24px rgba(0,0,0,.4); }
+  .dk .mapcard::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(11,13,16,.1) 35%,rgba(11,13,16,.92) 100%); }
+  .dk .mapcard .t { position:absolute; z-index:1; left:14px; right:14px; bottom:12px; display:flex; flex-direction:column; gap:2px; }
+  .dk .mapcard .t b { font-family:'Cinzel','Trajan Pro',Georgia,serif; font-size:24px; color:#d9b25f; font-weight:600; }
+  .dk .mapcard .lbl { position:absolute; z-index:1; top:10px; left:10px; padding:2px 9px; border-radius:99px; background:rgba(11,13,16,.75); border:1px solid #c2973f; color:#d9b25f; font-size:10px; letter-spacing:.1em; }
+  .dk .mapbans { margin-top:8px; padding:8px 10px; border:1px solid #2a313e; background:#161a22; border-radius:10px; font-size:11px; color:#8a8f99; }
+  .dk .mapbans div { display:flex; justify-content:space-between; padding:2px 0; }
+  .dk .mapbans s { color:#a63d3d; }
+</style>
+
+<h2>Draft suelto · v3</h2>
+<p class="subtitle">Mapa elegido a la izquierda, cuadrado 1:1 con la imagen de fondo. Lo demás igual que v2.</p>
+
+<div class="mockup">
+  <div class="mockup-header">1 · Crear draft</div>
+  <div class="mockup-body dk">
+    <div class="nav"><img src="../../../web/public/logo.webp" alt=""><span class="disp" style="font-size:16px;margin-right:10px">AoE III Draft</span><a>Torneos</a><a>Crear torneo</a><a class="on">Draft</a></div>
+    <div class="wrap">
+      <div class="form">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card pad">
+            <h4>Jugadores</h4>
+            <div class="opt"><div>Jugadores por equipo</div><div class="seg"><span>1</span><span class="on">2</span><span>3</span><span>4</span></div></div>
+            <div class="opt"><div>Equipos<small>(?) fijo en 2</small></div><div class="seg"><span class="on">2</span></div></div>
+          </div>
+          <div class="card pad">
+            <h4>Mapa</h4>
+            <div class="opt"><div>Quién elige el mapa (?)</div><div class="seg"><span>Equipo A</span><span class="on">Equipo B</span><span>Creador</span><span>Al azar</span></div></div>
+            <div class="opt"><div>Bans de mapa por equipo</div><div class="seg"><span>0</span><span class="on">1</span><span>2</span><span>3</span></div></div>
+            <div class="opt" style="align-items:flex-start"><div>Mapas disponibles<small>174 en total · buscador y selección por grupo</small></div>
+              <div class="thumbs"><img src="../../../web/public/assets/maps/amazonas.png" alt=""><img src="../../../web/public/assets/maps/alaska.png" alt=""><img src="../../../web/public/assets/maps/alpes.png" alt=""><img src="../../../web/public/assets/maps/acropolis.png" alt=""><span class="more">+170</span></div></div>
+          </div>
+          <div class="card pad">
+            <h4>Civilizaciones</h4>
+            <div class="opt"><div>Bans de civ por equipo</div><div class="seg"><span>0</span><span>1</span><span class="on">2</span><span>3</span></div></div>
+            <div class="opt"><div>Modo de pick<small>Ciego: se revela cuando confirman todos · Serpiente: por turnos</small></div><div class="seg"><span>Ciego</span><span class="on">Serpiente</span></div></div>
+            <div class="opt"><div>Repetir civ entre equipos<small>solo en serpiente · en ciego siempre se puede</small></div><span class="tog"></span></div>
+            <div class="opt"><div>Repetir civ dentro del equipo</div><span class="tog on"></span></div>
+          </div>
+        </div>
+        <div class="card pad" style="align-self:start;position:sticky;top:8px">
+          <h4>Resumen</h4>
+          <div class="sum">
+            <div><span>Formato</span><span>2 vs 2</span></div>
+            <div><span>Elige mapa</span><span>Equipo B</span></div>
+            <div><span>Bans de mapa</span><span>1 por equipo</span></div>
+            <div><span>Bans de civ</span><span>2 por equipo</span></div>
+            <div><span>Pick</span><span>Serpiente</span></div>
+            <div><span>Entre equipos</span><span>exclusivo</span></div>
+            <div><span>En el equipo</span><span>se repite</span></div>
+          </div>
+          <div style="margin-top:14px"><span class="btn" style="display:block;text-align:center">Crear y copiar link</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">2 · Sala, modo CIEGO (vista de Agu, Equipo A, creador)</div>
+  <div class="mockup-body dk">
+    <div class="wrap">
+      <div class="bar sp" style="justify-content:space-between">
+        <div class="row"><span class="disp" style="font-size:16px">Draft k7Qx2m</span>
+          <span class="chip ok">Mapa ✓</span><span class="chip ok">Bans ✓</span><span class="chip now">Picks · ciego</span><span class="chip">Revelado</span></div>
+        <div class="row"><span class="btn g">Copiar link</span><span class="btn d">Cerrar sala</span></div>
+      </div>
+      <div class="room">
+        <div>
+          <div class="top">
+          <div>
+            <div class="mapcard" style="background-image:url(../../../web/public/assets/maps/amazonas.png)">
+              <span class="lbl">MAPA ELEGIDO</span>
+              <div class="t"><b>Amazonas</b><span style="color:#e3d3ae;font-size:12px">Elegido por Equipo B</span></div>
+            </div>
+            <div class="mapbans"><div><span>Ban Equipo A</span><s>Alpes</s></div><div><span>Ban Equipo B</span><s>Alaska</s></div></div>
+          </div>
+          <div>
+          <div class="teams">
+            <div class="team a"><div class="h"><span>Equipo A</span><span class="note" style="color:#c6a96b">tu equipo</span></div>
+              <div class="pl"><span class="av">A</span><span class="n">Agu <span class="note">(vos)</span></span><img class="fl" src="../../../web/public/assets/flags/Flag_British.png" alt=""><span class="st draft">Sin confirmar</span></div>
+              <div class="pl"><span class="av">D</span><span class="n">Dani</span><img class="fl" src="../../../web/public/assets/flags/Flag_Spanish.png" alt=""><span class="st ok">✓ Confirmó</span></div></div>
+            <div class="team b"><div class="h"><span>Equipo B</span><span class="note" style="color:#6fa268">rivales</span></div>
+              <div class="pl"><span class="av">B</span><span class="n">Beto</span><span class="hid"></span><span class="st ok">✓ Ya eligió</span></div>
+              <div class="pl"><span class="av">C</span><span class="n">Caro</span><span class="hid" style="opacity:.35"></span><span class="st wait">Eligiendo…</span></div></div>
+          </div>
+
+          <div class="bans">
+            <div class="card pad"><h4>Bans de Equipo A</h4><div class="bn"><span class="x"><img class="fl big" src="../../../web/public/assets/flags/Flag_Russian.png" alt=""></span><span class="x"><img class="fl big" src="../../../web/public/assets/flags/Flag_French.png" alt=""></span><span class="note">Rusos · Franceses</span></div></div>
+            <div class="card pad"><h4>Bans de Equipo B</h4><div class="bn"><span class="x"><img class="fl big" src="../../../web/public/assets/flags/Flag_Ottoman.png" alt=""></span><span class="x"><img class="fl big" src="../../../web/public/assets/flags/Flag_Dutch.png" alt=""></span><span class="note">Otomanos · Holandeses</span></div></div>
+          </div>
+          </div>
+          </div>
+
+          <div class="card pad">
+            <h4>Elegí tu civilización</h4>
+            <div class="grid">
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Spanish.png" alt="">Españoles</div>
+              <div class="civ sel"><img src="../../../web/public/assets/flags/Flag_British.png" alt="">Británicos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_German.png" alt="">Alemanes</div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_Russian.png" alt="">Rusos<span class="tag">baneada</span></div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_Ottoman.png" alt="">Otomanos<span class="tag">baneada</span></div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_Dutch.png" alt="">Holandeses<span class="tag">baneada</span></div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_French.png" alt="">Franceses<span class="tag">baneada</span></div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Portuguese.png" alt="">Portugueses</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Swedish.png" alt="">Suecos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Italian.png" alt="">Italianos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Japanese.png" alt="">Japoneses</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Chinese.png" alt="">Chinos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Indian.png" alt="">Indios</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Sioux.png" alt="">Sioux</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Aztec.png" alt="">Aztecas</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Iroquois.png" alt="">Iroqueses</div>
+            </div>
+          </div>
+
+          <div class="act">
+            <div class="row"><img class="fl big" src="../../../web/public/assets/flags/Flag_British.png" alt=""><div><b>Británicos</b><div class="note">Al confirmar, tus rivales ven que ya elegiste (no cuál). Después no se cambia (?).</div></div></div>
+            <div class="row"><span class="btn g">Cambiar</span><span class="btn">Confirmar pick</span></div>
+          </div>
+          <p class="note" style="margin-top:8px">Cuando confirman los 4, se revelan todas las civs a la vez.</p>
+        </div>
+
+        <div class="card chat">
+          <div class="tabs"><span class="on">Todos</span><span>Equipo A 🔒</span></div>
+          <div class="msgs">
+            <div class="m sys">Caro se unió a la sala</div>
+            <div class="m"><b class="b">Beto</b><p>gl hf</p></div>
+            <div class="m"><b class="a">Agu</b><p>suerte, vamos con el mapa de Caro</p></div>
+            <div class="m"><b class="b">Caro</b><p>jaja dale</p></div>
+          </div>
+          <div class="inp"><div>Escribí un mensaje…</div><p class="note" style="margin:8px 0 0">El chat se borra al cerrar la sala.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">3 · Sala, modo SERPIENTE (exclusivo entre equipos activado)</div>
+  <div class="mockup-body dk">
+    <div class="wrap">
+      <div class="bar"><span class="disp" style="font-size:16px">Draft k7Qx2m</span>
+        <span class="chip ok">Mapa ✓</span><span class="chip ok">Bans ✓</span><span class="chip now">Picks · pick 3 de 4</span><span class="chip">Final</span></div>
+
+      <div class="order">
+        <span class="note" style="margin-right:4px">Orden</span>
+        <div class="o a"><span class="av">A</span>Agu<img class="fl" src="../../../web/public/assets/flags/Flag_British.png" alt=""></div><span class="ar">→</span>
+        <div class="o b"><span class="av">B</span>Beto<img class="fl" src="../../../web/public/assets/flags/Flag_German.png" alt=""></div><span class="ar">→</span>
+        <div class="o b now"><span class="av">C</span>Caro<span class="st draft">elige ahora</span></div><span class="ar">→</span>
+        <div class="o a"><span class="av">D</span>Dani<span class="st wait">espera</span></div>
+      </div>
+
+      <div class="room">
+        <div>
+          <div class="top">
+          <div>
+            <div class="mapcard" style="background-image:url(../../../web/public/assets/maps/amazonas.png)">
+              <span class="lbl">MAPA ELEGIDO</span>
+              <div class="t"><b>Amazonas</b><span style="color:#e3d3ae;font-size:12px">Elegido por Equipo B</span></div>
+            </div>
+            <div class="mapbans"><div><span>Ban Equipo A</span><s>Alpes</s></div><div><span>Ban Equipo B</span><s>Alaska</s></div></div>
+          </div>
+          <div class="card pad">
+            <h4>Civs · las que tomó el rival quedan bloqueadas</h4>
+            <div class="grid">
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Spanish.png" alt="">Españoles</div>
+              <div class="civ tk"><img src="../../../web/public/assets/flags/Flag_British.png" alt="">Británicos<span class="tag">Agu · Equipo A</span></div>
+              <div class="civ tk"><img src="../../../web/public/assets/flags/Flag_German.png" alt="">Alemanes<span class="tag">Beto · Equipo B</span></div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_Russian.png" alt="">Rusos<span class="tag">baneada</span></div>
+              <div class="civ ban"><img src="../../../web/public/assets/flags/Flag_Ottoman.png" alt="">Otomanos<span class="tag">baneada</span></div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Portuguese.png" alt="">Portugueses</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Swedish.png" alt="">Suecos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Italian.png" alt="">Italianos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Japanese.png" alt="">Japoneses</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Chinese.png" alt="">Chinos</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Indian.png" alt="">Indios</div>
+              <div class="civ"><img src="../../../web/public/assets/flags/Flag_Sioux.png" alt="">Sioux</div>
+            </div>
+          </div>
+          </div>
+        </div>
+        <div class="card pad"><h4>Chat</h4><p class="note" style="margin:0">Misma columna de chat que en el modo ciego (Todos / Equipo).</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body></html>

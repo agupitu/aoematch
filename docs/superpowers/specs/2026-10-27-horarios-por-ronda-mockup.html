@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta: horarios por ronda</title>
+<style>
+html{background:#0b0d10}
+body{margin:0;padding:24px;font-family:system-ui,sans-serif;color:#f3e7cd}
+.wrap{max-width:900px;margin:0 auto}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.app{background:#161a22;border:1px solid #2a313e;border-radius:12px;padding:16px;color:#f3e7cd;user-select:none}
+.cap{margin:0;font-size:12px;color:#8b93a3}
+.bt{background:#1c212b;border:1px solid #2a313e;color:#e3d3ae;border-radius:8px;padding:4px 10px;font-size:12px;line-height:16px;cursor:pointer}
+.bt.a{border-color:#c2973f;color:#d9b25f}
+.bt.p{background:#c2973f;border-color:#c2973f;color:#11141a;font-weight:500}
+#cols{flex:1;display:flex;gap:2px}
+.col{flex:1;min-width:0}
+.col.w{margin-left:6px}
+.hd{height:45px;box-sizing:border-box;padding-top:3px;text-align:center;font-size:11px;line-height:14px;color:#8b93a3}
+.hd span,.hd b{display:block;height:14px}
+.hd b{font-size:12px;font-weight:500;color:#f3e7cd}
+.b{height:7px;margin-bottom:1px;border-radius:2px;background:#1c212b;cursor:pointer}
+.b.m{background:#2a313e}
+.b:not(.on):hover{background:#3a4453}
+.b.on{background:#c2973f}
+.mz .b.on.m{background:#d9b25f}
+.lb{position:absolute;right:6px;font-size:11px;line-height:11px;color:#c6a96b}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h2 class="sr-only">Maqueta: calendario de horarios con barras redondeadas por media hora, las de media hora más claras, y columnas angostas</h2>
+<div class="app" id="app">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin:0 0 10px">
+    <div>
+      <p style="margin:0;font-size:15px;font-weight:500;color:#f3e7cd">Mis horarios · Cuartos</p>
+      <p class="cap" id="rng"></p>
+    </div>
+    <button class="bt p">Guardar horarios</button>
+  </div>
+  <div class="sg" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 12px">
+    <span class="cap">Días del rango (solo maqueta)</span>
+    <button class="bt" data-n="7">7</button><button class="bt" data-n="14">14</button><button class="bt" data-n="21">21</button>
+    <button class="bt" id="tz" style="margin-left:8px">Pintadas: media hora más clara (solo maqueta)</button>
+  </div>
+  <div style="display:flex;margin:0 0 8px">
+    <div style="width:34px;flex:none">
+      <div style="height:45px"></div>
+      <div id="lab" style="position:relative;height:384px"></div>
+    </div>
+    <div id="cols"></div>
+  </div>
+  <p class="cap" id="sum"></p>
+  <p class="cap">Arrastrá un rectángulo para pintar o borrar</p>
+</div>
+</div>
+<script>
+const NS=48,MAXD=21;
+const DS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MS=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const dd=k=>new Date(2026,10,14+k);
+const hh=s=>String(Math.floor(s/2)).padStart(2,'0')+':'+(s%2?'30':'00');
+const fmt=h=>{const m=Math.round(h*60),a=Math.floor(m/60),b=m%60;return b?a+' h '+b+' min':a+' h'};
+const est=Array.from({length:MAXD},(_,k)=>{
+  const a=Array(NS).fill(false),w=dd(k).getDay();
+  ((w===0||w===6)?[[30,37],[42,45]]:[[40,46]]).forEach(([x,y])=>{for(let i=x;i<=y;i++)a[i]=true});
+  return a;
+});
+let N=14,anc=null,base=null,modo=null,cel=[];
+function refrescar(){
+  let t=0;
+  for(let k=0;k<N;k++)for(let i=0;i<NS;i++){const v=est[k][i];cel[k][i].classList.toggle('on',v);if(v)t++}
+  document.getElementById('sum').textContent='Marcado en la ronda: '+fmt(t/2);
+}
+function rect(k,i){
+  const k0=Math.min(anc.k,k),k1=Math.max(anc.k,k),i0=Math.min(anc.i,i),i1=Math.max(anc.i,i);
+  for(let a=0;a<MAXD;a++)for(let b=0;b<NS;b++)est[a][b]=(a>=k0&&a<=k1&&b>=i0&&b<=i1)?modo:base[a][b];
+  refrescar();
+}
+function construir(){
+  const cols=document.getElementById('cols');
+  cols.textContent='';cel=[];
+  for(let k=0;k<N;k++){
+    const f=dd(k);
+    const col=document.createElement('div');
+    col.className='col'+(f.getDay()===1?' w':'');
+    const hd=document.createElement('div');
+    hd.className='hd';
+    hd.innerHTML='<span>'+((k===0||f.getDate()===1)?MS[f.getMonth()]:'&nbsp;')+'</span><span>'+DS[f.getDay()]+'</span><b>'+f.getDate()+'</b>';
+    col.appendChild(hd);
+    cel[k]=[];
+    for(let i=0;i<NS;i++){
+      const c=document.createElement('div');
+      c.className='b'+(i%2?' m':'');
+      c.title=DS[f.getDay()]+' '+f.getDate()+' · '+hh(i);
+      c.onmousedown=e=>{e.preventDefault();anc={k,i};base=est.map(r=>r.slice());modo=!est[k][i];rect(k,i)};
+      c.onmouseenter=()=>{if(anc)rect(k,i)};
+      col.appendChild(c);cel[k].push(c);
+    }
+    cols.appendChild(col);
+  }
+  const a=dd(0),b=dd(N-1);
+  document.getElementById('rng').textContent=DS[a.getDay()]+' '+a.getDate()+(a.getMonth()!==b.getMonth()?' '+MS[a.getMonth()]:'')+' – '+DS[b.getDay()]+' '+b.getDate()+' '+MS[b.getMonth()]+' · America/Argentina/Buenos_Aires';
+  document.querySelectorAll('.sg button[data-n]').forEach(x=>x.classList.toggle('a',+x.dataset.n===N));
+  refrescar();
+}
+const lab=document.getElementById('lab');
+for(let h=0;h<24;h++){const e=document.createElement('div');e.className='lb';e.style.top=(16*h-2)+'px';e.textContent=String(h).padStart(2,'0')+'h';lab.appendChild(e)}
+document.querySelectorAll('.sg button[data-n]').forEach(x=>{x.onclick=()=>{N=+x.dataset.n;construir()}});
+document.getElementById('tz').onclick=function(){this.classList.toggle('a');document.getElementById('app').classList.toggle('mz')};
+window.addEventListener('mouseup',()=>{anc=null});
+window.addEventListener('blur',()=>{anc=null});
+construir();
+</script>
+</body>
+</html>
