@@ -22,8 +22,6 @@ const perfil = (nombre, extra = {}) => ({
   display_name_lower: nombre.toLowerCase(),
   avatar_url: null,
   timezone: 'UTC',
-  availability: [],
-  exceptions: [],
   ...extra,
 });
 
@@ -105,6 +103,12 @@ describe('usuarios', () => {
     await assertFails(como('nuevo').doc('users/otro').set(perfil('Otro')));
     await assertFails(anonimo().doc('users/x').set(perfil('X')));
     await assertFails(como('nuevo2').doc('users/nuevo2').set(perfil('Nuevo', { is_admin: 1 })));
+  });
+
+  it('el perfil ya no guarda horarios: van por ronda en el torneo', async () => {
+    await assertFails(como('nuevo3').doc('users/nuevo3').set(perfil('Nuevo', { availability: [] })));
+    await assertFails(como('nuevo3').doc('users/nuevo3').set(perfil('Nuevo', { exceptions: [] })));
+    await assertFails(como('miembro').doc('users/miembro').update({ availability: [] }));
   });
 
   it('edita su perfil y su rating, no `is_admin` ni el perfil ajeno', async () => {

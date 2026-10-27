@@ -1,11 +1,12 @@
-// users/{uid} (docs/firestore-modelo.md): perfil público, horario semanal y
-// excepciones. Cada uno escribe solo el suyo (firestore.rules).
+// users/{uid} (docs/firestore-modelo.md): perfil público. Cada uno escribe
+// solo el suyo (firestore.rules). Los horarios no están acá: se cargan por
+// ronda en el torneo (datos/rondas.ts).
 
 import { type User as FirebaseUser } from 'firebase/auth';
 import { doc, runTransaction, updateDoc } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import type { User } from '../types';
-import { type Doc, ahora, conMensaje, leer, leerPorIds, ordenarPor } from './base';
+import { type Doc, ahora, conMensaje, leer, leerPorIds } from './base';
 
 const refUsuario = (uid: string) => doc(firestore, 'users', uid);
 
@@ -61,8 +62,6 @@ export async function asegurarPerfil(cuenta: FirebaseUser): Promise<User> {
       xbox_tag: null,
       rating_1v1: null,
       rating_team: null,
-      availability: [],
-      exceptions: [],
       is_admin: 0,
       created_at: ahora(),
       });
@@ -101,23 +100,3 @@ export async function actualizarPerfil(uid: string, campos: Partial<User>): Prom
 
 /** Perfiles por uid: Map uid -> doc (los que no existen no aparecen). */
 export const mapaDeUsuarios = (uids: (string | null | undefined)[]) => leerPorIds('users', uids);
-
-export type Bloque = { start_min: number; end_min: number };
-
-/** Horario semanal de un usuario, en orden (vacío si no existe). */
-export async function horarioDe(uid: string): Promise<Bloque[]> {
-  const u = await leer(refUsuario(uid));
-  return ordenarPor(u?.availability ?? [], 'start_min');
-}
-
-/** Guarda la semana propia: descarta bloques inválidos y la ordena. */
-export async function guardarHorario(uid: string, bloques: Bloque[]): Promise<void> {
-  const limpios: Bloque[] = [];
-  for (const b of bloques) {
-    const s = Math.max(0, Math.min(10080, parseInt(String(b.start_min), 10)));
-    const e = Math.max(0, Math.min(10080, parseInt(String(b.end_min), 10)));
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
-    limpios.push({ start_min: s, end_min: e });
-  }
-  await conMensaje(() => updateDoc(refUsuario(uid), { availability: ordenarPor(limpios, 'start_min') }));
-}

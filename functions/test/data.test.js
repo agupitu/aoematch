@@ -38,7 +38,7 @@ describe('usuarios', () => {
     assert.equal(u.display_name_lower, 'kaiser');
     assert.equal(u.timezone, 'Europe/Berlin');
     assert.equal(u.is_admin, 0);
-    assert.deepEqual(u.availability, []);
+    assert.equal(u.availability, undefined);
   });
 
   it('no pisa un usuario existente', async () => {

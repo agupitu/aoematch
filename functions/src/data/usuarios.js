@@ -35,8 +35,6 @@ export function guardarUsuario(uid, datos, w) {
     rating_1v1: null,
     rating_team: null,
     is_admin: 0,
-    availability: [],
-    exceptions: [],
     created_at: ahora(),
     ...datos,
     display_name,

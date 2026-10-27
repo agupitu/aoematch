@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { guardarHorario, horarioDe } from '../datos/usuarios';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Spinner } from '../components/ui';
-import { AvailabilityGrid, type Bloque } from '../components/AvailabilityGrid';
-import { horas, zonaDelNavegador } from '../lib';
+import { zonaDelNavegador } from '../lib';
 
 const ZONAS = [
   'America/Argentina/Buenos_Aires', 'America/Santiago', 'America/Bogota', 'America/Mexico_City',
@@ -14,8 +12,6 @@ const ZONAS = [
 
 export function Profile() {
   const { user, actualizar, cargando } = useAuth();
-  const [bloques, setBloques] = useState<Bloque[] | null>(null);
-  const [sucio, setSucio] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -33,9 +29,6 @@ export function Profile() {
       rating_1v1: user.rating_1v1?.toString() ?? '',
       rating_team: user.rating_team?.toString() ?? '',
     });
-    horarioDe(user.id)
-      .then(setBloques)
-      .catch(() => setBloques([]));
   }, [user]);
 
   if (cargando) return <Spinner />;
@@ -64,16 +57,6 @@ export function Profile() {
       setError((err as Error).message);
     }
   };
-
-  const guardarHorarios = async () => {
-    if (!user) return;
-    await guardarHorario(user.id, bloques ?? []);
-    setSucio(false);
-    setMensaje('Horarios guardados.');
-    setTimeout(() => setMensaje(''), 2500);
-  };
-
-  const totalMin = (bloques ?? []).reduce((s, b) => s + (b.end_min - b.start_min), 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
@@ -154,33 +137,6 @@ export function Profile() {
         <button className="btn btn-primary mt-4" onClick={guardarPerfil}>
           Guardar datos
         </button>
-      </section>
-
-      <section className="card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="title text-lg">Cuándo podés jugar</h2>
-            <p className="hint text-sm">
-              Pintá tus franjas de la semana. Con esto el sistema cruza horarios y propone cuándo jugar cada
-              partido. Total marcado: <span className="text-parch-200">{horas(totalMin)}</span>
-            </p>
-          </div>
-          <button className="btn btn-primary" disabled={!sucio} onClick={guardarHorarios}>
-            Guardar horarios
-          </button>
-        </div>
-        {bloques === null ? (
-          <Spinner />
-        ) : (
-          <AvailabilityGrid
-            value={bloques}
-            timezone={form.timezone}
-            onChange={(b) => {
-              setBloques(b);
-              setSucio(true);
-            }}
-          />
-        )}
       </section>
     </div>
   );
