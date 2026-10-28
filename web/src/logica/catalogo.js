@@ -3,6 +3,7 @@
 
 import civsJson from './datos/civs.json' with { type: 'json' };
 import mapsJson from './datos/maps.json' with { type: 'json' };
+import { infoDeMapa } from './mapas-info.js';
 
 // Mismo orden que daba SQLite con ORDER BY name_es (comparación binaria, no por idioma).
 const porNombre = (a, b) => (a.name_es < b.name_es ? -1 : a.name_es > b.name_es ? 1 : 0);
@@ -12,7 +13,7 @@ const CIVS = civsJson
   .sort(porNombre);
 
 const MAPAS = mapsJson
-  .map(({ id, slug, name_es, img }) => ({ id, slug, name_es, img }))
+  .map(({ id, slug, name_es, img }) => ({ id, slug, name_es, img, ...infoDeMapa(slug) }))
   .sort(porNombre);
 
 const CIV_POR_ID = new Map(CIVS.map((c) => [c.id, c]));

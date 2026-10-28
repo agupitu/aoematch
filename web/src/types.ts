@@ -23,7 +23,17 @@ export type Civ = {
   flag: string;
 };
 
-export type GameMap = { id: number; slug: string; name_es: string; img: string };
+export type GameMap = {
+  id: number;
+  slug: string;
+  name_es: string;
+  img: string;
+  /** Dónde queda (`web/src/logica/mapas-info.js`): america, europa, asia, africa u otros. */
+  region?: string;
+  /** tierra, agua o ambos. */
+  terreno?: string;
+};
+
 
 export type Member = {
   id: string;
