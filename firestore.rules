@@ -137,7 +137,8 @@ service cloud.firestore {
         && d.team_size in [1, 2, 3, 4]
         && d.get('admin_ids', []) is list && d.get('admin_ids', []).size() <= 10
         && enteroEntre(d.get('civ_bans', 0), 0, 3)
-        && enteroEntre(d.get('best_of', 1), 1, 9);
+        && enteroEntre(d.get('best_of', 1), 1, 9)
+        && d.get('series_mode', 'mejor_de') in ['mejor_de', 'fijas'];
     }
 
     match /tournaments/{slug} {

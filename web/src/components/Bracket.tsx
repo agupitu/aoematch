@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Match } from '../types';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta } from '../lib';
+import { etiquetaDeSerie } from '../logica/series.js';
 import { IconosVod } from './VodLinks';
 
 function Lado({
@@ -34,7 +35,7 @@ export function MatchCard({ m }: { m: Match }) {
         </Link>
         <span className="flex items-center gap-1.5">
           <IconosVod links={m.vod_links ?? []} />
-          <span>{listo ? ETIQUETA_ESTADO_PARTIDO[m.status] : m.scheduled_at ? fechaCorta(m.scheduled_at) : `BO${m.best_of}`}</span>
+          <span>{listo ? ETIQUETA_ESTADO_PARTIDO[m.status] : m.scheduled_at ? fechaCorta(m.scheduled_at) : etiquetaDeSerie(m)}</span>
         </span>
       </div>
       <Link to={`/m/${m.id}`} className="block">

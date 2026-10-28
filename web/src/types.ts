@@ -65,6 +65,9 @@ export type Registration = {
   timezone: string;
 };
 
+/** Cómo se decide una serie: al mejor de N, o a N partidas que se juegan todas (`web/src/logica/series.js`). */
+export type SerieModo = 'mejor_de' | 'fijas';
+
 export type Match = {
   id: string;
   tournament_id: string;
@@ -82,6 +85,7 @@ export type Match = {
   score_a: number;
   score_b: number;
   best_of: number;
+  series_mode?: SerieModo;
   status: string;
   scheduled_at: string | null;
   vod_links?: VodLink[];
@@ -143,6 +147,7 @@ export type Tournament = {
   max_teams: number | null;
   best_of: number;
   best_of_final: number | null;
+  series_mode?: SerieModo;
   group_count: number;
   group_advance: number;
   swiss_rounds: number;

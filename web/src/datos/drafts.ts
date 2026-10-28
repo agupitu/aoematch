@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { banear, elegirMapa, eligieronTodos, planDeDraft, revelar, validarPick } from '../logica/draft.js';
+import { proximaPartida } from '../logica/series.js';
 import { type Doc, Rechazo, conMensaje } from './base';
 
 export type Draft = Omit<ReturnType<typeof planDeDraft>, 'banned_civ_ids' | 'map_id' | 'map_chooser_team_id'> & {
@@ -40,10 +41,19 @@ const picksDe = (matchId: string, gameNo: number) =>
  * Número de la partida que se juega ahora: la siguiente a las que ya tienen
  * ganador. null si la serie está cerrada o ya se jugaron todas.
  */
-export function partidaActual(m: { status: string; best_of: number; games?: { winner_team_id: string | null }[] }) {
+export function partidaActual(m: {
+  status: string;
+  best_of: number;
+  series_mode?: string;
+  games?: { winner_team_id: string | null }[];
+}) {
   if (['finalizado', 'walkover'].includes(m.status)) return null;
-  const jugadas = (m.games ?? []).filter((g) => g.winner_team_id).length;
-  return jugadas < m.best_of ? jugadas + 1 : null;
+  const ganadas = new Map<string, number>();
+  for (const g of m.games ?? []) {
+    if (g.winner_team_id) ganadas.set(g.winner_team_id, (ganadas.get(g.winner_team_id) ?? 0) + 1);
+  }
+  const [a = 0, b = 0] = [...ganadas.values()];
+  return proximaPartida(m, a, b);
 }
 
 /**

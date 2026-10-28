@@ -1,6 +1,7 @@
-import type { Civ, GameMap } from '../types';
+import type { Civ, GameMap, SerieModo } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
+import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
 
 export type PremioBorrador = {
@@ -21,6 +22,7 @@ export type Borrador = {
   max_teams: string;
   best_of: number;
   best_of_final: string;
+  series_mode: SerieModo;
   group_count: number;
   group_advance: number;
   swiss_rounds: number;
@@ -55,6 +57,7 @@ export const BORRADOR_INICIAL: Borrador = {
   max_teams: '',
   best_of: 3,
   best_of_final: '',
+  series_mode: 'mejor_de',
   group_count: 2,
   group_advance: 2,
   swiss_rounds: 5,
@@ -81,6 +84,11 @@ export const BORRADOR_INICIAL: Borrador = {
 
 export type PestaniaForm =
   | 'basico' | 'formato' | 'draft' | 'premios' | 'inscripcion' | 'mapas' | 'civs';
+
+const SERIE_HINT: Record<SerieModo, string> = {
+  mejor_de: 'Se corta cuando un equipo gana la mayoría de las partidas.',
+  fijas: 'Se juegan todas las partidas y gana el que más ganó. Si empatan, se juega una más.',
+};
 
 /** Reparto inicial cuando el organizador suma el primer puesto. */
 const PREMIOS_SUGERIDOS: PremioBorrador[] = [
@@ -153,6 +161,17 @@ export function TournamentForm({
   recaudadoCents?: number;
 }) {
   const set = <K extends keyof Borrador>(k: K, v: Borrador[K]) => onChange({ ...value, [k]: v });
+
+  /** Al cambiar de modo, la cantidad pasa a una que ese modo ofrezca. */
+  const cambiarModo = (modo: SerieModo) => {
+    const validas: number[] = opcionesDeSerie(modo);
+    onChange({
+      ...value,
+      series_mode: modo,
+      best_of: validas.includes(value.best_of) ? value.best_of : 3,
+      best_of_final: validas.includes(Number(value.best_of_final)) ? value.best_of_final : '',
+    });
+  };
 
   const pestanias: { id: PestaniaForm; label: string; count?: number }[] = [
     { id: 'basico', label: 'Lo básico' },
@@ -255,31 +274,46 @@ export function TournamentForm({
                   onChange={(e) => set('max_teams', e.target.value)}
                 />
               </Campo>
-              <Campo label="Serie al mejor de">
+              <Campo label="Tipo de serie" hint={SERIE_HINT[value.series_mode]}>
+                <select
+                  className="field"
+                  value={value.series_mode}
+                  onChange={(e) => cambiarModo(e.target.value as SerieModo)}
+                >
+                  <option value="mejor_de">Al mejor de</option>
+                  <option value="fijas">A cantidad de partidas</option>
+                </select>
+              </Campo>
+              <Campo label={value.series_mode === 'fijas' ? 'Partidas por serie' : 'Serie al mejor de'}>
                 <select
                   className="field"
                   value={value.best_of}
                   onChange={(e) => set('best_of', Number(e.target.value))}
                 >
-                  {[1, 3, 5, 7].map((n) => (
+                  {opcionesDeSerie(value.series_mode).map((n: number) => (
                     <option key={n} value={n}>
-                      BO{n}
+                      {etiquetaDeSerie({ series_mode: value.series_mode, best_of: n })}
                     </option>
                   ))}
                 </select>
               </Campo>
-              <Campo label="Final al mejor de" hint="Vacío = igual que el resto.">
+              <Campo
+                label={value.series_mode === 'fijas' ? 'Partidas de la final' : 'Final al mejor de'}
+                hint="Vacío = igual que el resto."
+              >
                 <select
                   className="field"
                   value={value.best_of_final}
                   onChange={(e) => set('best_of_final', e.target.value)}
                 >
                   <option value="">Igual</option>
-                  {[3, 5, 7].map((n) => (
-                    <option key={n} value={n}>
-                      BO{n}
-                    </option>
-                  ))}
+                  {opcionesDeSerie(value.series_mode)
+                    .filter((n: number) => n > 1)
+                    .map((n: number) => (
+                      <option key={n} value={n}>
+                        {etiquetaDeSerie({ series_mode: value.series_mode, best_of: n })}
+                      </option>
+                    ))}
                 </select>
               </Campo>
 

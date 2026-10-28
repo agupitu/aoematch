@@ -11,6 +11,7 @@ import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado, useLive } from '../live';
 import { usePresencia } from '../presence';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, zonaDelNavegador } from '../lib';
+import { etiquetaDeSerie, partidasMaximas } from '../logica/series.js';
 import type { MatchDetail, Ventana } from '../types';
 
 export function MatchRoom() {
@@ -87,7 +88,7 @@ export function MatchRoom() {
             <span className={m.winner_team_id === m.team_b_id ? 'text-gold-400' : ''}>{nombres.b}</span>
           </h1>
           <p className="mt-1 text-sm text-parch-400">
-            {m.label ?? `Ronda ${m.round}`} · BO{m.best_of} · {ETIQUETA_ESTADO_PARTIDO[m.status] ?? m.status}
+            {m.label ?? `Ronda ${m.round}`} · {etiquetaDeSerie(m)} · {ETIQUETA_ESTADO_PARTIDO[m.status] ?? m.status}
             {m.scheduled_at && ` · ${fechaCorta(m.scheduled_at, user?.timezone)}`}
           </p>
         </div>
@@ -336,7 +337,7 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
 
 function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; onDone: () => void }) {
   const [abierto, setAbierto] = useState(false);
-  const [gameNo, setGameNo] = useState(String(Math.min(m.best_of, m.score_a + m.score_b + 1)));
+  const [gameNo, setGameNo] = useState(String(Math.min(partidasMaximas(m), m.score_a + m.score_b + 1)));
   const [ganador, setGanador] = useState('');
   const [replay, setReplay] = useState('');
   const [wo, setWo] = useState('');
@@ -368,7 +369,7 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
       <button
         className="btn btn-primary"
         onClick={() => {
-          setGameNo(String(Math.min(m.best_of, m.score_a + m.score_b + 1)));
+          setGameNo(String(Math.min(partidasMaximas(m), m.score_a + m.score_b + 1)));
           setGanador('');
           setError('');
           setAbierto(true);
@@ -381,9 +382,10 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
           <div>
             <label className="label">Partida</label>
             <select className="field" value={gameNo} onChange={(e) => setGameNo(e.target.value)}>
-              {Array.from({ length: m.best_of }, (_, i) => (
+              {Array.from({ length: partidasMaximas(m) }, (_, i) => (
                 <option key={i} value={i + 1}>
                   Partida {i + 1}
+                  {i + 1 > m.best_of ? ' (desempate)' : ''}
                   {m.games.some((g) => g.game_no === i + 1 && g.winner_team_id) ? ' (cargada)' : ''}
                 </option>
               ))}

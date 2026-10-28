@@ -34,6 +34,7 @@ export function guardarTorneo(slug, datos, w) {
     max_teams: null,
     best_of: 3,
     best_of_final: null,
+    series_mode: 'mejor_de',
     group_count: 0,
     group_advance: 2,
     swiss_rounds: 0,

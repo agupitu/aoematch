@@ -16,6 +16,7 @@ import { firestore } from '../firebase';
 import { mapaPorId, civs as todasLasCivs } from '../logica/catalogo.js';
 import { poolCivs, poolMapas } from '../logica/draft.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
+import { MODOS_DE_SERIE } from '../logica/series.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
 import { mapaDeUsuarios } from './usuarios';
@@ -59,7 +60,7 @@ export async function listarTorneos() {
 
 const CAMPOS_EDITABLES = [
   'name', 'description', 'rules_md', 'banner_url', 'status', 'format', 'team_size',
-  'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance', 'swiss_rounds',
+  'max_teams', 'best_of', 'best_of_final', 'series_mode', 'group_count', 'group_advance', 'swiss_rounds',
   'third_place', 'map_repeat', 'first_map_id', 'civ_bans', 'civ_repeat_series', 'entry_fee_cents',
   'currency', 'payment_link', 'payment_notes', 'allow_solo', 'reg_opens_at', 'reg_closes_at',
   'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes',
@@ -90,6 +91,7 @@ export function camposDe(body: Record<string, unknown>) {
     cambios[c] = v;
   }
   if (cambios.name === null) delete cambios.name;
+  if (cambios.series_mode !== undefined && !MODOS_DE_SERIE.includes(cambios.series_mode as string)) delete cambios.series_mode;
   if (cambios.name !== undefined) cambios.name = String(cambios.name).slice(0, 120);
   if (typeof cambios.civ_bans === 'number') cambios.civ_bans = Math.max(0, Math.min(3, Math.round(cambios.civ_bans)));
 
@@ -130,7 +132,7 @@ function slugify(s: string) {
 /** Valores por defecto de un torneo nuevo (los de la tabla `tournaments`). */
 const POR_DEFECTO = {
   description: null, rules_md: null, banner_url: null, status: 'borrador', format: 'eliminacion_simple',
-  team_size: 1, max_teams: null, best_of: 3, best_of_final: null, group_count: 0, group_advance: 2,
+  team_size: 1, max_teams: null, best_of: 3, best_of_final: null, series_mode: 'mejor_de', group_count: 0, group_advance: 2,
   swiss_rounds: 0, third_place: 0, map_repeat: 0, first_map_id: null,
   civ_bans: 0, civ_repeat_series: 1, entry_fee_cents: 0, currency: 'ARS', payment_link: null, payment_notes: null,
   allow_solo: 1, reg_opens_at: null, reg_closes_at: null, starts_at: null, prize_pool_mode: 'ninguno',

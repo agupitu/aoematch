@@ -146,6 +146,15 @@ describe('torneos y etapas', () => {
     await assertFails(anonimo().doc('tournaments/liga6').set(torneo({ slug: 'liga6', organizer_id: 'nuevo' })));
   });
 
+  it('la serie es al mejor de o a cantidad fija de partidas', async () => {
+    const db = como('nuevo');
+    await assertSucceeds(db.doc('tournaments/s1').set(torneo({ slug: 's1', organizer_id: 'nuevo', series_mode: 'fijas', best_of: 4 })));
+    await assertSucceeds(db.doc('tournaments/s2').set(torneo({ slug: 's2', organizer_id: 'nuevo', series_mode: 'mejor_de' })));
+    await assertFails(db.doc('tournaments/s3').set(torneo({ slug: 's3', organizer_id: 'nuevo', series_mode: 'raro' })));
+    await assertSucceeds(como('org').doc('tournaments/copa').update({ series_mode: 'fijas', best_of: 3 }));
+    await assertFails(como('org').doc('tournaments/copa').update({ series_mode: 'mitad' }));
+  });
+
   it('pisar un torneo ajeno con set no pasa', async () => {
     await assertFails(como('nuevo').doc('tournaments/copa').set(torneo({ organizer_id: 'nuevo' })));
   });

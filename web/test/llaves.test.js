@@ -253,3 +253,80 @@ describe('partidas de una serie', () => {
     assert.throws(() => darWalkover(partidos, semi.id, 'E2'), /no juega/);
   });
 });
+
+describe('series a cantidad fija de partidas', () => {
+  const partida = (game_no, winner_team_id) => ({ game_no, winner_team_id, map_id: 1, civs: [] });
+  const semis = (n, extra = {}) => {
+    const c = generarCuadro(torneo({ series_mode: 'fijas', best_of: n, ...extra }), equipos(4), ids());
+    return {
+      partidos: c.partidos,
+      semi: c.partidos.find((p) => p.round === 1 && p.team_a_id === 'E1'),
+      final: c.partidos.find((p) => p.label === 'Final'),
+    };
+  };
+  const aplicar = (partidos, cambios) => partidos.map((p) => ({ ...p, ...(cambios.find((c) => c.id === p.id) ?? {}) }));
+  const estado = (r) => [r.partido.status, r.partido.winner_team_id, r.partido.score_a, r.partido.score_b];
+
+  it('los partidos heredan el modo y la cantidad; la final puede tener otra', () => {
+    const c = generarCuadro(torneo({ series_mode: 'fijas', best_of: 3, best_of_final: 5 }), equipos(4), ids());
+    assert.ok(c.partidos.every((p) => p.series_mode === 'fijas'));
+    assert.equal(c.partidos.find((p) => p.label === 'Final').best_of, 5);
+    assert.equal(c.partidos.find((p) => p.label === 'Semifinal').best_of, 3);
+  });
+
+  it('un torneo guardado sin modo genera series al mejor de', () => {
+    const c = generarCuadro(torneo(), equipos(4), ids());
+    assert.ok(c.partidos.every((p) => p.series_mode === 'mejor_de'));
+  });
+
+  it('con la mayoría no cierra: se juegan todas', () => {
+    const { partidos, semi } = semis(3);
+    const r = cargarPartidas(partidos, semi.id, [partida(1, 'E1'), partida(2, 'E1')]);
+    assert.deepEqual(estado(r), ['en_juego', null, 2, 0]);
+  });
+
+  it('con la última partida cierra y el ganador pasa a la final', () => {
+    const { partidos, semi, final } = semis(3);
+    const r = cargarPartidas(partidos, semi.id, [partida(1, 'E1'), partida(2, 'E1'), partida(3, 'E4')]);
+    assert.deepEqual(estado(r), ['finalizado', 'E1', 2, 1]);
+    assert.equal(r.cambios.find((c) => c.id === final.id).team_a_id, 'E1');
+  });
+
+  it('a un número par, si empatan se juega una partida más; esa extra solo si empataron', () => {
+    const { partidos, semi } = semis(2);
+    const empatada = cargarPartidas(partidos, semi.id, [partida(1, 'E1'), partida(2, 'E4')]);
+    assert.deepEqual(estado(empatada), ['en_juego', null, 1, 1]);
+
+    const lista = aplicar(partidos, empatada.cambios);
+    const r = cargarPartidas(lista, semi.id, [partida(1, 'E1'), partida(2, 'E4'), partida(3, 'E4')]);
+    assert.deepEqual(estado(r), ['finalizado', 'E4', 1, 2]);
+
+    assert.throws(
+      () => cargarPartidas(partidos, semi.id, [partida(1, 'E1'), partida(2, 'E1'), partida(3, 'E4')]),
+      /solo se juega si empatan/
+    );
+  });
+
+  it('no admite más partidas que las de la serie', () => {
+    const { partidos, semi } = semis(3);
+    assert.throws(
+      () => cargarPartidas(partidos, semi.id, [1, 2, 3, 4].map((n) => partida(n, n % 2 ? 'E1' : 'E4'))),
+      /a 3 partidas/
+    );
+  });
+
+  it('walkover: gana con todas las partidas', () => {
+    const { partidos, semi, final } = semis(3);
+    const r = darWalkover(partidos, semi.id, 'E4');
+    assert.deepEqual([r.partido.status, r.partido.score_a, r.partido.score_b], ['walkover', 0, 3]);
+    assert.equal(r.cambios.find((c) => c.id === final.id).team_a_id, 'E4');
+  });
+
+  it('borrar la última partida de una serie cerrada la reabre y saca al equipo de la final', () => {
+    const { partidos, semi, final } = semis(3);
+    const cerrada = aplicar(partidos, cargarPartidas(partidos, semi.id, [partida(1, 'E1'), partida(2, 'E1'), partida(3, 'E4')]).cambios);
+    const abierta = cargarPartidas(cerrada, semi.id, [partida(1, 'E1'), partida(2, 'E1')]);
+    assert.deepEqual(estado(abierta), ['en_juego', null, 2, 0]);
+    assert.equal(abierta.cambios.find((c) => c.id === final.id).team_a_id, null);
+  });
+});

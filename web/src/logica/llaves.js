@@ -9,6 +9,7 @@
 // matches/{id} (docs/firestore-modelo.md) con su `id`.
 
 import { ordenarPor } from './orden.js';
+import { estadoDeSerie, modoDeSerie, partidasMaximas, victoriasDeWalkover } from './series.js';
 
 // --------------------------------------------------------------- utilidades
 
@@ -74,6 +75,7 @@ function crearMatch(c, m) {
     score_a: 0,
     score_b: 0,
     best_of: m.best_of,
+    series_mode: modoDeSerie(c.torneo),
     status: m.status ?? 'pendiente',
     scheduled_at: null,
     next_match_id: null,
@@ -531,8 +533,7 @@ export function rondaSuiza(torneo, etapas, equipos, partidos, ids) {
 
 // ------------------------------------------------- partidas de una serie
 
-/** Partidas que necesita un equipo para ganar la serie al mejor de `bestOf`. */
-export const paraGanar = (bestOf) => Math.floor(bestOf / 2) + 1;
+export { paraGanar } from './series.js';
 
 /**
  * Saca de los partidos siguientes al ganador y al perdedor de un partido que
@@ -578,9 +579,19 @@ export function cargarPartidas(partidos, matchId, games) {
   const ganadas = (teamId) => lista.filter((g) => g.winner_team_id === teamId).length;
   const a = ganadas(m.team_a_id);
   const b = ganadas(m.team_b_id);
-  if (a + b > m.best_of) throw new Error(`La serie es al mejor de ${m.best_of}.`);
-  const necesarias = paraGanar(m.best_of);
-  const ganador = a >= necesarias ? m.team_a_id : b >= necesarias ? m.team_b_id : null;
+  const fija = modoDeSerie(m) === 'fijas';
+  if (a + b > partidasMaximas(m)) {
+    throw new Error(fija ? `La serie es a ${m.best_of} partidas.` : `La serie es al mejor de ${m.best_of}.`);
+  }
+  if (fija && a + b > m.best_of) {
+    // La partida extra de una serie par solo se juega si las primeras empataron.
+    const primeras = lista.filter((g) => g.winner_team_id).slice(0, m.best_of);
+    if (primeras.filter((g) => g.winner_team_id === m.team_a_id).length * 2 !== m.best_of) {
+      throw new Error(`La serie es a ${m.best_of} partidas: la partida extra solo se juega si empatan.`);
+    }
+  }
+  const { ganador: lado } = estadoDeSerie(m, a, b);
+  const ganador = lado === 'a' ? m.team_a_id : lado === 'b' ? m.team_b_id : null;
 
   const ganadorAntes = terminado(m) ? m.winner_team_id : null;
   if (ganadorAntes && ganadorAntes !== ganador) reabrir(mapa, m);
@@ -613,7 +624,7 @@ export function darWalkover(partidos, matchId, winnerTeamId) {
   if (!m) throw new Error('Partido inexistente.');
   if (![m.team_a_id, m.team_b_id].includes(winnerTeamId)) throw new Error('Ese equipo no juega este partido.');
   if (terminado(m)) throw new Error('El partido ya tiene resultado.');
-  const n = paraGanar(m.best_of);
+  const n = victoriasDeWalkover(m);
   const a = winnerTeamId === m.team_a_id ? n : 0;
   return cerrarPartido(partidos, matchId, winnerTeamId, a, n - a, true);
 }

@@ -37,6 +37,7 @@ export async function guardarPartido(datos, w, ref = refPartido()) {
     score_a: 0,
     score_b: 0,
     best_of: 3,
+    series_mode: 'mejor_de',
     status: 'pendiente',
     scheduled_at: null,
     next_match_id: null,

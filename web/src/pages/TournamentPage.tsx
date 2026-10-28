@@ -6,6 +6,7 @@ import {
 import { actualizarTorneo, detalleTorneo, guardarVodFase } from '../datos/torneos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
+import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
 import { Bracket, MatchCard } from '../components/Bracket';
@@ -77,7 +78,7 @@ export function TournamentPage() {
               </Badge>
             </div>
             <p className="text-sm text-parch-400">
-              {ETIQUETA_FORMATO[t.format]} · {t.team_size}v{t.team_size} · BO{t.best_of} · organiza{' '}
+              {ETIQUETA_FORMATO[t.format]} · {t.team_size}v{t.team_size} · {etiquetaDeSerie(t)} · organiza{' '}
               <span className="text-parch-200">{t.organizer.display_name}</span>
             </p>
           </div>
@@ -845,6 +846,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       max_teams: t.max_teams?.toString() ?? '',
       best_of: t.best_of,
       best_of_final: t.best_of_final?.toString() ?? '',
+      series_mode: t.series_mode ?? 'mejor_de',
       group_count: t.group_count || 2,
       group_advance: t.group_advance,
       swiss_rounds: t.swiss_rounds || 5,
