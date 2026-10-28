@@ -104,6 +104,11 @@ mapa. Además:
 | `equipos` | entero | contador nuevo: equipos del torneo |
 | `orden` | texto ISO | nuevo: `starts_at ?? created_at`, para el `ORDER BY COALESCE(...)` del listado |
 
+- La serie la definen `series_mode` y `best_of`. `series_mode` es `'mejor_de'` (el valor por defecto, y el que
+  se asume si falta) o `'fijas'`: al mejor de N se corta cuando un equipo gana la mayoría; a N partidas se
+  juegan todas y gana quien más ganó (si N es par y empatan, se juega una más que desempata). `best_of_final`
+  usa el mismo modo para la final. Al generar las llaves cada partido copia `series_mode` y `best_of`
+  (`web/src/logica/series.js`); las reglas validan el modo del torneo.
 - Los contadores reemplazan los `COUNT(*)` del listado y de `premiosDe`. Se actualizan con
   `FieldValue.increment` en la misma transacción que cambia la inscripción o el equipo (T16, T17,
   T20). Si alguna vez se desajustan, se recalculan leyendo las subcolecciones.
@@ -113,11 +118,17 @@ mapa. Además:
 
 #### `tournaments/{slug}/registrations/{uid}`
 
-`{ user_id, team_id, kind, status, paid, paid_at, payment_ref, note, created_at }`, con `paid` entero
-`0/1` como hoy (el detalle lo devuelve como bool). El id del
+`{ user_id, team_id, kind, status, paid, paid_at, payment_ref, note, join_request, created_at }`, con `paid`
+entero `0/1` como hoy (el detalle lo devuelve como bool). El id del
 documento reemplaza el `UNIQUE (tournament_id, user_id)`. El detalle las lee todas y las ordena por
 `created_at`; el armador filtra en memoria las sueltas (`kind == 'solo'`, sin `team_id`, no
-retiradas).
+retiradas, sin pedido de ingreso pendiente).
+
+`join_request` (opcional) es el pedido de un inscripto suelto para entrar a un equipo del organizador:
+`{ team_id, status: 'pendiente' | 'rechazado', created_at }`. Un inscripto tiene como mucho uno. Lo escribe
+el jugador (solo `pendiente`, solo suelto y sin retirarse, con la inscripción abierta, a un equipo
+`staff_made` de este torneo) y lo cancela él mismo; el staff lo aprueba (mete al jugador en el equipo y lo
+borra) o lo rechaza (deja `rechazado` como aviso). Al retirarse no queda ninguno.
 
 #### `tournaments/{slug}/stages/{stageId}`
 
@@ -160,9 +171,16 @@ las rondas con sus horarios.
 | `captain_id` | uid | `teams` |
 | `seed` | entero o null | `teams` |
 | `auto_built` | entero `0/1` | `teams` |
+| `staff_made` | entero `0/1`, ausente = 0 | nuevo: lo creó el organizador (ver abajo) |
 | `created_at` | texto ISO | `teams` |
 | `members` | `[{ user_id, role }]` | tabla `team_members` |
 | `member_ids` | `[uid]` | nuevo: los mismos uid, para `array-contains` |
+
+**Equipos del organizador** (`staff_made: 1`): los crea el staff vacíos (`members: []`, `captain_id: null`) y los
+jugadores piden lugar con `join_request` (en su inscripción). Solo el staff mete gente: las reglas no dejan
+que un jugador se sume solo ni que el capitán agregue miembros (puede sacarlos). El primero que entra queda de
+capitán (`web/src/logica/equipos.js`). Si el último se va, el equipo queda como lugar libre en vez de
+borrarse; solo el staff lo borra. Un equipo sin jugadores no entra a las llaves ni a la tabla.
 
 Va en la raíz y no dentro del torneo porque los partidos, las salas y `equipoDelUsuario` lo buscan solo
 por id. Nombre y avatar de los miembros no se copian: la API los completa con un `getAll` de `users`.
@@ -175,6 +193,7 @@ Todas las columnas de `matches` con el mismo nombre (`tournament_id` es el slug;
 
 | Campo | Tipo | Viene de |
 |---|---|---|
+| `series_mode` | `'mejor_de'` o `'fijas'`, ausente = `'mejor_de'` | nuevo: copia del torneo; junto con `best_of` define cuándo se cierra la serie |
 | `games` | `[{ game_no, map_id, winner_team_id, replay_url, notes, civs: [{ user_id, team_id, civ_id }] }]` | tablas `match_games` y `game_civs` (una entrada por partida de la serie) |
 | `schedule_votes` | `[{ user_id, slot_utc, vote }]` | tabla `match_schedule_votes`; se reemplaza la entrada del mismo usuario y horario, como el `INSERT OR REPLACE` de hoy |
 

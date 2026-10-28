@@ -61,9 +61,19 @@ El formulario de creación está dividido en pestañas —**lo básico, formato,
 draft, inscripción, premios, mapas y civilizaciones**— y es el mismo que después
 aparece en **Configuración**. Ahí se define el formato (**eliminación simple,
 doble, liga, grupos + playoff o suizo**), el tamaño de equipo (1v1 a 4v4), el
-largo de las series, el pool de mapas, las civilizaciones habilitadas, el costo
-de inscripción con su link de pago y el reparto de premios. Los buscadores de
-mapas y civilizaciones ignoran tildes y mayúsculas: `decan` encuentra `Decán`.
+tipo y largo de las series, el pool de mapas, las civilizaciones habilitadas, el
+costo de inscripción con su link de pago y el reparto de premios. Los buscadores
+de mapas y civilizaciones ignoran tildes y mayúsculas: `decan` encuentra `Decán`.
+
+**Series.** Pueden ser *al mejor de N* (BO1, BO3, BO5, BO7: se corta cuando un
+equipo gana la mayoría) o *a N partidas* (de 2 a 9: se juegan todas y gana el que
+más ganó; si N es par y empatan, se juega una más que desempata). La final puede
+tener su propio largo.
+
+**Vista previa.** En la pestaña *Formato* se ve cómo va a quedar el torneo con
+esa configuración —cuadro, fechas de la liga, primera ronda del suizo, o grupos
+con sus playoffs— armado con el mismo generador de llaves, con la cantidad de
+equipos que elijas (por defecto, el tope del torneo).
 
 Las llaves se generan con siembra clásica (1-8, 4-5, 2-7, 3-6), byes
 automáticos y avance del ganador —y del perdedor, en doble eliminación— al
@@ -73,6 +83,14 @@ partido siguiente.
 Cada jugador se anota solo o con equipo. El organizador ve la lista con elo,
 zona horaria y estado, y marca a mano quién pagó. No hay cobro automático: se
 guarda el link de pago y el organizador confirma.
+
+### Equipos del organizador
+En la pestaña *Equipos* el organizador puede armar equipos vacíos ("Los
+Tercios", "Halcones"…). Los jugadores piden lugar en uno —al inscribirse o
+después— y el organizador aprueba o rechaza cada pedido; el primero que entra
+queda de capitán. Nadie se suma solo a esos equipos y el capitán no puede
+agregar gente (sí sacarla). Si un jugador se va, el lugar queda libre. Los
+equipos que siguen vacíos no entran a las llaves.
 
 ### Premios
 La bolsa puede ser un **monto fijo** que pone la organización o salir de **lo
