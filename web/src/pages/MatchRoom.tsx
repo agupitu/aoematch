@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { agendar, detallePartido, guardarVodPartido, horariosDelPartido } from '../datos/partidos';
 import { type EstadoDraft, civsDeLaPartida, partidaActual, useDraft } from '../datos/drafts';
 import { cargarSerie, walkover } from '../datos/resultados';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
-import { CargarPartidas, type DelDraft } from '../components/CargarPartidas';
+import { CargarPartidas, type DelDraft, necesitaAncho } from '../components/CargarPartidas';
+import { PartidasDeLaSerie } from '../components/PartidasDeLaSerie';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
 import { EditorVod, ListaVod } from '../components/VodLinks';
@@ -18,6 +19,8 @@ import type { MatchDetail, Ventana } from '../types';
 export function MatchRoom() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { key: claveDeUbicacion } = useLocation();
   const [m, setM] = useState<MatchDetail | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -66,6 +69,8 @@ export function MatchRoom() {
 
   const nombres = { a: m.teams.a?.name ?? 'Equipo A', b: m.teams.b?.name ?? 'Equipo B' };
   const faltanEquipos = !m.team_a_id || !m.team_b_id;
+  // Con la serie cerrada y partidas cargadas, el lugar del draft muestra lo que se jugó.
+  const serieCerrada = !faltanEquipos && gameNo === null && m.games.some((g) => g.winner_team_id || g.map || g.civs.length);
 
   const salasChat: SalaChat[] = [
     { id: `match:${id}`, label: 'Sala del partido', hint: 'La ven los dos equipos y el organizador.' },
@@ -78,7 +83,16 @@ export function MatchRoom() {
     <div className="mx-auto max-w-[110rem] px-4 py-5">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to={`/t/${m.tournament.slug}`} className="text-xs text-parch-400 hover:text-gold-400">
+          <Link
+            to={`/t/${m.tournament.slug}`}
+            // Si se llegó desde otra pantalla de la app, se vuelve a ella (Llaves, Horarios...) y no al resumen.
+            onClick={(e) => {
+              if (claveDeUbicacion === 'default') return;
+              e.preventDefault();
+              navigate(-1);
+            }}
+            className="text-xs text-parch-400 hover:text-gold-400"
+          >
             ← {m.tournament.name}
           </Link>
           <h1 className="title mt-1 flex flex-wrap items-center gap-3 text-2xl">
@@ -148,44 +162,20 @@ export function MatchRoom() {
             <div className="card grid h-full place-items-center p-8 text-parch-400">
               Cuando estén los dos equipos se abre el draft.
             </div>
+          ) : serieCerrada ? (
+            <div className="h-full overflow-auto">
+              <PartidasDeLaSerie m={m} />
+            </div>
           ) : (
             <DraftBoard m={m} gameNo={gameNo} estado={estadoDraft} uid={user?.id ?? null} onError={avisar} />
           )}
         </div>
       </div>
 
-      {m.games.length > 0 && (
-        <section className="card mt-4 p-4">
-          <h3 className="title mb-3 text-base">Partidas de la serie</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {m.games.map((g) => (
-              <div key={g.id} className="rounded-lg border border-ink-700 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <strong className="text-sm text-parch-100">Partida {g.game_no}</strong>
-                  {g.winner_team_id && (
-                    <Badge tone="good">
-                      Ganó {g.winner_team_id === m.team_a_id ? nombres.a : nombres.b}
-                    </Badge>
-                  )}
-                </div>
-                {g.map && (
-                  <div className="mb-2 flex items-center gap-2">
-                    <img src={g.map.img} alt="" className="h-10 w-10 rounded object-cover" />
-                    <span className="text-sm text-parch-200">{g.map.name_es}</span>
-                  </div>
-                )}
-                <ul className="space-y-1">
-                  {g.civs.map((c) => (
-                    <li key={c.user_id} className="flex items-center gap-2 text-xs text-parch-400">
-                      <img src={c.flag} alt="" className="h-3.5 w-5 rounded-[2px] object-cover" />
-                      <span className="text-parch-200">{c.display_name}</span> · {c.name_es}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
+      {!serieCerrada && (
+        <div className="mt-4">
+          <PartidasDeLaSerie m={m} />
+        </div>
       )}
     </div>
   );
@@ -372,7 +362,7 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
       >
         Cargar resultado
       </button>
-      <Modal open={abierto} onClose={() => setAbierto(false)} title="Cargar las partidas">
+      <Modal open={abierto} onClose={() => setAbierto(false)} title="Cargar las partidas" wide={necesitaAncho(m)}>
         <div className="space-y-4">
           <CargarPartidas
             m={m}

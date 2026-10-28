@@ -40,7 +40,7 @@ async function enLaLlave(matchId: string, calcular: (partidos: Doc[]) => Resulta
 export type Partida = {
   winner_team_id: string | null;
   map_id?: number | null;
-  civs?: { user_id: string; team_id: string; civ_id: number }[];
+  civs?: { user_id: string | null; team_id: string; civ_id: number }[];
   replay_url?: string | null;
 };
 
@@ -70,11 +70,11 @@ export function cargarSerie(matchId: string, partidas: PartidaDeSerie[]) {
         const previa = games.find((g) => g.game_no === datos.game_no);
         const nueva = {
           game_no: datos.game_no,
-          map_id: datos.map_id ?? previa?.map_id ?? null,
+          map_id: datos.map_id === undefined ? previa?.map_id ?? null : datos.map_id,
           winner_team_id: datos.winner_team_id,
           replay_url: links[i] === undefined ? previa?.replay_url ?? null : links[i],
           notes: previa?.notes ?? null,
-          civs: datos.civs ?? previa?.civs ?? [],
+          civs: datos.civs === undefined ? previa?.civs ?? [] : datos.civs,
         };
         games = [...games.filter((g) => g.game_no !== datos.game_no), nueva];
       });

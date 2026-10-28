@@ -1,18 +1,34 @@
 import { useState } from 'react';
 import type { PartidaDeSerie } from '../datos/resultados';
+import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
+import { civsALugares, civsDelEquipo, lugaresACivs, lugaresDelEquipo } from '../logica/detallePartida.js';
 import { estadoDeSerie, partidasJugables, partidasMaximas } from '../logica/series.js';
-import type { MatchDetail } from '../types';
+import type { Civ, GameMap, MatchDetail } from '../types';
+import { ElegirConImagen, type ItemElegible } from './ElegirConImagen';
 import { Alerta } from './ui';
 
 /** Mapa y civs del draft ya revelado de una partida: se guardan junto con su resultado. */
 export type DelDraft = { game_no: number; map_id: number | null; civs: NonNullable<PartidaDeSerie['civs']> };
 
-type ModoLink = 'todas' | 'cada';
+/** Mapa y civs elegidos para una partida, como texto ('' = sin cargar): las civs por lugar de cada equipo. */
+type Detalle = { mapa: string; a: string[]; b: string[] };
+
+const LADOS = ['a', 'b'] as const;
+
+const ITEMS_CIVS: ItemElegible[] = (catalogoCivs() as Civ[]).map((c) => ({ id: c.id, nombre: c.name_es, img: c.flag }));
+const ITEMS_MAPAS: ItemElegible[] = (catalogoMapas() as GameMap[]).map((mp) => ({ id: mp.id, nombre: mp.name_es, img: mp.img }));
+const CIV = new Map(ITEMS_CIVS.map((i) => [String(i.id), i]));
+const MAPA = new Map(ITEMS_MAPAS.map((i) => [String(i.id), i]));
+
+/** ¿Hace falta un modal ancho? Cada partida lleva un círculo y una civ por jugador. */
+export const necesitaAncho = (m: MatchDetail) =>
+  112 + partidasMaximas(m) * (44 + Math.max(1, m.tournament.team_size) * 36 + 8) + 48 > 470;
 
 /**
- * Staff: carga todas las partidas de la serie en un solo cuadro. Los equipos
- * van en las filas y las partidas en las columnas; el círculo amarillo marca
- * a quien ganó cada una. El link del replay es uno para todas o uno por partida.
+ * Staff: carga todas las partidas de la serie en un solo cuadro. Las partidas
+ * van en las columnas y, de arriba abajo: el mapa, una fila por equipo (el
+ * círculo amarillo marca a quien ganó y al lado va la civ que usó cada jugador)
+ * y el link del replay de esa partida. Debajo, un link para todas.
  */
 export function CargarPartidas({
   m, delDraft, error, onGuardar,
@@ -32,9 +48,28 @@ export function CargarPartidas({
   const [replays, setReplays] = useState<string[]>(() =>
     Array.from({ length: total }, (_, i) => cargada(i + 1)?.replay_url ?? '')
   );
-  const [modo, setModo] = useState<ModoLink>(() => (m.games.some((g) => g.replay_url) ? 'cada' : 'todas'));
   const [global, setGlobal] = useState('');
-  const [inicial] = useState(() => JSON.stringify({ ganadores, replays, modo, global }));
+
+  // Un lugar de civ por jugador de cada equipo; el draft revelado de una partida sin datos la rellena.
+  const lugares = Object.fromEntries(
+    LADOS.map((l) => {
+      const e = m.teams[l];
+      return [l, e ? lugaresDelEquipo(e, Math.max(m.tournament.team_size, civsDelEquipo(m.games, e.id))) : []];
+    })
+  ) as Record<'a' | 'b', ReturnType<typeof lugaresDelEquipo>>;
+  const [detalles, setDetalles] = useState<Detalle[]>(() =>
+    Array.from({ length: total }, (_, i) => {
+      const propia = cargada(i + 1);
+      const fuente = propia && (propia.map_id || propia.civs?.length) ? propia : delDraft?.game_no === i + 1 ? delDraft : propia;
+      const civs = fuente?.civs ?? [];
+      return {
+        mapa: fuente?.map_id ? String(fuente.map_id) : '',
+        a: m.teams.a ? civsALugares(civs, m.teams.a, lugares.a) : [],
+        b: m.teams.b ? civsALugares(civs, m.teams.b, lugares.b) : [],
+      };
+    })
+  );
+  const [inicial] = useState(() => JSON.stringify({ ganadores, replays, global, detalles }));
 
   const lados = ganadores.map((id) => (id && id === m.team_a_id ? 'a' : id && id === m.team_b_id ? 'b' : null));
   const jugables: boolean[] = partidasJugables(m, lados);
@@ -45,25 +80,30 @@ export function CargarPartidas({
   const elegir = (i: number, teamId: string) =>
     setGanadores((g) => g.map((x, j) => (j === i ? (x === teamId ? null : teamId) : x)));
   const cambiarLink = (i: number, valor: string) => setReplays((r) => r.map((x, j) => (j === i ? valor : x)));
+  const cambiarMapa = (i: number, mapa: string) => setDetalles((d) => d.map((x, j) => (j === i ? { ...x, mapa } : x)));
+  const cambiarCiv = (i: number, lado: 'a' | 'b', lugar: number, valor: string) =>
+    setDetalles((d) => d.map((x, j) => (j === i ? { ...x, [lado]: x[lado].map((v, k) => (k === lugar ? valor : v)) } : x)));
 
   const guardar = () => {
     const partidas: PartidaDeSerie[] = [];
     for (let i = 0; i < total; i++) {
+      // Una partida que ya no se juega (la serie quedó definida antes) no guarda nada.
+      const d = detalles[i];
       const winner = jugables[i] ? ganadores[i] : null;
-      if (!winner && !cargada(i + 1)) continue;
-      const link = modo === 'cada' ? (winner ? replays[i].trim() : '') : winner && global.trim() ? global.trim() : undefined;
-      partidas.push({
-        game_no: i + 1,
-        winner_team_id: winner,
-        replay_url: link,
-        ...(winner && delDraft?.game_no === i + 1 ? { map_id: delDraft.map_id, civs: delDraft.civs } : {}),
-      });
+      const map_id = jugables[i] && d.mapa ? Number(d.mapa) : null;
+      const civs = jugables[i] ? LADOS.flatMap((l) => (m.teams[l] ? lugaresACivs(d[l], m.teams[l], lugares[l]) : [])) : [];
+      const conDatos = !!winner || map_id !== null || civs.length > 0;
+      if (!conDatos && !cargada(i + 1)) continue;
+      // El link propio de la partida, o el de todas; sin ninguno se borra el que hubiera.
+      const replay_url = conDatos ? replays[i].trim() || global.trim() : '';
+      partidas.push({ game_no: i + 1, winner_team_id: winner, replay_url, map_id, civs });
     }
     onGuardar(partidas);
   };
 
-  const sinCambios = JSON.stringify({ ganadores, replays, modo, global }) === inicial;
+  const sinCambios = JSON.stringify({ ganadores, replays, global, detalles }) === inicial;
   const nombreGanador = ganador === 'a' ? m.teams.a?.name : ganador === 'b' ? m.teams.b?.name : null;
+  const columnas = Array.from({ length: total }, (_, i) => i);
 
   return (
     <div className="space-y-4">
@@ -72,8 +112,8 @@ export function CargarPartidas({
           <thead>
             <tr className="text-[11px] text-parch-400">
               <th className="pr-2 text-left font-normal">Partida</th>
-              {Array.from({ length: total }, (_, i) => (
-                <th key={i} className="px-0.5 text-center font-normal" title={i + 1 > m.best_of ? 'Desempate' : undefined}>
+              {columnas.map((i) => (
+                <th key={i} className="px-1 text-center font-normal" title={i + 1 > m.best_of ? 'Desempate' : undefined}>
                   {i + 1}
                   {i + 1 > m.best_of ? '*' : ''}
                 </th>
@@ -82,33 +122,107 @@ export function CargarPartidas({
             </tr>
           </thead>
           <tbody>
-            {equipos.map((e, k) => (
-              <tr key={e.id}>
-                <td className="max-w-[9rem] truncate pr-2 text-parch-100">{e.name}</td>
-                {Array.from({ length: total }, (_, i) => {
-                  const marcada = ganadores[i] === e.id && jugables[i];
-                  return (
-                    <td key={i} className="px-0.5 text-center">
-                      <button
-                        type="button"
-                        disabled={!jugables[i]}
-                        aria-pressed={marcada}
-                        aria-label={`${e.name} gana la partida ${i + 1}`}
-                        onClick={() => elegir(i, e.id)}
-                        className="grid h-8 w-8 place-items-center rounded-full transition-colors hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-                      >
-                        <span
-                          className={`h-5 w-5 rounded-full border-2 transition-colors ${
-                            marcada ? 'border-gold-400 bg-gold-400' : 'border-ink-600'
-                          }`}
-                        />
-                      </button>
-                    </td>
-                  );
-                })}
-                <td className="pl-2 text-right font-semibold text-gold-400 tabular-nums">{k === 0 ? a : b}</td>
-              </tr>
-            ))}
+            <tr>
+              <td className="pr-2 text-xs text-parch-400">Mapa</td>
+              {columnas.map((i) => {
+                const elegido = MAPA.get(detalles[i].mapa);
+                return (
+                  <td key={i} className="px-1 text-center align-top">
+                    <ElegirConImagen
+                      items={ITEMS_MAPAS}
+                      valor={detalles[i].mapa}
+                      onChange={(v) => cambiarMapa(i, v)}
+                      titulo={`Mapa de la partida ${i + 1}`}
+                      vacio="Sin mapa"
+                      disabled={!jugables[i]}
+                      className="mx-auto flex w-full min-w-[5.5rem] flex-col items-center gap-0.5 rounded-lg border border-dashed border-ink-600 px-1 py-1 text-[10px] text-parch-400 hover:border-gold-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-ink-600"
+                    >
+                      {elegido ? (
+                        <>
+                          <img src={elegido.img} alt="" className="h-9 w-9 rounded object-cover" />
+                          <span className="max-w-[5.5rem] truncate text-parch-200">{elegido.nombre}</span>
+                        </>
+                      ) : (
+                        <span className="grid h-9 place-items-center">Elegir mapa</span>
+                      )}
+                    </ElegirConImagen>
+                  </td>
+                );
+              })}
+              <td />
+            </tr>
+
+            {equipos.map((e, k) => {
+              const lado = k === 0 ? 'a' : 'b';
+              return (
+                <tr key={e.id}>
+                  <td className="max-w-[8rem] truncate pr-2 text-parch-100" title={e.name}>
+                    {e.name}
+                  </td>
+                  {columnas.map((i) => {
+                    const marcada = ganadores[i] === e.id && jugables[i];
+                    return (
+                      <td key={i} className="px-1">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={!jugables[i]}
+                            aria-pressed={marcada}
+                            aria-label={`${e.name} gana la partida ${i + 1}`}
+                            onClick={() => elegir(i, e.id)}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                          >
+                            <span
+                              className={`h-5 w-5 rounded-full border-2 transition-colors ${
+                                marcada ? 'border-gold-400 bg-gold-400' : 'border-ink-600'
+                              }`}
+                            />
+                          </button>
+                          {lugares[lado].map((lugar, n) => {
+                            const civ = CIV.get(detalles[i][lado][n] ?? '');
+                            return (
+                              <ElegirConImagen
+                                key={n}
+                                items={ITEMS_CIVS}
+                                valor={detalles[i][lado][n] ?? ''}
+                                onChange={(v) => cambiarCiv(i, lado, n, v)}
+                                titulo={`Civ de ${lugar.nombre} en la partida ${i + 1}${civ ? `: ${civ.nombre}` : ''}`}
+                                vacio="Sin civ"
+                                disabled={!jugables[i]}
+                                className={`grid h-6 w-9 shrink-0 place-items-center overflow-hidden rounded border text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                                  civ ? 'border-ink-600' : 'border-dashed border-ink-600 text-parch-400 hover:border-gold-600'
+                                }`}
+                              >
+                                {civ ? <img src={civ.img} alt="" className="h-full w-full object-cover" /> : '+'}
+                              </ElegirConImagen>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="pl-2 text-right font-semibold text-gold-400 tabular-nums">{k === 0 ? a : b}</td>
+                </tr>
+              );
+            })}
+
+            <tr>
+              <td className="pr-2 text-xs text-parch-400">Link</td>
+              {columnas.map((i) => (
+                <td key={i} className="px-1">
+                  <input
+                    className="field !py-1 text-xs"
+                    style={{ minWidth: '5.5rem' }}
+                    aria-label={`Link del replay de la partida ${i + 1}`}
+                    placeholder="https://…"
+                    disabled={!jugables[i]}
+                    value={replays[i]}
+                    onChange={(ev) => cambiarLink(i, ev.target.value)}
+                  />
+                </td>
+              ))}
+              <td />
+            </tr>
           </tbody>
         </table>
       </div>
@@ -119,43 +233,14 @@ export function CargarPartidas({
       </p>
 
       <div>
-        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <label className="label mb-0">Link del replay (opcional)</label>
-          <div className="flex gap-1 text-xs">
-            {(['todas', 'cada'] as const).map((o) => (
-              <button
-                key={o}
-                type="button"
-                aria-pressed={modo === o}
-                onClick={() => setModo(o)}
-                className={`rounded-md border px-2 py-0.5 transition-colors ${
-                  modo === o ? 'border-gold-500 bg-gold-500/10 text-gold-400' : 'border-ink-700 text-parch-400 hover:text-parch-100'
-                }`}
-              >
-                {o === 'todas' ? 'Uno para todas' : 'Uno por partida'}
-              </button>
-            ))}
-          </div>
-        </div>
-        {modo === 'todas' ? (
-          <input className="field" value={global} onChange={(e) => setGlobal(e.target.value)} placeholder="https://…" />
-        ) : (
-          <div className="space-y-1.5">
-            {Array.from({ length: total }, (_, i) =>
-              jugables[i] ? (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="w-16 shrink-0 text-xs text-parch-400">Partida {i + 1}</span>
-                  <input
-                    className="field"
-                    value={replays[i]}
-                    onChange={(e) => cambiarLink(i, e.target.value)}
-                    placeholder="https://…"
-                  />
-                </div>
-              ) : null
-            )}
-          </div>
-        )}
+        <label className="label">Link de todas las partidas (opcional)</label>
+        <input
+          className="field"
+          value={global}
+          onChange={(ev) => setGlobal(ev.target.value)}
+          placeholder="https://…"
+        />
+        <p className="hint mt-1 text-xs">Lo usan las partidas que no tienen su propio link.</p>
       </div>
 
       {delDraft && (
