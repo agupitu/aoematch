@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   type OrdenManual, confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
 } from '../datos/llaves';
-import { actualizarTorneo, detalleTorneo, guardarVodFase } from '../datos/torneos';
+import { actualizarTorneo, detalleTorneo } from '../datos/torneos';
 import {
   aprobarPedido, borrarEquipoDelOrganizador, cancelarPedido, crearEquipoDelOrganizador, pedirLugar,
   rechazarPedido, renombrarEquipo,
@@ -16,20 +16,21 @@ import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
 import { ArmadoManual } from '../components/ArmadoManual';
-import { Bracket, MatchCard } from '../components/Bracket';
+import { CalendarioDelTorneo } from '../components/CalendarioDelTorneo';
+import { CivsHabilitadas } from '../components/CivsHabilitadas';
 import { FechasDeRonda } from '../components/FechasDeRonda';
+import { Fases } from '../components/Fases';
 import { MatchCalendar } from '../components/MatchCalendar';
 import { MisHorarios } from '../components/MisHorarios';
 import { TournamentForm, medioVacio, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
-import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado } from '../live';
 import { usePresencia } from '../presence';
 import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
   costo, costosEnTexto, fechaCorta, monto, zonaDelNavegador,
 } from '../lib';
-import type { Civ, GameMap, PagoMedio, Registration, StandingRow, Team, Tournament, User } from '../types';
+import type { Civ, GameMap, PagoMedio, Registration, Team, Tournament, User } from '../types';
 
 type Pestania = 'resumen' | 'inscripciones' | 'equipos' | 'llaves' | 'horarios' | 'chat' | 'config';
 
@@ -305,17 +306,7 @@ function Resumen({ t }: { t: Tournament }) {
           </div>
         </section>
 
-        <section className="card p-5">
-          <h3 className="title mb-3 text-lg">Civilizaciones habilitadas ({t.civs.length})</h3>
-          <div className="flex flex-wrap gap-2">
-            {t.civs.map((c) => (
-              <span key={c.id} className="flex items-center gap-1.5 rounded-lg border border-ink-700 px-2 py-1">
-                <img src={c.flag} alt="" className="h-4 w-6 rounded-[2px] object-cover" />
-                <span className="text-[11px] text-parch-200">{c.name_es}</span>
-              </span>
-            ))}
-          </div>
-        </section>
+        <CivsHabilitadas pool={t.civs} />
 
         {t.rules_md && (
           <section className="card p-5">
@@ -344,6 +335,8 @@ function Resumen({ t }: { t: Tournament }) {
             <Dato k="Arranca" v={fechaCorta(t.starts_at)} />
           </dl>
         </section>
+
+        <CalendarioDelTorneo t={t} />
 
         {t.payment_methods.length > 0 && (
           <section className="card p-5">
@@ -1060,89 +1053,7 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
       {staff && t.matches.length > 0 && <FechasDeRonda t={t} onDone={onDone} />}
 
-      {t.standings && t.standings.length > 0 && <Tabla filas={t.standings} titulo="Posiciones" />}
-
-      {t.stages.map((s) => (
-        <section key={s.id} className="space-y-3">
-          <header className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="title text-base">{s.name}</h3>
-            <ListaVod links={s.vod_links ?? []} />
-          </header>
-          {staff && (
-            <EditorVod
-              links={s.vod_links ?? []}
-              onGuardar={(links) => guardarVodFase(t.id, s.id, links).then(onDone)}
-            />
-          )}
-          {s.groups.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {s.groups.map((g) => (
-                <Tabla key={g.id} filas={g.standings} titulo={g.name} />
-              ))}
-            </div>
-          )}
-        </section>
-      ))}
-
-      {t.matches.length === 0 ? (
-        <Empty>Las llaves todavía no están generadas.</Empty>
-      ) : t.format === 'liga' || t.format === 'suizo' || hayGrupos ? (
-        <ListaPartidos matches={t.matches} />
-      ) : (
-        <Bracket matches={t.matches} />
-      )}
-    </div>
-  );
-}
-
-function Tabla({ filas, titulo }: { filas: StandingRow[]; titulo: string }) {
-  return (
-    <section className="card overflow-hidden">
-      <h4 className="title border-b border-ink-700 px-4 py-2.5 text-sm">{titulo}</h4>
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-parch-400">
-          <tr>
-            <th className="px-4 py-2">Equipo</th>
-            <th className="px-2 py-2">PJ</th>
-            <th className="px-2 py-2">G</th>
-            <th className="px-2 py-2">P</th>
-            <th className="px-2 py-2">+/-</th>
-            <th className="px-4 py-2">Pts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filas.map((r) => (
-            <tr key={r.team.id} className="border-t border-ink-800">
-              <td className="px-4 py-2 text-parch-100">{r.team.name}</td>
-              <td className="px-2 py-2 text-parch-400">{r.pj}</td>
-              <td className="px-2 py-2 text-parch-400">{r.pg}</td>
-              <td className="px-2 py-2 text-parch-400">{r.pp}</td>
-              <td className="px-2 py-2 text-parch-400">{r.gf - r.gc}</td>
-              <td className="px-4 py-2 font-semibold text-gold-400">{r.pts}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function ListaPartidos({ matches }: { matches: Tournament['matches'] }) {
-  const rondas = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
-  return (
-    <div className="space-y-5">
-      {rondas.map((r) => (
-        <div key={r}>
-          <h4 className="label">{matches.find((m) => m.round === r)?.label ?? `Ronda ${r}`}</h4>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {matches
-              .filter((m) => m.round === r)
-              .map((m) => (
-                <MatchCard key={m.id} m={m} />
-              ))}
-          </div>
-        </div>
-      ))}
+      <Fases t={t} staff={staff} onDone={onDone} />
     </div>
   );
 }

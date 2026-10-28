@@ -57,8 +57,8 @@ function desfase(ms, zona) {
 
 const dosCifras = (n) => String(n).padStart(2, '0');
 
-/** Fecha local ('YYYY-MM-DD') de un instante. */
-function diaLocal(ms, zona) {
+/** Fecha local ('YYYY-MM-DD') de un instante (ms desde 1970) en `zona`. */
+export function diaLocal(ms, zona) {
   const p = partes(ms, zona);
   return `${p.year}-${p.month}-${p.day}`;
 }
