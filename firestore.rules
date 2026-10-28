@@ -68,6 +68,16 @@ service cloud.firestore {
         && (links.size() < 20 || vodLinkValido(links[19]));
     }
 
+    // Links de pago de un torneo: hasta 5, cada uno con nombre y dirección http(s).
+    function pagoLinksValidos(links) {
+      return links is list && links.size() <= 5
+        && (links.size() < 1 || vodLinkValido(links[0]))
+        && (links.size() < 2 || vodLinkValido(links[1]))
+        && (links.size() < 3 || vodLinkValido(links[2]))
+        && (links.size() < 4 || vodLinkValido(links[3]))
+        && (links.size() < 5 || vodLinkValido(links[4]));
+    }
+
     function rutaTorneo(slug) {
       return /databases/$(database)/documents/tournaments/$(slug);
     }
@@ -138,7 +148,8 @@ service cloud.firestore {
         && d.get('admin_ids', []) is list && d.get('admin_ids', []).size() <= 10
         && enteroEntre(d.get('civ_bans', 0), 0, 3)
         && enteroEntre(d.get('best_of', 1), 1, 9)
-        && d.get('series_mode', 'mejor_de') in ['mejor_de', 'fijas'];
+        && d.get('series_mode', 'mejor_de') in ['mejor_de', 'fijas']
+        && pagoLinksValidos(d.get('payment_links', []));
     }
 
     match /tournaments/{slug} {

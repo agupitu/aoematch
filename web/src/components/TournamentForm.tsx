@@ -1,6 +1,7 @@
-import type { Civ, GameMap, SerieModo } from '../types';
+import type { Civ, GameMap, PagoLink, SerieModo } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
+import { MAX_LINKS_DE_PAGO } from '../logica/pagos.js';
 import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
 import { VistaPrevia } from './VistaPrevia';
@@ -35,7 +36,7 @@ export type Borrador = {
   civ_repeat_team: boolean;
   entry_fee_cents: number;
   currency: string;
-  payment_link: string;
+  payment_links: PagoLink[];
   payment_notes: string;
   allow_solo: boolean;
   reg_closes_at: string;
@@ -71,7 +72,7 @@ export const BORRADOR_INICIAL: Borrador = {
   civ_repeat_team: true,
   entry_fee_cents: 0,
   currency: 'ARS',
-  payment_link: '',
+  payment_links: [],
   payment_notes: '',
   allow_solo: true,
   reg_closes_at: '',
@@ -462,14 +463,11 @@ export function TournamentForm({
                   ))}
                 </select>
               </Campo>
-              <Campo label="Link de pago" hint="Mercado Pago, PayPal, Ko-fi, lo que uses.">
-                <input
-                  className="field"
-                  value={value.payment_link}
-                  onChange={(e) => set('payment_link', e.target.value)}
-                  placeholder="https://…"
-                />
-              </Campo>
+            </div>
+
+            <LinksDePago value={value.payment_links} onChange={(v) => set('payment_links', v)} />
+
+            <div className="mt-4 max-w-2xl">
               <Campo label="Instrucciones de pago">
                 <textarea
                   className="field min-h-16"
@@ -515,6 +513,66 @@ export function TournamentForm({
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------ links de pago
+
+/** Los links para pagar la inscripción: cada uno con el nombre que ven los jugadores. */
+function LinksDePago({ value, onChange }: { value: PagoLink[]; onChange: (v: PagoLink[]) => void }) {
+  const editar = (i: number, cambio: Partial<PagoLink>) =>
+    onChange(value.map((l, j) => (i === j ? { ...l, ...cambio } : l)));
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h4 className="label mb-0">Links de pago</h4>
+        <span className="text-xs text-parch-400">Mercado Pago, PayPal, Ko-fi, lo que uses. Hasta {MAX_LINKS_DE_PAGO}.</span>
+        <button
+          type="button"
+          className="btn btn-ghost ml-auto"
+          disabled={value.length >= MAX_LINKS_DE_PAGO}
+          onClick={() => onChange([...value, { label: '', url: '' }])}
+        >
+          Agregar link
+        </button>
+      </div>
+
+      {value.length === 0 ? (
+        <p className="hint rounded-lg border border-dashed border-ink-700 p-4 text-center text-sm">
+          Sin links de pago: el organizador cobra por fuera.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {value.map((l, i) => (
+            <div key={i} className="grid items-center gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
+              <input
+                className="field"
+                aria-label={`Nombre del link ${i + 1}`}
+                value={l.label}
+                placeholder="Nombre (Mercado Pago)"
+                onChange={(e) => editar(i, { label: e.target.value })}
+              />
+              <input
+                className="field"
+                aria-label={`Dirección del link ${i + 1}`}
+                value={l.url}
+                placeholder="https://…"
+                onChange={(e) => editar(i, { url: e.target.value })}
+              />
+              <button
+                type="button"
+                className="btn btn-danger px-2"
+                title="Quitar"
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

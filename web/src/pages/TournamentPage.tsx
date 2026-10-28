@@ -10,6 +10,7 @@ import {
 } from '../datos/equipos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { pedidosPendientes } from '../logica/equipos.js';
+import { textoDelLink } from '../logica/pagos.js';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
@@ -185,10 +186,14 @@ function AccionesInscripcion({
           {t.entry_fee_cents > 0 && (
             <Alerta tone="info">
               Costo: {plata(t.entry_fee_cents, t.currency)}.{' '}
-              {t.payment_link && (
-                <a className="text-gold-400 underline" href={t.payment_link} target="_blank" rel="noreferrer">
-                  Pagar acá
-                </a>
+              {t.payment_links.length > 0 && (
+                <span className="inline-flex flex-wrap items-center gap-x-3">
+                  {t.payment_links.map((l) => (
+                    <a key={l.url} className="text-gold-400 underline" href={l.url} target="_blank" rel="noreferrer">
+                      {textoDelLink(l)}
+                    </a>
+                  ))}
+                </span>
               )}
               {t.payment_notes && <span className="mt-1 block text-parch-400">{t.payment_notes}</span>}
               <span className="mt-1 block text-parch-400">
@@ -341,10 +346,14 @@ function Resumen({ t }: { t: Tournament }) {
           </dl>
         </section>
 
-        {t.payment_link && (
-          <a href={t.payment_link} target="_blank" rel="noreferrer" className="btn btn-ghost w-full">
-            Link de pago
-          </a>
+        {t.payment_links.length > 0 && (
+          <div className="space-y-2">
+            {t.payment_links.map((l) => (
+              <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="btn btn-ghost w-full">
+                {textoDelLink(l)}
+              </a>
+            ))}
+          </div>
         )}
       </aside>
     </div>
@@ -1110,7 +1119,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       civ_repeat_team: t.civ_repeat_team !== 0,
       entry_fee_cents: t.entry_fee_cents,
       currency: t.currency,
-      payment_link: t.payment_link ?? '',
+      payment_links: t.payment_links.map((l) => ({ ...l })),
       payment_notes: t.payment_notes ?? '',
       allow_solo: !!t.allow_solo,
       reg_closes_at: t.reg_closes_at?.slice(0, 16) ?? '',

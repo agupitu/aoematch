@@ -52,7 +52,7 @@ export function guardarTorneo(slug, datos, w) {
     draft_timer_s: 60,
     entry_fee_cents: 0,
     currency: 'ARS',
-    payment_link: null,
+    payment_links: [],
     payment_notes: null,
     allow_solo: 1,
     reg_opens_at: null,

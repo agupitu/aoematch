@@ -34,6 +34,8 @@ export type GameMap = {
   terreno?: string;
 };
 
+/** Un link para pagar la inscripción, con el nombre que ven los jugadores. */
+export type PagoLink = { label: string; url: string };
 
 export type Member = {
   id: string;
@@ -177,7 +179,7 @@ export type Tournament = {
   civ_repeat_team?: number;
   entry_fee_cents: number;
   currency: string;
-  payment_link: string | null;
+  payment_links: PagoLink[];
   payment_notes: string | null;
   allow_solo: number;
   reg_opens_at: string | null;
