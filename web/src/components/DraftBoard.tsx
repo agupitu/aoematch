@@ -25,7 +25,7 @@ export function DraftBoard({
   onError: (mensaje: string) => void;
 }) {
   const [ocupado, setOcupado] = useState(false);
-  const { draft, mio, picks } = estado;
+  const { draft, mio, picks, companeros } = estado;
   const nombres: Record<string, string> = {
     [m.team_a_id ?? 'a']: m.teams.a?.name ?? 'Equipo A',
     [m.team_b_id ?? 'b']: m.teams.b?.name ?? 'Equipo B',
@@ -83,7 +83,8 @@ export function DraftBoard({
   const picked = new Set(draft.picked ?? []);
   const baneadas = new Set(draft.banned_civ_ids);
   const turnoBan = turnoDeBan(draft);
-  const permitidas = new Set<number>(uid && juego ? civsPermitidas(draft, uid) : []);
+  const permitidas = new Set<number>(uid && juego ? civsPermitidas(draft, uid, companeros) : []);
+  const deCompaneros = new Set<number>(Object.values(companeros));
 
   const puedoMapa = !!uid && draft.state === 'mapa' && miEquipo === draft.map_chooser_team_id;
   const puedoBanear = !!uid && draft.state === 'bans' && miEquipo === turnoBan;
@@ -101,7 +102,11 @@ export function DraftBoard({
       : draft.state === 'bans'
         ? `Banea ${nombres[turnoBan!]} (${draft.banned_civ_ids.length + 1} de ${draft.ban_order.length})`
         : draft.state === 'picks'
-          ? `Cada jugador elige su civ sin ver las demás · eligieron ${picked.size} de ${draft.player_ids.length}`
+          ? `${
+              draft.civ_repeat_team === 0
+                ? 'Cada jugador elige su civ sin ver las del otro equipo; en un mismo equipo no se repiten'
+                : 'Cada jugador elige su civ sin ver las demás'
+            } · eligieron ${picked.size} de ${draft.player_ids.length}`
           : 'Draft cerrado';
   const meToca = puedoMapa || puedoBanear || (puedoElegir && mio == null);
 
@@ -166,7 +171,7 @@ export function DraftBoard({
               </div>
               <ul className="space-y-1.5">
                 {roster(teamId).map((j) => {
-                  const civId = picks?.[j.id] ?? (j.id === uid ? mio : null);
+                  const civId = picks?.[j.id] ?? (j.id === uid ? mio : null) ?? companeros[j.id] ?? null;
                   const civ = civId != null ? civPorId(civId) : null;
                   return (
                     <li key={j.id} className="flex items-center gap-2 text-sm">
@@ -263,20 +268,24 @@ export function DraftBoard({
               const c = civPorId(id);
               if (!c) return null;
               const baneada = baneadas.has(id);
+              const delCompanero = !baneada && puedoElegir && deCompaneros.has(id);
               const clickeable = !ocupado && ((puedoBanear && !baneada) || (puedoElegir && permitidas.has(id)));
               const clase = `relative flex min-w-0 flex-col items-center gap-1 rounded-lg border p-2 ${
                 baneada
                   ? 'border-ink-800 opacity-30'
-                  : mio === id
-                    ? 'border-gold-500 ring-2 ring-gold-500/40'
-                    : clickeable
-                      ? 'border-ink-700 transition-all hover:-translate-y-0.5 hover:border-gold-500'
-                      : 'border-ink-700'
+                  : delCompanero
+                    ? 'border-ink-800 opacity-40'
+                    : mio === id
+                      ? 'border-gold-500 ring-2 ring-gold-500/40'
+                      : clickeable
+                        ? 'border-ink-700 transition-all hover:-translate-y-0.5 hover:border-gold-500'
+                        : 'border-ink-700'
               }`;
               const cuerpo = (
                 <>
                   <img src={c.flag} alt="" className="h-8 w-12 rounded-[3px] object-cover" />
                   <span className="w-full truncate text-center text-[11px] text-parch-200">{c.name_es}</span>
+                  {delCompanero && <span className="text-[10px] text-parch-400">de un compañero</span>}
                 </>
               );
               return clickeable ? (
@@ -284,7 +293,9 @@ export function DraftBoard({
                   key={id}
                   onClick={() =>
                     hacer(() =>
-                      puedoBanear ? banearCiv(m.id, draft.game_no, miEquipo!, id) : elegirCiv(draft, m.id, uid!, id)
+                      puedoBanear
+                        ? banearCiv(m.id, draft.game_no, miEquipo!, id)
+                        : elegirCiv(draft, m.id, uid!, id, companeros)
                     )
                   }
                   className={clase}

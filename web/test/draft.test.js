@@ -121,6 +121,33 @@ describe('picks ciegos', () => {
     assert.throws(() => validarPick(d, 'a1', CIVS[1]), /No podés elegir/);
   });
 
+  it('por defecto un equipo puede repetir civ entre sus jugadores', () => {
+    const d = picks();
+    assert.equal(d.civ_repeat_team, 1);
+    assert.ok(civsPermitidas(d, 'a2', { a1: CIVS[0] }).includes(CIVS[0]));
+    validarPick(d, 'a2', CIVS[0], { a1: CIVS[0] });
+    assert.equal(planDeDraft(torneo({ team_size: 2, civ_repeat_team: 1 }), partido(), dosContraDos).civ_repeat_team, 1);
+  });
+
+  it('sin repetir en el equipo: no vale la civ de un compañero, sí la del rival y la propia', () => {
+    const d = picks({ civ_repeat_team: 0 });
+    assert.equal(d.civ_repeat_team, 0);
+    const elegidas = { a1: CIVS[0], b1: CIVS[1] };
+    assert.ok(!civsPermitidas(d, 'a2', elegidas).includes(CIVS[0]));
+    assert.ok(civsPermitidas(d, 'a2', elegidas).includes(CIVS[1]));
+    assert.throws(() => validarPick(d, 'a2', CIVS[0], elegidas), /compañero/);
+    validarPick(d, 'a2', CIVS[1], elegidas);
+    // cambiar el propio pick no choca consigo mismo
+    validarPick(d, 'a1', CIVS[0], elegidas);
+    // los rivales no se bloquean entre sí
+    assert.ok(civsPermitidas(d, 'b2', elegidas).includes(CIVS[0]));
+  });
+
+  it('un draft guardado antes de la opción deja repetir', () => {
+    const { civ_repeat_team: _borrado, ...viejo } = picks({ civ_repeat_team: 0 });
+    assert.ok(civsPermitidas(viejo, 'a2', { a1: CIVS[0] }).includes(CIVS[0]));
+  });
+
   it('se revela cuando eligieron todos, con las civs listas para la partida', () => {
     const d = picks();
     const parciales = { a1: CIVS[0], a2: CIVS[0], b2: CIVS[1] };

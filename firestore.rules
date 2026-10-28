@@ -533,9 +533,43 @@ service cloud.firestore {
           return /databases/$(database)/documents/matches/$(matchId)/drafts/$(gameNo);
         }
 
-        // Pick ciego: el ajeno no se lee hasta que el draft se revela.
+        function rutaPick(uid) {
+          return /databases/$(database)/documents/matches/$(matchId)/drafts/$(gameNo)/picks/$(uid);
+        }
+
+        // Con `civ_repeat_team` en 0 (no repetir civ en el equipo), `a` y `b` son
+        // del mismo equipo. Sin la marca en el draft, se puede repetir.
+        function sonCompaneros(d, a, b) {
+          return d.get('civ_repeat_team', 1) == 0
+            && d.team_of.get(a, null) != null
+            && d.team_of.get(a, null) == d.team_of.get(b, 'otro');
+        }
+
+        // ¿El i-ésimo jugador del draft es compañero de `userId` y ya guardó `civ`?
+        function companeroYaLaTiene(d, userId, civ, i) {
+          return d.player_ids.size() > i
+            && d.player_ids[i] != userId
+            && sonCompaneros(d, userId, d.player_ids[i])
+            && d.player_ids[i] in d.get('picked', [])
+            && get(rutaPick(d.player_ids[i])).data.civ_id == civ;
+        }
+
+        // Ningún compañero tiene ya esa civ: son hasta 8 jugadores por draft.
+        function sinRepetirEnElEquipo(d, userId, civ) {
+          return d.get('civ_repeat_team', 1) != 0
+            || !(companeroYaLaTiene(d, userId, civ, 0) || companeroYaLaTiene(d, userId, civ, 1)
+                 || companeroYaLaTiene(d, userId, civ, 2) || companeroYaLaTiene(d, userId, civ, 3)
+                 || companeroYaLaTiene(d, userId, civ, 4) || companeroYaLaTiene(d, userId, civ, 5)
+                 || companeroYaLaTiene(d, userId, civ, 6) || companeroYaLaTiene(d, userId, civ, 7));
+        }
+
+        // Pick ciego: el ajeno no se lee hasta que el draft se revela. Sin repetir
+        // civ en el equipo, los compañeros sí se ven el pick (si no, no podrían
+        // evitar la repetida); el rival no.
         match /picks/{userId} {
-          allow read: if (conSesion() && yo() == userId) || get(rutaDraft()).data.revealed == true;
+          allow read: if (conSesion() && yo() == userId)
+            || get(rutaDraft()).data.revealed == true
+            || (conSesion() && sonCompaneros(get(rutaDraft()).data, yo(), userId));
           allow create, update: if conSesion() && yo() == userId
             && pickValido(get(rutaDraft()).data, userId, request.resource.data);
           allow delete: if esStaff(get(rutaPartido(matchId)).data.tournament_id);
@@ -547,7 +581,8 @@ service cloud.firestore {
             && p.keys().hasOnly(['civ_id'])
             && p.civ_id in d.civ_pool
             && !(p.civ_id in d.banned_civ_ids)
-            && !(p.civ_id in d.civs_usadas.get(userId, []));
+            && !(p.civ_id in d.civs_usadas.get(userId, []))
+            && sinRepetirEnElEquipo(d, userId, p.civ_id);
         }
       }
     }

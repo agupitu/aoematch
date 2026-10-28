@@ -47,7 +47,7 @@ export function guardarTorneo(slug, datos, w) {
     civ_bans: 0,
     civ_pattern: null,
     civ_repeat_series: 1,
-    civ_repeat_team: 0,
+    civ_repeat_team: 1,
     civ_mirror: 1,
     draft_timer_s: 60,
     entry_fee_cents: 0,

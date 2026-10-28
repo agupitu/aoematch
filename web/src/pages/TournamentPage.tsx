@@ -283,8 +283,9 @@ function Resumen({ t }: { t: Tournament }) {
             <Dato k="Mapas siguientes" v="Los elige el que perdió la partida anterior" />
             <Dato k="Bans de civ por equipo" v={t.civ_bans ? String(t.civ_bans) : 'sin bans'} />
             <Dato k="Pick de civs" v="Ciego" />
-            <Dato k="Repetir civ en la serie" v={t.civ_repeat_series ? 'permitido' : 'prohibido'} />
-            <Dato k="Repetir mapa en la serie" v={t.map_repeat ? 'permitido' : 'prohibido'} />
+            <Dato k="Repetir civ en el equipo" v={t.civ_repeat_team === 0 ? 'prohibido' : 'permitido'} />
+            <Dato k="Repetir civ contra el mismo rival" v={t.civ_repeat_series ? 'permitido' : 'prohibido'} />
+            <Dato k="Repetir mapa contra el mismo rival" v={t.map_repeat ? 'permitido' : 'prohibido'} />
           </dl>
         </section>
 
@@ -1106,6 +1107,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       first_map_id: t.first_map_id,
       civ_bans: t.civ_bans ?? 0,
       civ_repeat_series: !!t.civ_repeat_series,
+      civ_repeat_team: t.civ_repeat_team !== 0,
       entry_fee_cents: t.entry_fee_cents,
       currency: t.currency,
       payment_link: t.payment_link ?? '',
@@ -1141,6 +1143,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
         third_place: form.third_place ? 1 : 0,
         map_repeat: form.map_repeat ? 1 : 0,
         civ_repeat_series: form.civ_repeat_series ? 1 : 0,
+        civ_repeat_team: form.civ_repeat_team ? 1 : 0,
         civ_bans: Math.max(0, Math.min(3, form.civ_bans || 0)),
         allow_solo: form.allow_solo ? 1 : 0,
         first_map_id: form.map_ids.includes(form.first_map_id ?? -1) ? form.first_map_id : null,

@@ -6,9 +6,11 @@
 //   2. Bans de civ: `civ_bans` por equipo, alternados; arranca el equipo que
 //      no eligió mapa (en la primera, el equipo A).
 //   3. Picks ciegos: cada jugador elige su civ sin ver las demás; se muestran
-//      todas cuando eligieron todos. Se puede repetir civ, también en espejo y
-//      dentro del mismo equipo (D6). Con `civ_repeat_series` en 0, nadie repite
-//      una civ que ya usó en la serie.
+//      todas cuando eligieron todos. Se puede repetir civ, también en espejo
+//      (D6). Con `civ_repeat_team` en 0 nadie repite la civ de un compañero (los
+//      compañeros sí se ven el pick, si no no podrían evitarlo) y con
+//      `civ_repeat_series` en 0 nadie repite una civ que ya usó contra el mismo
+//      rival.
 //   Sin reloj: se espera a que elijan todos.
 //
 // El documento drafts/{gameNo} guarda lo que devuelve `planDeDraft` y lo van
@@ -53,7 +55,7 @@ export function hash(texto) {
 /**
  * Draft de la partida `gameNo` de un partido.
  *   torneo   doc del torneo (`map_ids`, `civ_ids`, `first_map_id`, `map_repeat`,
- *            `civ_bans`, `civ_repeat_series`, `team_size`)
+ *            `civ_bans`, `civ_repeat_series`, `civ_repeat_team`, `team_size`)
  *   partido  doc del partido con su `id` (`team_a_id`, `team_b_id`, `games`)
  *   equipos  { a, b }: docs de los dos equipos (`captain_id`, `member_ids`)
  * Juegan los primeros `team_size` de cada equipo, capitán primero.
@@ -121,6 +123,8 @@ export function planDeDraft(torneo, partido, equipos, gameNo = 1) {
     player_ids: [...deA, ...deB],
     team_of: Object.fromEntries([...deA.map((u) => [u, a]), ...deB.map((u) => [u, b])]),
     civs_usadas: civsUsadas,
+    // Solo un 0 explícito prohíbe repetir en el equipo: lo guardado antes de la opción deja repetir.
+    civ_repeat_team: torneo.civ_repeat_team === 0 ? 0 : 1,
     revealed: false,
   };
 }
@@ -150,17 +154,31 @@ export function banear(draft, teamId, civId) {
   return { ...draft, banned_civ_ids: banned, state: banned.length === draft.ban_order.length ? 'picks' : 'bans' };
 }
 
-/** Civs que un jugador puede elegir: el pool, sin baneadas ni las que ya usó en la serie. */
-export function civsPermitidas(draft, uid) {
-  const fuera = new Set([...draft.banned_civ_ids, ...(draft.civs_usadas[uid] ?? [])]);
+/** Civs que ya eligieron los compañeros de `uid` (`picks` es { uid: civId }), si el torneo no deja repetir en el equipo. */
+function civsDeCompaneros(draft, uid, picks) {
+  if (draft.civ_repeat_team !== 0) return [];
+  return Object.entries(picks)
+    .filter(([otro]) => otro !== uid && draft.team_of[otro] === draft.team_of[uid])
+    .map(([, civ]) => civ);
+}
+
+/**
+ * Civs que un jugador puede elegir: el pool, sin baneadas, sin las que ya usó
+ * contra el mismo rival y, si el torneo no deja repetir en el equipo, sin las
+ * que ya eligió un compañero (`picks` son los picks que ve: { uid: civId }).
+ */
+export function civsPermitidas(draft, uid, picks = {}) {
+  const fuera = new Set([...draft.banned_civ_ids, ...(draft.civs_usadas[uid] ?? []), ...civsDeCompaneros(draft, uid, picks)]);
   return draft.civ_pool.filter((id) => !fuera.has(id));
 }
 
 /** Tira un error si el pick no vale. Se puede cambiar mientras no se reveló. */
-export function validarPick(draft, uid, civId) {
+export function validarPick(draft, uid, civId, picks = {}) {
   if (draft.state !== 'picks' || draft.revealed) throw new Error('No es momento de elegir civ.');
   if (!draft.player_ids.includes(uid)) throw new Error('No jugás esta partida.');
-  if (!civsPermitidas(draft, uid).includes(civId)) throw new Error('No podés elegir esa civ.');
+  if (!civsPermitidas(draft, uid, picks).includes(civId)) {
+    throw new Error(civsDeCompaneros(draft, uid, picks).includes(civId) ? 'Un compañero ya eligió esa civ.' : 'No podés elegir esa civ.');
+  }
 }
 
 /** ¿Ya eligieron todos? `picks` es { uid: civId }. */

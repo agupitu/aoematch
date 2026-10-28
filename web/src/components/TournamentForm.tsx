@@ -32,6 +32,7 @@ export type Borrador = {
   first_map_id: number | null;
   civ_bans: number;
   civ_repeat_series: boolean;
+  civ_repeat_team: boolean;
   entry_fee_cents: number;
   currency: string;
   payment_link: string;
@@ -67,6 +68,7 @@ export const BORRADOR_INICIAL: Borrador = {
   first_map_id: null,
   civ_bans: 0,
   civ_repeat_series: true,
+  civ_repeat_team: true,
   entry_fee_cents: 0,
   currency: 'ARS',
   payment_link: '',
@@ -87,8 +89,8 @@ export type PestaniaForm =
   | 'basico' | 'formato' | 'draft' | 'premios' | 'inscripcion' | 'mapas' | 'civs';
 
 const SERIE_HINT: Record<SerieModo, string> = {
-  mejor_de: 'Se corta cuando un equipo gana la mayoría de las partidas.',
-  fijas: 'Se juegan todas las partidas y gana el que más ganó. Si empatan, se juega una más.',
+  mejor_de: 'Serie = las partidas que juegan dos equipos entre sí. Se corta cuando uno gana la mayoría.',
+  fijas: 'Serie = las partidas que juegan dos equipos entre sí. Se juegan todas y gana el que más ganó; si empatan, una más.',
 };
 
 /** Reparto inicial cuando el organizador suma el primer puesto. */
@@ -374,18 +376,16 @@ export function TournamentForm({
 
         {tab === 'draft' && (
           <section className="card p-5">
-            <h3 className="title mb-1 text-lg">Draft</h3>
-            <p className="hint mb-4 text-sm">
-              La primera partida sale al azar o con el mapa que fijes. Después elige el mapa el equipo
-              que perdió la anterior. Los picks de civ son siempre ciegos, se puede espejar y se puede
-              repetir civ en el equipo. No hay reloj: se espera a que elijan todos.
-            </p>
+            <h3 className="title mb-2 text-lg">Draft</h3>
+            <ul className="hint mb-4 space-y-0.5 text-sm">
+              <li>- Primera partida: mapa al azar o el que fijes.</li>
+              <li>- Desde la segunda elige el mapa quien perdió la anterior.</li>
+              <li>- Picks de civ ciegos; se puede espejar contra el rival.</li>
+              <li>- Sin reloj: se espera a que elijan todos.</li>
+            </ul>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo
-                label="Primer mapa"
-                hint="Al azar, o uno fijo del pool. De la partida 2 en adelante lo elige el que perdió."
-              >
+              <Campo label="Primer mapa" hint="Al azar, o uno fijo del pool.">
                 <select
                   className="field"
                   value={value.first_map_id ?? ''}
@@ -413,17 +413,29 @@ export function TournamentForm({
               </Campo>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <h4 className="label mt-5">Repeticiones</h4>
+            <p className="hint mb-3 text-xs">
+              Las dos últimas valen dentro de una serie (las partidas que juegan dos equipos entre sí, por
+              ejemplo un BO3), no en toda la fase.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Check
+                checked={value.civ_repeat_team}
+                onChange={(v) => set('civ_repeat_team', v)}
+                label="Permitir repetir civ en el mismo equipo"
+                hint="Apagado: dos compañeros no pueden elegir la misma civ."
+              />
               <Check
                 checked={value.civ_repeat_series}
                 onChange={(v) => set('civ_repeat_series', v)}
-                label="Permitir repetir civ entre partidas de la serie"
+                label="Permitir repetir civ contra el mismo rival"
                 hint="Apagado: en un BO3 cada jugador usa civs distintas en cada partida."
               />
               <Check
                 checked={value.map_repeat}
                 onChange={(v) => set('map_repeat', v)}
-                label="Permitir repetir mapa dentro de la serie"
+                label="Permitir repetir mapa contra el mismo rival"
+                hint="Apagado: en una serie no se juega dos veces el mismo mapa."
               />
             </div>
           </section>

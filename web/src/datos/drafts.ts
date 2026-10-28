@@ -106,16 +106,33 @@ export function banearCiv(matchId: string, gameNo: number, teamId: string, civId
 /**
  * Pick propio. Va en un batch con `picked`, que anota que ya eligió sin decir
  * qué (las reglas no dejan anotarse sin el pick guardado). Se puede cambiar
- * mientras no se reveló.
+ * mientras no se reveló. `companeros` son los picks que ya ven de su equipo,
+ * para avisar antes de escribir si el torneo no deja repetir civ en el equipo.
  */
-export function elegirCiv(draft: Draft, matchId: string, uid: string, civId: number) {
-  validarPick(draft, uid, civId);
+export function elegirCiv(
+  draft: Draft,
+  matchId: string,
+  uid: string,
+  civId: number,
+  companeros: Record<string, number> = {}
+) {
+  validarPick(draft, uid, civId, companeros);
   const batch = writeBatch(firestore);
   batch.set(refPick(matchId, draft.game_no, uid), { civ_id: civId });
   if (!(draft.picked ?? []).includes(uid)) {
     batch.update(refDraft(matchId, draft.game_no), { picked: arrayUnion(uid) });
   }
-  return conMensaje(() => batch.commit());
+  return conMensaje(async () => {
+    try {
+      await batch.commit();
+    } catch (err) {
+      // Dos compañeros pueden elegir la misma a la vez: las reglas dejan pasar solo a uno.
+      if (draft.civ_repeat_team === 0 && (err as { code?: string }).code === 'permission-denied') {
+        throw new Rechazo('Un compañero ya eligió esa civ.');
+      }
+      throw err;
+    }
+  });
 }
 
 /**
@@ -155,6 +172,8 @@ export type EstadoDraft = {
   mio: number | null;
   /** Todos los picks, una vez revelado. */
   picks: Record<string, number> | null;
+  /** Los picks de mis compañeros, antes de revelar: solo si el torneo no deja repetir civ en el equipo. */
+  companeros: Record<string, number>;
   error: string;
 };
 
@@ -169,6 +188,7 @@ export function useDraft(matchId: string | undefined, gameNo: number | null, uid
   const [revelado, setRevelado] = useState(false);
   const [mio, setMio] = useState<number | null>(null);
   const [picks, setPicks] = useState<Record<string, number> | null>(null);
+  const [companeros, setCompaneros] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
   const revelando = useRef(false);
 
@@ -201,6 +221,29 @@ export function useDraft(matchId: string | undefined, gameNo: number | null, uid
     );
   }, [matchId, gameNo, uid, juego]);
 
+  // Sin repetir civ en el equipo, los compañeros se ven el pick (las reglas lo dejan solo entre ellos).
+  const deMiEquipo =
+    draft && draft.civ_repeat_team === 0 && uid && Array.isArray(draft.player_ids) && draft.team_of?.[uid]
+      ? draft.player_ids.filter((p) => p !== uid && draft.team_of[p] === draft.team_of[uid])
+      : [];
+  const claveCompaneros = deMiEquipo.join(',');
+  useEffect(() => {
+    setCompaneros({});
+    if (!matchId || !gameNo || !claveCompaneros || revelado) return;
+    const bajas = claveCompaneros.split(',').map((p) =>
+      onSnapshot(
+        refPick(matchId, gameNo, p),
+        (s) =>
+          setCompaneros((c) => {
+            const { [p]: _antes, ...resto } = c;
+            return s.exists() ? { ...resto, [p]: s.data().civ_id as number } : resto;
+          }),
+        () => undefined
+      )
+    );
+    return () => bajas.forEach((baja) => baja());
+  }, [matchId, gameNo, claveCompaneros, revelado]);
+
   useEffect(() => {
     setPicks(null);
     if (!matchId || !gameNo || !revelado) return;
@@ -221,5 +264,5 @@ export function useDraft(matchId: string | undefined, gameNo: number | null, uid
     });
   }, [draft, matchId, uid]);
 
-  return { draft, mio, picks, error };
+  return { draft, mio, picks, companeros, error };
 }

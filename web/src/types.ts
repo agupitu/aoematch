@@ -173,6 +173,8 @@ export type Tournament = {
   first_map: GameMap | null;
   civ_bans: number;
   civ_repeat_series: number;
+  /** 0 = dos compañeros no pueden elegir la misma civ; ausente o 1 = sí. */
+  civ_repeat_team?: number;
   entry_fee_cents: number;
   currency: string;
   payment_link: string | null;

@@ -243,6 +243,65 @@ describe('draft: pick ciego', () => {
   });
 });
 
+describe('draft: sin repetir civ en el equipo', () => {
+  const ruta = 'matches/m1/drafts/1';
+
+  /** Guarda el pick y se anota, en un batch, como lo hace la web. */
+  function elegir(uid, civ) {
+    const db = como(uid);
+    const batch = db.batch();
+    batch.set(db.doc(`${ruta}/picks/${uid}`), { civ_id: civ });
+    batch.update(db.doc(ruta), { picked: firebase.firestore.FieldValue.arrayUnion(uid) });
+    return batch.commit();
+  }
+
+  beforeEach(async () => {
+    await sembrarDraft('m1', 1, { ...draft({ ...torneo, civ_repeat_team: 0 }, partido('m1'), 1), picked: [] });
+  });
+
+  it('un compañero no puede guardar la civ que ya tiene el otro; el rival sí (espejo)', async () => {
+    await assertSucceeds(elegir('a1', CIVS[0]));
+    await assertFails(elegir('a2', CIVS[0]));
+    await assertSucceeds(elegir('a2', CIVS[1]));
+    // el rival puede copiar la civ (espejo), pero no entre compañeros del otro equipo
+    await assertSucceeds(elegir('b1', CIVS[0]));
+    await assertFails(elegir('b2', CIVS[0]));
+    await assertSucceeds(elegir('b2', CIVS[2]));
+  });
+
+  it('al cambiar su pick tampoco pisa el de un compañero, y lo libera al cambiarlo', async () => {
+    await assertSucceeds(elegir('a1', CIVS[0]));
+    await assertSucceeds(elegir('a2', CIVS[1]));
+    await assertFails(como('a2').doc(`${ruta}/picks/a2`).set({ civ_id: CIVS[0] }));
+    await assertSucceeds(como('a1').doc(`${ruta}/picks/a1`).set({ civ_id: CIVS[2] }));
+    await assertSucceeds(como('a2').doc(`${ruta}/picks/a2`).set({ civ_id: CIVS[0] }));
+    await assertSucceeds(como('a1').doc(`${ruta}/picks/a1`).set({ civ_id: CIVS[2] }));
+  });
+
+  it('los compañeros se ven el pick antes de revelar; el rival y los de afuera no', async () => {
+    await assertSucceeds(elegir('a1', CIVS[0]));
+    await assertSucceeds(como('a2').doc(`${ruta}/picks/a1`).get());
+    await assertSucceeds(como('a1').doc(`${ruta}/picks/a1`).get());
+    await assertFails(como('b1').doc(`${ruta}/picks/a1`).get());
+    await assertFails(como('c1').doc(`${ruta}/picks/a1`).get());
+    await assertFails(anonimo().doc(`${ruta}/picks/a1`).get());
+  });
+
+  it('si el torneo deja repetir, nadie ve el pick del compañero ni se bloquea', async () => {
+    await sembrarDraft('m1', 1, { ...draft(torneo, partido('m1'), 1), picked: [] });
+    await assertSucceeds(elegir('a1', CIVS[0]));
+    await assertSucceeds(elegir('a2', CIVS[0]));
+    await assertFails(como('a2').doc(`${ruta}/picks/a1`).get());
+  });
+
+  it('un draft armado antes de la opción (sin la marca) deja repetir', async () => {
+    const { civ_repeat_team: _marca, ...viejo } = draft({ ...torneo, civ_repeat_team: 0 }, partido('m1'), 1);
+    await sembrarDraft('m1', 1, { ...viejo, picked: [] });
+    await assertSucceeds(elegir('a1', CIVS[0]));
+    await assertSucceeds(elegir('a2', CIVS[0]));
+  });
+});
+
 describe('chat', () => {
   const mensaje = (uid, extra = {}) => ({
     body: 'gg', system: 0, created_at: ahora(),
