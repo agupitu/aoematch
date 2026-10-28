@@ -369,6 +369,18 @@ export async function sembrarDemo() {
     await guardarInscripcion(t1.id, u.id, { kind: 'solo', status: 'confirmada', paid, paid_at: paid ? new Date().toISOString() : null });
   }
 
+  // Equipos del organizador: uno ya con su capitán, uno vacío, y dos pedidos de ingreso por resolver.
+  const tercios = await guardarEquipo({
+    tournament_id: t1.id, name: 'Los Tercios', staff_made: 1, captain_id: usuarios[1].id,
+    members: [{ user_id: usuarios[1].id, role: 'capitan' }],
+  });
+  await guardarSalaDeEquipo(tercios, 'Los Tercios', [usuarios[1].id], t1);
+  await guardarInscripcion(t1.id, usuarios[1].id, { kind: 'equipo', team_id: tercios, status: 'confirmada', paid: 1, paid_at: new Date().toISOString() });
+  const halcones = await guardarEquipo({ tournament_id: t1.id, name: 'Halcones', staff_made: 1 });
+  const pedido = (team_id) => ({ team_id, status: 'pendiente', created_at: new Date().toISOString() });
+  await guardarInscripcion(t1.id, usuarios[2].id, { kind: 'solo', status: 'confirmada', join_request: pedido(tercios) });
+  await guardarInscripcion(t1.id, usuarios[3].id, { kind: 'solo', status: 'confirmada', join_request: pedido(halcones) });
+
   // --- torneo 2: 1v1 en curso, con llaves listas
   const t2 = await crearTorneo('ladder-1v1-de-otono', {
     name: 'Ladder 1v1 de Otoño',

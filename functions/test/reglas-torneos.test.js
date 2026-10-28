@@ -312,4 +312,146 @@ describe('equipos', () => {
     await assertSucceeds(como('cap').doc('teams/e1').delete());
     await assertSucceeds(como('org').doc('teams/e2').delete());
   });
+
+  it('la marca de equipo del organizador no la pone el capitán', async () => {
+    await assertFails(como('cap').doc('teams/e1').update({ staff_made: 1 }));
+    await assertFails(como('nuevo').doc('teams/n1').set(equipo('nuevo', [], { staff_made: 1 })));
+  });
+});
+
+describe('equipos del organizador y pedidos de ingreso', () => {
+  const ref = (db, uid, slug = 'copa') => db.doc(`tournaments/${slug}/registrations/${uid}`);
+
+  /** Equipo del organizador con esos jugadores; el primero es el capitán. */
+  const delOrganizador = (uids = [], extra = {}) => ({
+    tournament_id: 'copa',
+    name: 'Los Tercios',
+    tag: null,
+    logo_url: null,
+    captain_id: uids[0] ?? null,
+    seed: null,
+    auto_built: 0,
+    staff_made: 1,
+    created_at: '2026-10-26T00:00:00.000Z',
+    members: uids.map((u, i) => ({ user_id: u, role: i === 0 ? 'capitan' : 'jugador' })),
+    member_ids: uids,
+    ...extra,
+  });
+  const pedido = (team_id, extra = {}) => ({ team_id, status: 'pendiente', created_at: '2026-10-27T10:00:00.000Z', ...extra });
+  const pideLugar = (uid, equipoId) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc(`tournaments/copa/registrations/${uid}`).update({ join_request: pedido(equipoId) }));
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc('teams/eo1').set(delOrganizador());
+      await db.doc('teams/eo2').set(delOrganizador(['capEO'], { name: 'Halcones' }));
+      await db.doc('teams/eoOtro').set(delOrganizador([], { tournament_id: 'cerrado' }));
+      await db.doc('tournaments/copa/registrations/capEO').set(inscripcion('capEO', { team_id: 'eo2', kind: 'equipo' }));
+    });
+  });
+
+  it('el staff crea equipos vacíos; un jugador no puede', async () => {
+    await assertSucceeds(como('org').doc('teams/nuevoEO').set(delOrganizador()));
+    await assertSucceeds(como('adm').doc('teams/nuevoEO2').set(delOrganizador()));
+    await assertFails(como('cap').doc('teams/nuevoEO3').set(delOrganizador()));
+    await assertFails(anonimo().doc('teams/nuevoEO4').set(delOrganizador()));
+  });
+
+  it('nadie entra por su cuenta a un equipo del organizador, ni lo mete el capitán', async () => {
+    const db = como('nuevo');
+    const e = delOrganizador(['capEO', 'nuevo'], { name: 'Halcones' });
+    const sumarse = db.batch();
+    sumarse.update(db.doc('teams/eo2'), { members: e.members, member_ids: e.member_ids });
+    sumarse.set(ref(db, 'nuevo'), inscripcion('nuevo', { team_id: 'eo2', kind: 'equipo' }));
+    await assertFails(sumarse.commit());
+
+    await assertFails(como('capEO').doc('teams/eo2').update({ members: e.members, member_ids: e.member_ids }));
+  });
+
+  it('el capitán de un equipo del organizador sí puede sacar gente', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc('teams/eo3').set(delOrganizador(['capEO3', 'jugEO3'], { name: 'Tres' })));
+    await assertSucceeds(como('capEO3').doc('teams/eo3').update({
+      members: [{ user_id: 'capEO3', role: 'capitan' }],
+      member_ids: ['capEO3'],
+    }));
+  });
+
+  it('pide lugar al inscribirse: la inscripción trae el pedido', async () => {
+    await assertSucceeds(ref(como('nuevo'), 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eo1') })));
+  });
+
+  it('el pedido va a un equipo del organizador de este torneo, pendiente y sin campos de más', async () => {
+    const nuevo = como('nuevo');
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: pedido('e1') })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eoOtro') })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eo1', { status: 'rechazado' }) })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eo1', { status: 'aprobado' }) })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eo1', { extra: 1 }) })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { join_request: 'eo1' })));
+    await assertFails(ref(nuevo, 'nuevo').set(inscripcion('nuevo', { team_id: 'eo1', kind: 'equipo', join_request: pedido('eo1') })));
+  });
+
+  it('con la inscripción cerrada no se pide lugar; sin jugadores sueltos sí, pero no anotarse suelto', async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc('tournaments/copa').update({ allow_solo: 0 }));
+    await assertSucceeds(ref(como('nuevo'), 'nuevo').set(inscripcion('nuevo', { join_request: pedido('eo1') })));
+    await assertFails(ref(como('nuevo2'), 'nuevo2').set(inscripcion('nuevo2')));
+
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc('tournaments/copa').update({ status: 'en_curso' }));
+    await assertFails(ref(como('nuevo3'), 'nuevo3').set(inscripcion('nuevo3', { join_request: pedido('eo1') })));
+    await assertFails(ref(como('suelto'), 'suelto').update({ join_request: pedido('eo1') }));
+  });
+
+  it('un inscripto suelto pide lugar, cambia el pedido y lo cancela; con equipo no pide', async () => {
+    const suelto = ref(como('suelto'), 'suelto');
+    await assertSucceeds(suelto.update({ join_request: pedido('eo1') }));
+    await assertSucceeds(suelto.update({ join_request: pedido('eo2') }));
+    await assertSucceeds(suelto.update({ join_request: null }));
+    await assertFails(ref(como('cap'), 'cap').update({ join_request: pedido('eo1') }));
+    await assertFails(ref(como('otro'), 'suelto').update({ join_request: pedido('eo1') }));
+  });
+
+  it('al retirarse no queda el pedido', async () => {
+    await pideLugar('suelto', 'eo1');
+    const suelto = ref(como('suelto'), 'suelto');
+    await assertFails(suelto.update({ status: 'retirada' }));
+    await assertSucceeds(suelto.update({ status: 'retirada', join_request: null }));
+  });
+
+  it('el staff aprueba metiéndolo al equipo; un jugador no', async () => {
+    await pideLugar('suelto', 'eo1');
+    const e = delOrganizador(['suelto']);
+    const aprobar = (db) => {
+      const b = db.batch();
+      b.update(db.doc('teams/eo1'), { captain_id: 'suelto', members: e.members, member_ids: e.member_ids });
+      b.update(ref(db, 'suelto'), { team_id: 'eo1', kind: 'equipo', join_request: null });
+      return b.commit();
+    };
+    await assertFails(aprobar(como('cap')));
+    await assertFails(aprobar(como('suelto')));
+    await assertSucceeds(aprobar(como('org')));
+  });
+
+  it('el staff rechaza dejando el aviso; el jugador lo quita o pide de nuevo', async () => {
+    await pideLugar('suelto', 'eo1');
+    await assertSucceeds(ref(como('adm'), 'suelto').update({ join_request: pedido('eo1', { status: 'rechazado' }) }));
+    await assertSucceeds(ref(como('suelto'), 'suelto').update({ note: 'sigo disponible' }));
+    await assertSucceeds(ref(como('suelto'), 'suelto').update({ join_request: pedido('eo2') }));
+  });
+
+  it('un equipo del organizador lo renombra y lo borra el staff; el último jugador lo deja libre sin borrarlo', async () => {
+    await assertSucceeds(como('adm').doc('teams/eo1').update({ name: 'Otro nombre' }));
+    await assertFails(como('suelto').doc('teams/eo1').update({ name: 'Robado' }));
+
+    await assertFails(como('capEO').doc('teams/eo2').delete());
+    const db = como('capEO');
+    const libre = db.batch();
+    libre.update(db.doc('teams/eo2'), { captain_id: null, members: [], member_ids: [] });
+    libre.update(ref(db, 'capEO'), { team_id: null, kind: 'solo' });
+    await assertSucceeds(libre.commit());
+
+    await assertSucceeds(como('org').doc('teams/eo2').delete());
+  });
 });

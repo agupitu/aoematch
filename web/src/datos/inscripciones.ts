@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
+import { sinMiembro } from '../logica/equipos.js';
 import type { Tournament, User } from '../types';
 import { type Doc, Rechazo, ahora, conMensaje } from './base';
 import { vigente } from './torneos';
@@ -28,24 +29,13 @@ async function leerEnTx(tx: Transaction, ref: ReturnType<typeof doc>): Promise<D
 /** `members` y `member_ids` siempre juntos. */
 const conIds = (members: Miembro[]) => ({ members, member_ids: members.map((m) => m.user_id) });
 
-/**
- * El equipo sin `uid`. Si se iba el capitán, el primero que queda pasa a serlo
- * (las reglas no dejan un capitán fuera de su equipo). null si queda vacío.
- */
-function sinMiembro(equipo: Doc, uid: string) {
-  const quedan: Miembro[] = (equipo.members ?? []).filter((m: Miembro) => m.user_id !== uid);
-  if (!quedan.length) return null;
-  if (equipo.captain_id !== uid) return conIds(quedan);
-  const capitan = quedan[0].user_id;
-  return {
-    captain_id: capitan,
-    ...conIds(quedan.map((m) => ({ ...m, role: m.user_id === capitan ? 'capitan' : 'jugador' }))),
-  };
-}
-
 export type Alta = { kind: 'solo' | 'equipo'; team_name?: string; team_id?: string; note?: string };
 
-/** Inscribe a quien entró: suelto, con un equipo nuevo o sumándose a uno con lugar. */
+/**
+ * Inscribe a quien entró: suelto, con un equipo nuevo, sumándose a uno con
+ * lugar o, si el equipo es del organizador, pidiéndole lugar (queda suelto con
+ * el pedido hasta que el staff lo apruebe).
+ */
 export function inscribirse(t: Tournament, user: User, { kind, team_name, team_id, note }: Alta) {
   return conMensaje(() =>
     runTransaction(firestore, async (tx) => {
@@ -54,12 +44,15 @@ export function inscribirse(t: Tournament, user: User, { kind, team_name, team_i
       if (!['inscripcion', 'armado'].includes(t.status)) throw new Rechazo('Las inscripciones no están abiertas.');
 
       let equipo: Doc | null = null;
+      let pedido: Doc | null = null;
       let nuevo: string | null = null;
       if (t.team_size > 1 && kind === 'equipo') {
         if (team_id) {
-          equipo = await leerEnTx(tx, refEquipo(team_id));
-          if (!equipo || equipo.tournament_id !== t.id) throw new Rechazo('Ese equipo no existe en el torneo.');
-          if (equipo.members.length >= t.team_size) throw new Rechazo('El equipo ya está completo.');
+          const elegido = await leerEnTx(tx, refEquipo(team_id));
+          if (!elegido || elegido.tournament_id !== t.id) throw new Rechazo('Ese equipo no existe en el torneo.');
+          if (elegido.members.length >= t.team_size) throw new Rechazo('El equipo ya está completo.');
+          if (elegido.staff_made) pedido = elegido;
+          else equipo = elegido;
         } else {
           if (!team_name) throw new Rechazo('Poné un nombre de equipo.');
           nuevo = String(team_name).slice(0, 60);
@@ -94,6 +87,7 @@ export function inscribirse(t: Tournament, user: User, { kind, team_name, team_i
         status: 'pendiente',
         kind: t.team_size === 1 ? 'equipo' : teamId ? 'equipo' : 'solo',
         team_id: teamId,
+        join_request: pedido ? { team_id: pedido.id, status: 'pendiente', created_at: ahora() } : null,
         note: note ? String(note).slice(0, 500) : null,
       };
       if (ya) {
@@ -112,14 +106,18 @@ export function inscribirse(t: Tournament, user: User, { kind, team_name, team_i
   );
 }
 
-/** Se retira del torneo y de su equipo; el equipo se borra si queda vacío. */
+/**
+ * Se retira del torneo y de su equipo (y se va su pedido de ingreso, si lo
+ * había); el equipo se borra si queda vacío, salvo uno del organizador, que
+ * queda como lugar libre.
+ */
 export function retirarse(t: Tournament, uid: string) {
   return conMensaje(() =>
     runTransaction(firestore, async (tx) => {
       const reg = await leerEnTx(tx, refInscripcion(t.id, uid));
       if (!reg) return;
       const equipo = reg.team_id ? await leerEnTx(tx, refEquipo(reg.team_id)) : null;
-      tx.update(refInscripcion(t.id, uid), { status: 'retirada', team_id: null });
+      tx.update(refInscripcion(t.id, uid), { status: 'retirada', team_id: null, join_request: null });
       if (!equipo) return;
       const queda = sinMiembro(equipo, uid);
       if (queda) tx.update(refEquipo(equipo.id), queda);
@@ -130,7 +128,8 @@ export function retirarse(t: Tournament, uid: string) {
 
 /**
  * Saca a un jugador de un equipo (él mismo, su capitán o el staff) y deja su
- * inscripción suelta. Si el equipo queda vacío, se borra.
+ * inscripción suelta. Si el equipo queda vacío, se borra (uno del organizador
+ * queda como lugar libre).
  */
 export function sacarMiembro(t: Tournament, teamId: string, userId: string) {
   return conMensaje(() =>

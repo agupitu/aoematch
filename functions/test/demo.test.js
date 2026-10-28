@@ -58,14 +58,28 @@ describe('demo', () => {
     );
     const cuantos = async (slug) => [(await listarInscripciones(slug)).length, (await listarEquipos(slug)).length];
     assert.equal(t['copa-sudamericana-3v3'].status, 'inscripcion');
-    assert.deepEqual(await cuantos('copa-sudamericana-3v3'), [15, 0]);
+    assert.deepEqual(await cuantos('copa-sudamericana-3v3'), [15, 2]);
     assert.equal(t['ladder-1v1-de-otono'].status, 'en_curso');
     assert.deepEqual(await cuantos('ladder-1v1-de-otono'), [8, 8]);
     assert.equal(t['clan-wars-2v2'].status, 'armado');
     assert.deepEqual(await cuantos('clan-wars-2v2'), [12, 6]);
     assert.deepEqual(await cuantos('copa-aoematch-mockup'), [16, 8]);
     assert.equal((await listarPartidos('ladder-1v1-de-otono')).length, 7);
-    assert.equal((await listarInscripciones('copa-sudamericana-3v3')).filter((r) => r.kind === 'solo').length, 15);
+    assert.equal((await listarInscripciones('copa-sudamericana-3v3')).filter((r) => r.kind === 'solo').length, 14);
+  });
+
+  it('la copa 3v3 trae equipos del organizador: uno con capitán, uno vacío y dos pedidos de ingreso', async () => {
+    const equipos = await listarEquipos('copa-sudamericana-3v3');
+    assert.deepEqual(
+      equipos.map((e) => [e.name, e.staff_made, e.member_ids.length, e.captain_id === null]).sort(),
+      [['Halcones', 1, 0, true], ['Los Tercios', 1, 1, false]]
+    );
+    const nombre = new Map(equipos.map((e) => [e.id, e.name]));
+    const pedidos = (await listarInscripciones('copa-sudamericana-3v3')).filter((r) => r.join_request);
+    assert.deepEqual(pedidos.map((r) => [nombre.get(r.join_request.team_id), r.join_request.status, r.team_id]).sort(), [
+      ['Halcones', 'pendiente', null],
+      ['Los Tercios', 'pendiente', null],
+    ]);
   });
 
   it('la copa de muestra: cuartos jugados con drafts ciegos, semis agendadas y una con el draft abierto', async () => {

@@ -230,39 +230,71 @@ service cloud.firestore {
         return (d.team_id == null) == (d.kind == 'solo');
       }
 
+      // Pedido para sumarse a un equipo del organizador (`staff_made`): lo hace un
+      // inscripto suelto y sin retirarse, con la inscripción abierta y a un equipo
+      // de este torneo. Solo se escribe `pendiente`; "rechazado" lo pone el staff.
+      // El staff lo aprueba metiéndolo al equipo (nadie entra solo a esos equipos).
+      function pedidoDe(d) {
+        return d.get('join_request', null);
+      }
+
+      function pedidoNuevoValido(d, t) {
+        let p = d.join_request;
+        return p is map
+          && p.keys().hasAll(['team_id', 'status'])
+          && p.keys().hasOnly(['team_id', 'status', 'created_at'])
+          && p.status == 'pendiente'
+          && texto(p.team_id, 1, 40)
+          && textoOpcional(p.get('created_at', null), 40)
+          && d.team_id == null && d.kind == 'solo'
+          && d.status != 'retirada'
+          && inscripcionAbierta(t)
+          && get(rutaEquipo(p.team_id)).data.tournament_id == slug
+          && get(rutaEquipo(p.team_id)).data.get('staff_made', 0) == 1;
+      }
+
       function altaPropia(userId) {
         let d = request.resource.data;
         let t = get(rutaTorneo(slug)).data;
         return yo() == userId
           && inscripcionAbierta(t)
-          && d.keys().hasOnly(['user_id', 'team_id', 'kind', 'status', 'paid', 'paid_at', 'payment_ref', 'note', 'created_at'])
+          && d.keys().hasOnly(['user_id', 'team_id', 'kind', 'status', 'paid', 'paid_at', 'payment_ref', 'note', 'created_at',
+                               'join_request'])
           && d.user_id == userId
           && d.status == 'pendiente'
           && d.paid == 0 && d.paid_at == null && d.payment_ref == null
           && d.kind in ['solo', 'equipo']
-          && (d.kind == 'equipo' || t.team_size == 1 || t.allow_solo == 1)
+          && (d.kind == 'equipo' || t.team_size == 1 || t.allow_solo == 1 || pedidoDe(d) != null)
           && equipoCoherente(d)
           && equipoConmigo(d.team_id)
+          && (pedidoDe(d) == null || pedidoNuevoValido(d, t))
           && textoOpcional(d.note, 500);
       }
 
-      // El dueño se retira, vuelve (si estaba retirado y está abierto) o
-      // cambia de equipo. Pago, estado del staff y nota del staff no los toca.
+      // El dueño se retira, vuelve (si estaba retirado y está abierto), cambia de
+      // equipo o pide lugar en uno del organizador. Pago, estado del staff y nota
+      // del staff no los toca. El pedido queda como estaba, se cancela o es uno
+      // nuevo y pendiente; al retirarse no queda ninguno.
       function cambioPropio(userId) {
         let d = request.resource.data;
         let r = resource.data;
         return yo() == userId
-          && soloCambian(['status', 'kind', 'team_id', 'note'])
+          && soloCambian(['status', 'kind', 'team_id', 'note', 'join_request'])
           && (d.status == r.status
               || d.status == 'retirada'
               || (r.status == 'retirada' && d.status == 'pendiente' && inscripcionAbierta(get(rutaTorneo(slug)).data)))
           && (d.status == 'retirada'
               ? d.team_id == null
               : (equipoCoherente(d) && equipoConmigo(d.team_id)))
+          && (pedidoDe(d) == pedidoDe(r)
+              || pedidoDe(d) == null
+              || pedidoNuevoValido(d, get(rutaTorneo(slug)).data))
+          && (d.status != 'retirada' || pedidoDe(d) == null)
           && textoOpcional(d.note, 500);
       }
 
-      // El capitán suma a alguien a su equipo o lo saca.
+      // El capitán suma a alguien a su equipo o lo saca. A un equipo del
+      // organizador solo lo suma el staff, aprobando su pedido.
       function cambioDeCapitan(userId) {
         let d = request.resource.data;
         let r = resource.data;
@@ -274,6 +306,7 @@ service cloud.firestore {
               : (d.kind == 'equipo'
                  && getAfter(rutaEquipo(d.team_id)).data.tournament_id == slug
                  && getAfter(rutaEquipo(d.team_id)).data.captain_id == yo()
+                 && getAfter(rutaEquipo(d.team_id)).data.get('staff_made', 0) == 0
                  && userId in getAfter(rutaEquipo(d.team_id)).data.member_ids));
       }
 
@@ -289,6 +322,7 @@ service cloud.firestore {
 
     function equipoValido(d, t) {
       return texto(d.name, 1, 60)
+        && d.get('staff_made', 0) in [0, 1]
         && textoOpcional(d.get('tag', null), 8)
         && textoOpcional(d.get('logo_url', null), 500)
         && d.member_ids is list && d.members is list
@@ -309,9 +343,17 @@ service cloud.firestore {
         && d.get('auto_built', 0) == 0;
     }
 
-    // Un jugador se suma solo a un equipo con lugar.
+    // Un equipo del organizador (`staff_made`) lo crea el staff, vacío; a los
+    // equipos de jugadores no se les pone la marca. En esos equipos nadie suma
+    // gente salvo el staff: el capitán solo puede sacar.
+    function sinNuevosMiembros(r, d) {
+      return r.get('staff_made', 0) == 0 || r.member_ids.toSet().hasAll(d.member_ids);
+    }
+
+    // Un jugador se suma solo a un equipo con lugar (que no sea del organizador).
     function meSumo(r, d, t) {
       return inscripcionAbierta(t)
+        && r.get('staff_made', 0) == 0
         && soloCambian(['members', 'member_ids'])
         && !(yo() in r.member_ids)
         && d.member_ids == r.member_ids.concat([yo()])
@@ -340,14 +382,17 @@ service cloud.firestore {
         && request.resource.data.tournament_id == resource.data.tournament_id
         && (esStaff(resource.data.tournament_id)
             || (resource.data.captain_id == yo()
-                && soloCambian(['name', 'tag', 'logo_url', 'captain_id', 'members', 'member_ids']))
+                && soloCambian(['name', 'tag', 'logo_url', 'captain_id', 'members', 'member_ids'])
+                && sinNuevosMiembros(resource.data, request.resource.data))
             || meSumo(resource.data, request.resource.data, get(rutaTorneo(resource.data.tournament_id)).data)
             || meVoy(resource.data, request.resource.data))
         && equipoValido(request.resource.data, get(rutaTorneo(resource.data.tournament_id)).data);
 
-      // Se borra con el staff, o cuando se va el último que quedaba.
+      // Se borra con el staff, o cuando se va el último que quedaba (no uno del
+      // organizador: ese queda como lugar libre).
       allow delete: if conSesion()
-        && (esStaff(resource.data.tournament_id) || resource.data.member_ids == [yo()]);
+        && (esStaff(resource.data.tournament_id)
+            || (resource.data.get('staff_made', 0) == 0 && resource.data.member_ids == [yo()]));
     }
 
     // -------------------------------------------------------------- partidos

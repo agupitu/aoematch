@@ -4,7 +4,12 @@ import {
   confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
 } from '../datos/llaves';
 import { actualizarTorneo, detalleTorneo, guardarVodFase } from '../datos/torneos';
+import {
+  aprobarPedido, borrarEquipoDelOrganizador, cancelarPedido, crearEquipoDelOrganizador, pedirLugar,
+  rechazarPedido, renombrarEquipo,
+} from '../datos/equipos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
+import { pedidosPendientes } from '../logica/equipos.js';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
@@ -156,6 +161,9 @@ function AccionesInscripcion({
       {activa ? (
         <>
           <Badge tone="good">Inscripto{reg?.team_name ? ` · ${reg.team_name}` : ''}</Badge>
+          {reg?.join_request?.status === 'pendiente' && (
+            <Badge tone="gold">Pedido a {t.teams.find((te) => te.id === reg.join_request?.team_id)?.name ?? 'un equipo'}</Badge>
+          )}
           <button
             className="btn btn-danger"
             onClick={async () => {
@@ -220,14 +228,19 @@ function AccionesInscripcion({
                         .filter((te) => te.members.length < t.team_size)
                         .map((te) => (
                           <option key={te.id} value={te.id}>
-                            {te.name} ({te.members.length}/{t.team_size})
+                            {te.name} ({te.members.length}/{t.team_size}){te.staff_made ? ' · con aprobación' : ''}
                           </option>
                         ))}
                     </select>
                     <button className="btn btn-primary" disabled={!equipoId} onClick={() => inscribir('equipo')}>
-                      Sumarme
+                      {t.teams.find((te) => te.id === equipoId)?.staff_made ? 'Pedir lugar' : 'Sumarme'}
                     </button>
                   </div>
+                  {t.teams.some((te) => te.staff_made) && (
+                    <p className="hint mt-1 text-xs">
+                      En los equipos “con aprobación” pedís lugar y el organizador decide quién entra.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -432,7 +445,15 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
                   {r.display_name}
                 </span>
               </td>
-              <td className="p-3 text-parch-400">{r.team_name ?? <span className="italic">suelto</span>}</td>
+              <td className="p-3 text-parch-400">
+                {r.team_name ?? (
+                  <span className="italic">
+                    suelto
+                    {r.join_request?.status === 'pendiente' &&
+                      ` · pide lugar en ${t.teams.find((te) => te.id === r.join_request?.team_id)?.name ?? 'un equipo'}`}
+                  </span>
+                )}
+              </td>
               <td className="p-3 text-parch-400">{r.rating_team ?? r.rating_1v1 ?? '—'}</td>
               <td className="p-3 text-xs text-parch-400">{r.timezone}</td>
               <td className="p-3">
@@ -489,7 +510,10 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  const sueltos = t.registrations.filter((r) => r.status !== 'retirada' && !r.team_id);
+  // Quien pidió lugar en un equipo del organizador espera ese lugar: el armador no lo reparte.
+  const sueltos = t.registrations.filter(
+    (r) => r.status !== 'retirada' && !r.team_id && r.join_request?.status !== 'pendiente'
+  );
 
   const proponer = async () => {
     setError('');
@@ -505,6 +529,10 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
   return (
     <div className="space-y-6">
+      <MiPedido t={t} onDone={onDone} />
+
+      {staff && t.team_size > 1 && <EquiposDelOrganizador t={t} onDone={onDone} />}
+
       {t.team_size > 1 && staff && (
         <section className="card p-5">
           <h3 className="title mb-1 text-lg">Armador de equipos</h3>
@@ -584,22 +612,206 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
   );
 }
 
+/** Lo que el jugador tiene en curso: un pedido de ingreso esperando respuesta, o uno que el organizador rechazó. */
+function MiPedido({ t, onDone }: { t: Tournament; onDone: () => void }) {
+  const { user } = useAuth();
+  const [error, setError] = useState('');
+  const pedido = t.me?.registration?.status !== 'retirada' ? t.me?.registration?.join_request : null;
+  if (!user || !pedido) return null;
+  const equipo = t.teams.find((te) => te.id === pedido.team_id)?.name ?? 'un equipo que ya no existe';
+  const pendiente = pedido.status === 'pendiente';
+
+  return (
+    <div className="space-y-2">
+      <Alerta tone={pendiente ? 'info' : 'bad'}>
+        <span className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            {pendiente
+              ? `Pediste lugar en ${equipo}. El organizador decide si entrás.`
+              : `El organizador rechazó tu pedido para ${equipo}. Podés pedir lugar en otro equipo.`}
+          </span>
+          <button
+            className="btn btn-ghost !px-2 !py-1"
+            onClick={async () => {
+              setError('');
+              try {
+                await cancelarPedido(t, user.id);
+                onDone();
+              } catch (err) {
+                setError((err as Error).message);
+              }
+            }}
+          >
+            {pendiente ? 'Cancelar pedido' : 'Entendido'}
+          </button>
+        </span>
+      </Alerta>
+      {error && <Alerta>{error}</Alerta>}
+    </div>
+  );
+}
+
+/** El organizador arma equipos vacíos y resuelve los pedidos de ingreso de los jugadores. */
+function EquiposDelOrganizador({ t, onDone }: { t: Tournament; onDone: () => void }) {
+  const [nombre, setNombre] = useState('');
+  const [error, setError] = useState('');
+  const pedidos = pedidosPendientes(t.registrations) as Registration[];
+  const completo = !!t.max_teams && t.teams.length >= t.max_teams;
+
+  const hacer = async (fn: () => Promise<unknown>) => {
+    setError('');
+    try {
+      await fn();
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <section className="card p-5">
+      <h3 className="title mb-1 text-lg">Equipos del organizador</h3>
+      <p className="mb-4 text-sm text-parch-400">
+        Armá los equipos vacíos: los jugadores piden lugar y vos aprobás quién entra. El primero que entra queda de
+        capitán. Los equipos que sigan vacíos no entran a las llaves.
+      </p>
+
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void hacer(async () => {
+            await crearEquipoDelOrganizador(t, nombre);
+            setNombre('');
+          });
+        }}
+      >
+        <div className="min-w-0 flex-1">
+          <label className="label">Nombre del equipo</label>
+          <input className="field" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Los Tercios" />
+        </div>
+        <button className="btn btn-primary" disabled={!nombre.trim() || completo}>
+          Agregar equipo
+        </button>
+      </form>
+      {t.max_teams && (
+        <p className="hint mt-2 text-xs">
+          {t.teams.length} de {t.max_teams} equipos{completo ? ': ya están todos' : ''}.
+        </p>
+      )}
+      {error && (
+        <div className="mt-3">
+          <Alerta>{error}</Alerta>
+        </div>
+      )}
+
+      {pedidos.length > 0 && (
+        <div className="mt-5">
+          <h4 className="label">Pedidos de ingreso ({pedidos.length})</h4>
+          <ul className="space-y-2">
+            {pedidos.map((r) => {
+              const equipo = t.teams.find((te) => te.id === r.join_request?.team_id);
+              const lleno = !!equipo && equipo.members.length >= t.team_size;
+              return (
+                <li key={r.user_id} className="flex flex-wrap items-center gap-2 rounded-lg border border-ink-700 p-3">
+                  <Avatar src={r.avatar_url} name={r.display_name} size={24} />
+                  <span className="text-sm text-parch-100">{r.display_name}</span>
+                  <span className="text-xs text-parch-400">{r.rating_team ?? r.rating_1v1 ?? '—'}</span>
+                  <span className="text-sm text-parch-400">
+                    quiere entrar a <strong className="text-parch-200">{equipo?.name ?? 'un equipo borrado'}</strong>
+                    {equipo && ` (${equipo.members.length}/${t.team_size})`}
+                  </span>
+                  <div className="ml-auto flex gap-1.5">
+                    <button
+                      className="btn btn-primary !px-3 !py-1"
+                      disabled={!equipo || lleno}
+                      title={lleno ? 'El equipo ya está completo' : undefined}
+                      onClick={() => hacer(() => aprobarPedido(t, r.user_id))}
+                    >
+                      Aprobar
+                    </button>
+                    <button className="btn btn-ghost !px-3 !py-1" onClick={() => hacer(() => rechazarPedido(t, r.user_id))}>
+                      Rechazar
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () => void }) {
+  const { user } = useAuth();
   const staff = !!t.me?.is_staff;
   const esMio = t.me?.team_id === team.id;
+  const delOrganizador = !!team.staff_made;
+  const libres = Math.max(0, t.team_size - team.members.length);
+  const miPedido = t.me?.registration?.status !== 'retirada' ? t.me?.registration?.join_request : null;
+  const pedidoAca = miPedido?.team_id === team.id && miPedido.status === 'pendiente';
+  const pedidos = pedidosPendientes(t.registrations).filter((r: Registration) => r.join_request?.team_id === team.id).length;
+  const puedePedir =
+    delOrganizador && !!user && !t.me?.team_id && libres > 0 && ['inscripcion', 'armado'].includes(t.status);
+
+  const [editando, setEditando] = useState(false);
+  const [nombre, setNombre] = useState(team.name);
+  const [error, setError] = useState('');
+
+  const hacer = async (fn: () => Promise<unknown>) => {
+    setError('');
+    try {
+      await fn();
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
 
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <h4 className="title text-base">{team.name}</h4>
+        <div className="min-w-0">
+          {editando ? (
+            <form
+              className="flex gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void hacer(async () => {
+                  await renombrarEquipo(team.id, nombre);
+                  setEditando(false);
+                });
+              }}
+            >
+              <input className="field !py-1" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+              <button className="btn btn-primary !px-2 !py-1">Guardar</button>
+              <button
+                type="button"
+                className="btn btn-ghost !px-2 !py-1"
+                onClick={() => {
+                  setEditando(false);
+                  setNombre(team.name);
+                }}
+              >
+                ✕
+              </button>
+            </form>
+          ) : (
+            <h4 className="title text-base">{team.name}</h4>
+          )}
           <p className="text-xs text-parch-400">
             {team.members.length}/{t.team_size} jugadores
             {team.seed ? ` · siembra ${team.seed}` : ''}
             {team.auto_built ? ' · armado automático' : ''}
+            {pedidos > 0 && ` · ${pedidos} ${pedidos === 1 ? 'pedido' : 'pedidos'}`}
           </p>
         </div>
-        {esMio && <Badge tone="gold">Tu equipo</Badge>}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {esMio && <Badge tone="gold">Tu equipo</Badge>}
+          {delOrganizador && <Badge>Del organizador</Badge>}
+        </div>
       </div>
 
       <ul className="space-y-1.5">
@@ -613,17 +825,56 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
               <button
                 className="text-xs text-parch-400 hover:text-blood-500"
                 title="Sacar del equipo"
-                onClick={async () => {
-                  await sacarMiembro(t, team.id, m.id);
-                  onDone();
-                }}
+                onClick={() => hacer(() => sacarMiembro(t, team.id, m.id))}
               >
                 ✕
               </button>
             )}
           </li>
         ))}
+        {delOrganizador &&
+          Array.from({ length: libres }, (_, i) => (
+            <li key={`libre${i}`} className="rounded-lg border border-dashed border-ink-700 px-2 py-1 text-sm text-ink-600 italic">
+              Lugar libre
+            </li>
+          ))}
       </ul>
+
+      {(puedePedir || (delOrganizador && staff)) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {puedePedir && (
+            <button
+              className="btn btn-primary !px-3 !py-1"
+              disabled={pedidoAca}
+              onClick={() => hacer(() => pedirLugar(t, user!, team.id))}
+            >
+              {pedidoAca ? 'Pedido enviado' : miPedido ? 'Cambiar mi pedido a este equipo' : 'Pedir lugar'}
+            </button>
+          )}
+          {delOrganizador && staff && !editando && (
+            <>
+              <button className="btn btn-ghost !px-2 !py-1" onClick={() => setEditando(true)}>
+                Renombrar
+              </button>
+              <button
+                className="btn btn-danger !px-2 !py-1"
+                disabled={team.members.length > 0}
+                title={team.members.length ? 'Sacá a los jugadores primero' : undefined}
+                onClick={() => {
+                  if (confirm(`¿Borrar el equipo ${team.name}?`)) void hacer(() => borrarEquipoDelOrganizador(t, team));
+                }}
+              >
+                Borrar
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {error && (
+        <div className="mt-2">
+          <Alerta>{error}</Alerta>
+        </div>
+      )}
     </div>
   );
 }

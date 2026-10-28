@@ -44,8 +44,13 @@ export type Team = {
   captain_id: string | null;
   seed: number | null;
   auto_built: number;
+  /** 1 si lo creó el organizador: se entra pidiendo lugar y con su aprobación. */
+  staff_made?: number;
   members: Member[];
 };
+
+/** Pedido de un inscripto suelto para entrar a un equipo del organizador. */
+export type JoinRequest = { team_id: string; status: 'pendiente' | 'rechazado'; created_at?: string };
 
 export type Registration = {
   id: string;
@@ -58,6 +63,7 @@ export type Registration = {
   paid_at: string | null;
   payment_ref: string | null;
   note: string | null;
+  join_request?: JoinRequest | null;
   display_name: string;
   avatar_url: string | null;
   rating_1v1: number | null;

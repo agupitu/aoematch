@@ -35,10 +35,14 @@ async function torneo(slug: string) {
   return t;
 }
 
-/** Equipos como el ORDER BY COALESCE(seed, 9999), id de antes. */
+/**
+ * Equipos que juegan, como el ORDER BY COALESCE(seed, 9999), id de antes. Los
+ * equipos del organizador que nadie ocupó no entran a las llaves.
+ */
 async function equiposEnOrden(slug: string) {
   const filas = await consultar(query(collection(firestore, 'teams'), where('tournament_id', '==', slug)));
-  return ordenarPor(filas, (e: Doc) => e.seed ?? 9999, 'created_at', 'id');
+  const conJugadores = filas.filter((e) => (e.member_ids ?? []).length > 0);
+  return ordenarPor(conJugadores, (e: Doc) => e.seed ?? 9999, 'created_at', 'id');
 }
 
 const partidosDe = (slug: string) => consultar(query(partidos(), where('tournament_id', '==', slug)));
@@ -105,7 +109,7 @@ export function generarLlaves(slug: string) {
   return conMensaje(async () => {
     const t = await torneo(slug);
     const equipos = await equiposEnOrden(slug);
-    if (equipos.length < 2) throw new Error('Hacen falta al menos dos equipos.');
+    if (equipos.length < 2) throw new Error('Hacen falta al menos dos equipos con jugadores.');
     const cuadro = generarCuadro(t, equipos, ids(slug));
     await borrarLlaves(slug);
     await escribirEnTandas([
@@ -153,7 +157,7 @@ export function proponerEquiposDelTorneo(t: Tournament) {
   return conMensaje(async () => {
     const inscripciones = await consultar(collection(firestore, 'tournaments', t.id, 'registrations'));
     const sueltas = ordenarPor(
-      inscripciones.filter((r) => r.kind === 'solo' && vigente(r) && !r.team_id),
+      inscripciones.filter((r) => r.kind === 'solo' && vigente(r) && !r.team_id && r.join_request?.status !== 'pendiente'),
       'user_id'
     );
     const usuarios = await mapaDeUsuarios(sueltas.map((r) => r.user_id));
