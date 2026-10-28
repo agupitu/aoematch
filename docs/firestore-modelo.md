@@ -109,6 +109,14 @@ mapa. Además:
   juegan todas y gana quien más ganó (si N es par y empatan, se juega una más que desempata). `best_of_final`
   usa el mismo modo para la final. Al generar las llaves cada partido copia `series_mode` y `best_of`
   (`web/src/logica/series.js`); las reglas validan el modo del torneo.
+- `civ_repeat_team` (entero `0/1`; ausente = 1): con 0, dos compañeros no pueden elegir la misma civ en el
+  draft. `planDeDraft` copia la marca al draft (`drafts/{gameNo}.civ_repeat_team`); con 0, las reglas dejan
+  que los compañeros lean el pick del otro antes de revelar (el rival no) y no dejan guardar la civ que ya
+  tiene un compañero. `civ_repeat_series` y `map_repeat` valen dentro de una serie (las partidas de un mismo
+  cruce entre dos equipos), no en toda la fase.
+- `payment_links`: `[{ label, url }]`, hasta 5, con `url` http(s) (las reglas lo validan). Reemplaza al
+  `payment_link` único: un torneo que solo lo tiene se lee como un link llamado "Pagar acá", y al guardar la
+  configuración se escribe `payment_links` y se borra `payment_link` (`web/src/logica/pagos.js`).
 - Los contadores reemplazan los `COUNT(*)` del listado y de `premiosDe`. Se actualizan con
   `FieldValue.increment` en la misma transacción que cambia la inscripción o el equipo (T16, T17,
   T20). Si alguna vez se desajustan, se recalculan leyendo las subcolecciones.

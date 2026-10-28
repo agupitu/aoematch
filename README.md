@@ -62,8 +62,20 @@ draft, inscripción, premios, mapas y civilizaciones**— y es el mismo que desp
 aparece en **Configuración**. Ahí se define el formato (**eliminación simple,
 doble, liga, grupos + playoff o suizo**), el tamaño de equipo (1v1 a 4v4), el
 tipo y largo de las series, el pool de mapas, las civilizaciones habilitadas, el
-costo de inscripción con su link de pago y el reparto de premios. Los buscadores
-de mapas y civilizaciones ignoran tildes y mayúsculas: `decan` encuentra `Decán`.
+costo de inscripción con sus links de pago (hasta 5, cada uno con su nombre) y el
+reparto de premios. Los buscadores de mapas y civilizaciones ignoran tildes y
+mayúsculas: `decan` encuentra `Decán`.
+
+**Mapas.** Al armar el pool se puede ver solo lo elegido y filtrar por terreno
+(tierra, agua o ambos) y por región (América, Europa, Asia, África); "Agregar los
+visibles" suma al pool lo que queda a la vista y "Quitar los visibles" lo saca.
+La clasificación es aproximada y está en `web/src/logica/mapas-info.js`.
+
+**Repeticiones del draft.** Hay tres opciones: repetir civ en el mismo equipo,
+repetir civ contra el mismo rival y repetir mapa contra el mismo rival (estas dos
+valen dentro de una serie, no en toda la fase). Sin repetir en el equipo, los
+compañeros se ven el pick antes de revelar y las reglas no dejan guardar la civ
+de un compañero.
 
 **Series.** Pueden ser *al mejor de N* (BO1, BO3, BO5, BO7: se corta cuando un
 equipo gana la mayoría) o *a N partidas* (de 2 a 9: se juegan todas y gana el que
