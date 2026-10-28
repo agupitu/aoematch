@@ -14,8 +14,8 @@ Firebase Auth solo con Google; el perfil de Steam se pega a mano y no se verific
 escuchas de Firestore sobre el partido, el draft y el chat; la presencia, Realtime Database. Sin reloj
 en el draft: se espera a que elijan todos.
 
-**Estado.** 4 tareas pendientes, 11 h en total (unos 2 días de 6 h para una persona sola; el
-senior entra en T30). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
+**Estado.** 19 tareas pendientes, 101 h en total: 4 de cierre (T30–T33, 11 h; unos 2 días de 6 h
+para una persona sola, el senior entra en T30) y 15 del draft suelto (Fase 8, T48–T62, 90 h). Hechas en la rama `feat/firebase`: T02 a T27 sobre el plan Blaze
 anterior, y T01, T28, T34–T47 del plan Spark (falta cerrar T30, y T31–T33). No hay datos para migrar.
 
 **Qué cambia del trabajo hecho.** Se aprovechan el modelo de datos (T04), la lógica de llaves,
@@ -32,6 +32,19 @@ las rutas y pasa a `firestore.rules`.
 - Draft: primero el mapa, que lo elige el equipo que perdió la partida anterior; el de la primera lo
   fija el creador o sale al azar. Después, bans de civ si el creador los configuró. Después cada
   jugador elige su civ sin ver las de nadie y se muestran todas cuando eligieron todos.
+
+**Pedido del 2026-10-27 (Fase 8 · Draft suelto).** Pestaña **Draft** en el header para armar un
+draft sin torneo: el creador fija jugadores por equipo, quién elige el mapa, bans de mapa y de civ,
+modo de pick de civ (ciego o serpiente, sin tiempo) y si se puede repetir civ entre equipos y dentro
+del equipo; comparte un link, la gente se reparte en dos equipos y hay chat de todos y de cada
+equipo, que se borra al cerrar la sala. Las opciones de civ y el botón "Confirmar pick" del ciego
+valen también para el draft de torneo. Diseño aprobado y maqueta en
+`docs/superpowers/specs/2026-10-27-draft-suelto-design.md` y `...-mockup.html`.
+
+**Antes de empezar la Fase 8.** La rama tiene cambios sin commitear de otra sesión (rondas y horarios
+por etapa) en `firestore.rules`, `web/src/types.ts`, `web/src/pages/MatchRoom.tsx` y
+`docs/firestore-modelo.md`. T50, T51, T52 y T61 tocan esos mismos archivos: esos cambios se commitean
+antes de arrancar T50, o el merge se coordina a mano.
 
 ## Lo que ya está
 
@@ -157,9 +170,25 @@ senior; **S** = senior. Tiempo: horas efectivas del rol asignado, con prueba y r
 | T31 | Dominio propio | 1 | J | 1 h | T30, decisión D3 | 2 |
 | T32 | Prueba completa en emuladores y en producción | 2 | J | 4 h | T28, T30, T41, T45 | 2 |
 | T33 | Borrar Render, SQLite, `functions/` y lo que quedó viejo; actualizar README | 1 | J | 2 h | T32, decisión D5 | 3 |
+| **Fase 8 · Draft suelto** |||||||
+| T48 | `web/src/logica/draft.js`: modos ciego y serpiente, repetir entre equipos y dentro del equipo, confirmar pick | 4 | S | 1 d | — | 8.0 |
+| T56 | `web/src/components/draft/`: mapa 1:1, grilla de civs con bandera, equipos con tilde, orden de serpiente, barra de confirmar | 3 | J | 1 d | — | 8.0 |
+| T49 | `web/src/logica/draftSuelto.js`: configuración, lobby, fases y reinicio del draft suelto | 4 | S | 1 d | T48 | 8.1 |
+| T50 | `firestore.rules`: opciones de civ del torneo, ciego con confirmar y compañeros, serpiente | 5 | S | 2 d? | T48 | 8.1 |
+| T51 | `firestore.rules`: `quick_drafts`, sus picks y el chat del draft con borrado al cerrar | 5 | S | 2 d? | T49, T50 | 8.2 |
+| T52 | `web/src/datos/drafts.ts`: confirmar pick, serpiente y picks de compañeros en el draft de torneo | 3 | S | 4 h | T48, T50 | 8.2 |
+| T55 | Opciones de civ en `TournamentForm.tsx`, `CreateTournament.tsx`, `TournamentPage.tsx` y `datos/torneos.ts` | 2 | J | 4 h | T50 | 8.2 |
+| T53 | `web/src/datos/draftsSueltos.ts`: crear, lobby, fases, picks, cerrar y `useDraftSuelto` | 4 | S | 1 d | T49, T51 | 8.3 |
+| T54 | `web/src/live.ts`: salas `draft` y `draftteam`; borrar el chat al cerrar | 4 | S | 4 h | T51 | 8.3 |
+| T57 | `DraftBoard.tsx` del torneo con los componentes nuevos, confirmar y serpiente | 3 | J | 1 d | T52, T56 | 8.3 |
+| T58 | Pestaña "Draft" en `App.tsx` y pantalla de crear (`DraftNuevo.tsx`) | 2 | J | 1 d | T53 | 8.4 |
+| T59 | `DraftSala.tsx`: lobby, link, lugares y espectadores | 3 | J | 1 d | T53, T56 | 8.4 |
+| T61 | Documentar en `docs/firestore-modelo.md`, `PLAN.md` y `README.md` | 1 | J | 2 h | T53, T54 | 8.4 |
+| T60 | `DraftSala.tsx`: fases en curso, chat con pestañas y cerrar sala | 3 | J | 1 d | T54, T59 | 8.5 |
+| T62 | Prueba completa del draft con cuatro navegadores y en celular | 2 | J | 4 h | T55, T57, T60 | 8.6 |
 
 Las dependencias con tareas hechas ya están cumplidas y no figuran en la tabla. T29 quedó hecha y su
-número no se reusa.
+número no se reusa. Las olas de la Fase 8 se cuentan aparte (`8.n`).
 
 ## Olas de ejecución
 
@@ -175,6 +204,26 @@ Ola 3  ─ T33                                      · 2 h
   9 h cada uno; el senior entra en la ola 1 (T47 y T30 van en fila).
 - **Una sola persona:** seguir las olas en orden.
 - **Duración total:** unos 3 días con el equipo mínimo; 33 h con una sola persona.
+
+### Olas de la Fase 8
+
+```
+Ola 8.0 ─ T48 ∥ T56                  · 1 d    (T48 senior, T56 junior)
+Ola 8.1 ─ T49 ∥ T50                  · 2 d    (los dos seniors; T50 es la más larga)
+Ola 8.2 ─ T51 ∥ T52 ∥ T55            · 2 d    (T51 y T52 seniors, T55 junior)
+Ola 8.3 ─ T53 ∥ T54 ∥ T57            · 1 d    (T53 y T54 seniors, T57 junior)
+Ola 8.4 ─ T58 ∥ T59 ∥ T61            · 1 d    (todas junior)
+Ola 8.5 ─ T60                        · 1 d
+Ola 8.6 ─ T62                        · 4 h
+```
+
+- **Camino crítico:** T48 → T50 → T51 → T53 → T59 → T60 → T62 = 52 h (unos 9 días de 6 h).
+- **Equipo mínimo:** 2 seniors y 2 juniors. Las olas 8.1 a 8.3 piden dos seniors a la vez; la 8.4
+  pide dos juniors (T61 es de 2 h y la toma quien termine primero). Más gente no acorta: T50 → T51
+  edita `firestore.rules` en fila y todo el resto cuelga de ahí. Una sola persona: seguir el orden de
+  la tabla (T48, T49, T50, T51, T52, T53, T54, T56, T55, T57, T58, T59, T60, T61, T62).
+- **Duración total de la Fase 8:** unos 9 días con el equipo mínimo; 90 h (15 días de 6 h) con una
+  sola persona.
 
 ## Detalle de cada tarea
 
@@ -326,6 +375,258 @@ Ola 3  ─ T33                                      · 2 h
       cómo está armado (sin servidor, reglas como seguridad).
 - [ ] Dar de baja Render si D5 lo indica.
 
+### Fase 8 · Draft suelto
+
+Nombres que usan todas las tareas (propuesta de este plan; el diseño deja la estructura al
+constructor, pero tienen que ser los mismos en lógica, reglas y pantallas):
+
+- Colección `quick_drafts/{draftId}`: id aleatorio de 10 caracteres, `get` abierto y `list` cerrado.
+  Configuración: `creator_id`, `team_size` (1–4), `map_chooser` (`a` | `b` | `creator` | `random`),
+  `map_bans` (0–3), `civ_bans` (0–3), `map_ids`, `civ_pick_mode`, `civ_repeat_enemy` (0/1),
+  `civ_repeat_team` (0/1). Estado: `state` (`lobby` | `bans_mapa` | `mapa` | `bans_civ` | `picks` |
+  `listo`), `closing` y `closed` (0/1), `slots` (`{ a: [uid|null…], b: [uid|null…] }`). Al empezar,
+  los mismos campos que el draft de partida (`team_a_id` = `'a'`, `team_b_id` = `'b'`, `player_ids`,
+  `team_of`, `civ_pool`, `ban_order`, `banned_civ_ids`, `picked`, `revealed`, `map_pool`, `map_id`,
+  `map_chooser_team_id`) más `banned_map_ids` y `map_ban_order`.
+- Subcolección `quick_drafts/{draftId}/picks/{uid}` y, en torneos, `matches/{id}/drafts/{n}/picks/{uid}`:
+  `{ civ_id, confirmed }` (0/1).
+- Campos nuevos que comparten el torneo, el draft de partida y el suelto: `civ_pick_mode`
+  (`'ciego'` | `'serpiente'`, por defecto ciego), `civ_repeat_enemy` y `civ_repeat_team` (por defecto
+  1 y 1). En el draft: `team_players` (`{ teamId: [uid…] }`), `pick_order` (uids, serpiente), `picks`
+  (`[{ user_id, civ_id }]`, serpiente) y `civs_by_team` (`{ teamId: [civ_id…] }`, para que las reglas
+  comparen sin recorrer listas).
+- Chat: `rooms/draft_{id}` y `rooms/draftteam_{id}_{a|b}`; en `useChat`, `draft:{id}` y
+  `draftteam:{id}:{a|b}`.
+
+### T48 · Lógica compartida de civ — dif. 4 · senior · 1 d
+
+- [ ] `web/src/logica/draft.js`: `planDeDraft` lee `civ_pick_mode`, `civ_repeat_enemy` y
+      `civ_repeat_team` del torneo (por defecto `'ciego'`, 1, 1) y los copia al documento junto con
+      `team_players`. Un draft ya abierto, sin esos campos, se trata como ciego, sí, sí.
+- [ ] Ciego: `validarPick` suma "no repetir dentro del equipo" (civ ya elegida por un compañero) cuando
+      `civ_repeat_team` es 0; nueva `confirmarPick(draft, uid, picks)` (exige pick propio y que no
+      esté confirmado); el pick se cambia hasta confirmar; `revelar` y `eligieronTodos` cuentan
+      confirmados.
+- [ ] Serpiente: `ordenSerpiente(teamSize, primero, segundo)` (ABBA por jugador; dentro del equipo,
+      por orden de `team_players`), `turnoDePick(draft)` y `elegirCivSerpiente(draft, uid, civId)`:
+      valida turno, pool, baneadas y las dos opciones de repetición; agrega a `picks` y
+      `civs_by_team`; el último pick pasa a `listo`. `revelar` devuelve las civs también en serpiente.
+- [ ] `validarOpcionesDeCiv(opciones, civIds, jugadores)`: error si no alcanzan las civs para completar
+      todos los picks con los bans y las opciones elegidas.
+- [ ] Pruebas en `web/test/draft.test.js` (con `torneo()` y `equipo()`): orden para 1, 2, 3 y 4 por
+      equipo, exclusividad, repetir en el equipo, confirmar definitivo, pool insuficiente, draft viejo
+      sin campos nuevos.
+- [ ] Ya existe y no se rehace: bans alternados, `elegirMapa`, `civs_usadas` (`civ_repeat_series`).
+
+### T56 · Componentes compartidos del draft — dif. 3 · junior · 1 d
+
+- [ ] Carpeta `web/src/components/draft/`, componentes que solo reciben props (sin leer datos):
+      `MapaCuadrado` (tarjeta `aspect-square` con `mapa.img` de fondo, etiqueta "MAPA ELEGIDO",
+      nombre y quién lo eligió) y `BansDeMapa` (caja chica debajo con el ban de cada equipo).
+- [ ] `GrillaDeCivs`, sacada de la grilla de `DraftBoard.tsx`: bandera `civ.flag` y nombre; estados
+      elegida, baneada, tomada por el rival (con quién la tomó) y no disponible; clickeable o no.
+- [ ] `EquiposDelDraft` (dos columnas con el color del equipo, fila por jugador: bandera y civ si se
+      ve; "✓ Ya eligió" o "Eligiendo…" para los rivales; "Sin confirmar" para el propio; modo
+      "lugares" para el lobby) y `OrdenDeSerpiente` (fila de turnos con el actual resaltado).
+- [ ] `BarraDeConfirmar` (civ elegida, "Cambiar", "Confirmar pick"), fija abajo.
+- [ ] Colores y clases del sitio (`gold`, `moss`, `ink`, `card`, `btn`); en celular las columnas se
+      apilan y la grilla no se corta. Referencia: `docs/superpowers/specs/2026-10-27-draft-suelto-mockup.html`.
+- [ ] Frontera: no se toca `DraftBoard.tsx` (lo hace T57); T56 no importa nada de `datos/`.
+
+### T49 · Lógica del draft suelto — dif. 4 · senior · 1 d
+
+- [ ] `web/src/logica/draftSuelto.js`, pura como `draft.js`: `crearDraftSuelto(config, creatorId)`
+      valida (team_size 1–4, bans 0–3, pool de mapas mayor que 2 × `map_bans`, `validarOpcionesDeCiv`
+      de T48) y devuelve el documento en `state: 'lobby'` con `slots` vacíos.
+- [ ] Lobby: `unirse(draft, uid, equipo)` (un lugar por usuario; cambiar de lugar vale hasta empezar),
+      `salirDelLugar`, `sacarJugador(draft, creatorId, uid)` y `puedeEmpezar` (todos los lugares
+      ocupados).
+- [ ] `empezar(draft, creatorId)` arma lo que arma `planDeDraft` (`player_ids`, `team_of`,
+      `team_players`, `civ_pool` = todas, `map_pool`, `ban_order`, `pick_order`) y pasa a la primera fase
+      que no esté vacía. Arranca el equipo que no elige el mapa; con `creator` o `random`, el A.
+- [ ] `banearMapa`, `elegirMapaSuelto` (equipo del turno, o solo el creador con `creator`),
+      `mapaAlAzar(draft)` (hash del id y los bans, como `hash` de `draft.js`) y `reiniciar(draft)`
+      (vuelve a `lobby` con los mismos jugadores y la misma configuración). Bans de civ, picks y
+      revelado: las funciones de T48.
+- [ ] Pruebas en `web/test/draftSuelto.test.js`: lobby, empezar con lugares vacíos, quién arranca con
+      cada `map_chooser`, bans de mapa que dejan un solo mapa, reinicio.
+
+### T50 · Reglas del draft con las opciones nuevas (torneo) — dif. 5 · senior · 2 d?
+
+- [ ] `torneoValido` en `firestore.rules`: `civ_pick_mode in ['ciego','serpiente']`, `civ_repeat_enemy` y
+      `civ_repeat_team` en 0/1, todos opcionales. En `web/src/types.ts`, los tres en `Tournament`.
+- [ ] `picks/{userId}` del ciego: escribe solo el dueño y mientras `confirmed` no sea 1; `confirmed`
+      solo 0 o 1; con `civ_repeat_team` en 0, no vale la civ de un compañero (recorrer `team_players`,
+      hasta 3 compañeros, cuidando el tope de 10 accesos por regla). Lee el dueño, sus compañeros
+      (`team_of`) o cualquiera con `revealed`.
+- [ ] `seAnota` exige además el pick propio con `confirmed == 1` (`existsAfter` y `getAfter`); `revela`
+      igual. Picks sin `confirmed` de drafts viejos cuentan como confirmados si su uid está en `picked`.
+- [ ] Serpiente: nueva `eligeSerpiente(r, d)`: cambian solo `picks`, `civs_by_team` y `state`;
+      `yo() == r.pick_order[n]`; la civ en `civ_pool`, no baneada y, según las opciones, fuera de
+      `civs_by_team` del otro equipo y del propio; `listo` en el último.
+- [ ] Pruebas en `functions/test/reglas-partidos.test.js`: el rival no lee el pick, el compañero sí; no
+      se cambia tras confirmar; turno equivocado falla; exclusividad y repetir en equipo; torneo sin
+      los campos nuevos sigue andando.
+- [ ] Frontera: las funciones se escriben recibiendo el draft (`d`), no la ruta, para que T51 las
+      reuse. La rama del staff (cualquier cambio en `matches/.../drafts`) se mantiene solo ahí.
+
+### T51 · Reglas del draft suelto y su chat — dif. 5 · senior · 2 d?
+
+- [ ] `quick_drafts/{id}`: `allow get: if true`, `allow list: if false`. Crear: con sesión,
+      `creator_id == yo()`, `state == 'lobby'`, configuración válida, `slots` vacíos,
+      `revealed == false`, `closing`/`closed` en 0 y el documento no existe.
+- [ ] Un update por paso, como `eligeMapa` y `banea` de hoy: lugar propio en `lobby` (`slots`, solo mi
+      uid), `sacaJugador` y `empieza` (creador, lugares completos), `baneaMapa`, `eligeMapaSuelto`
+      (equipo del turno; el creador con `creator`; con `random`, un jugador y un mapa del pool
+      restante), bans de civ, `seAnota`, `revela` y `eligeSerpiente` de T50, `reinicia` y `cierra`
+      (creador). El creador no tiene ninguna otra escritura.
+- [ ] `quick_drafts/{id}/picks/{uid}`: las mismas reglas del ciego de T50 leyendo el draft suelto.
+- [ ] Chat: `salaNuevaValida`, `puedeLeerSala` y `puedeEscribirSala` aceptan `kind: 'draft'` (lee
+      cualquiera; escriben jugadores y creador) y `kind: 'draft_equipo'` (solo jugadores de ese
+      equipo). El creador lee y borra mensajes y salas de todo el draft solo con `closing == 1` y
+      `closed == 0`; después marca `closed`.
+- [ ] Pruebas en `functions/test/reglas-draft-suelto.test.js` (nuevo, mismo arranque que
+      `reglas-partidos.test.js`): no se lista; secreto del ciego; turnos; el creador no escribe de más;
+      chat de equipo cerrado al rival y al creador árbitro, abierto para borrar en `closing`.
+- [ ] Frontera: arranca cuando T50 está mergeada (mismo archivo de reglas). La documentación la hace T61.
+
+### T52 · Datos del draft de torneo — dif. 3 · senior · 4 h
+
+- [ ] `web/src/datos/drafts.ts`: `abrirDraft` ya guarda `planDeDraft`; verificar que copia
+      `civ_pick_mode`, `civ_repeat_enemy` y `civ_repeat_team` (T48).
+- [ ] `elegirCiv` guarda `{ civ_id, confirmed: 0 }` sin anotarse; nueva `confirmarCiv(draft, matchId,
+      uid)` en un batch: `confirmed: 1` y `picked: arrayUnion(uid)`. Cambiar la civ antes de confirmar
+      sigue andando.
+- [ ] Nueva `elegirCivSerpiente(matchId, gameNo, uid, civId)` en transacción (relee el draft) con
+      `elegirCivSerpiente` de T48; escribe `picks`, `civs_by_team` y `state`.
+- [ ] `useDraft`: además del pick propio, escucha los de los compañeros (`team_of`); `EstadoDraft` suma
+      `equipo: Record<uid, civId>`. Casos: espectador sin sesión (no lee picks) y jugador sin pick.
+- [ ] `revelarSiEstanTodos` y el efecto de `useDraft` revelan cuando todos confirmaron, no cuando todos
+      eligieron.
+
+### T55 · Opciones de civ en torneos — dif. 2 · junior · 4 h
+
+- [ ] `web/src/components/TournamentForm.tsx`, pestaña Draft: selector "Modo de pick de civ" (Ciego /
+      Serpiente) y dos `Check`: "Repetir civ entre equipos" (apagado e inactivo en ciego, con el hint
+      "en ciego siempre se puede") y "Repetir civ dentro del equipo" (vuelve `civ_repeat_team`, que T45
+      había sacado). Corregir el texto de ayuda que hoy dice que los picks son siempre ciegos.
+- [ ] `Borrador` y `BORRADOR_INICIAL`: `civ_pick_mode: 'ciego'`, `civ_repeat_enemy: true`,
+      `civ_repeat_team: true`.
+- [ ] `CreateTournament.tsx` y `TournamentPage.tsx` (guardar y editar la configuración): mandar 0/1 como
+      `civ_repeat_series`; en la ficha, `Dato` para modo, repetir entre equipos y repetir en el equipo
+      junto a "Bans de civ por equipo".
+- [ ] `web/src/datos/torneos.ts`: sumar los tres campos a las listas de campos permitidos (líneas de
+      `civ_repeat_series`) y a los valores por defecto. El tipo `Tournament` ya lo agregó T50.
+- [ ] Torneos viejos sin los campos: se ven y se editan como ciego, sí, sí.
+
+### T53 · Datos del draft suelto — dif. 4 · senior · 1 d
+
+- [ ] `web/src/datos/draftsSueltos.ts`: `crearDraftSuelto(config)` genera el id (10 caracteres con
+      `crypto.getRandomValues`) y escribe en `quick_drafts/{id}` en una transacción que falla si ya
+      existe (reintenta con otro); `leerDraftSuelto`.
+- [ ] Acciones en transacción que relee el draft, con `conMensaje` y errores `Rechazo` como
+      `datos/drafts.ts`: `unirseAlLugar`, `salirDelLugar`, `sacarJugador`, `empezarDraft`,
+      `banearMapaSuelto`, `elegirMapaSuelto`, `banearCivSuelto`, `reiniciarDraftSuelto` y
+      `cerrarDraft` (marca `closing`, llama a `borrarChatDelDraft` de T54 y marca `closed`).
+- [ ] Picks: `elegirCivSuelto`, `confirmarCivSuelto`, `elegirCivSerpienteSuelto` y `revelarSuelto`, con
+      la forma de las de T52 pero sobre `quick_drafts`.
+- [ ] `useDraftSuelto(id, uid)` como `useDraft`: documento, pick propio y de compañeros, todos los
+      picks una vez revelado, `error`. Sin sesión: solo lectura, y las acciones fallan con
+      "Tenés que entrar".
+- [ ] Frontera: la lógica es la de T49 y T48; acá no se escribe ninguna regla de juego.
+
+### T54 · Chat del draft — dif. 4 · senior · 4 h
+
+- [ ] `web/src/live.ts`: `PREFIJOS` suma `draft` y `draftteam`; `parsearSala` entiende `draft:{id}` y
+      `draftteam:{id}:{a|b}`; `datosDeSala` arma `{ kind, draft_id, team_id, public_read, name,
+      created_at }` como pide `salaNuevaValida` (T51).
+- [ ] `borrarChatDelDraft(draftId)`: lista los mensajes de las tres salas y los borra en tandas de
+      450 con `writeBatch` (patrón de `generarLlaves` en `datos/llaves.ts`); después borra las salas.
+      Idempotente: si se corta, `closing` queda en 1 y se puede reintentar.
+- [ ] `useChat`/`enviar`: la sala de equipo del draft solo la crea un jugador de ese equipo; un
+      anónimo ve la general vacía (como hoy).
+- [ ] Evaluar el vencimiento automático (TTL) de Firestore sobre `messages` como respaldo (D14); si
+      no está en Spark o no es gratis, no se hace.
+- [ ] Sin pruebas de interfaz en el repo: se prueba en T62.
+
+### T57 · DraftBoard de torneo con los componentes nuevos — dif. 3 · junior · 1 d
+
+- [ ] `web/src/components/DraftBoard.tsx`: reemplazar mapa, equipos y grilla por los de T56: mapa 1:1 a
+      la izquierda, equipos y bans al costado, civs debajo (como la maqueta).
+- [ ] Ciego: elegir una civ solo la marca y aparece `BarraDeConfirmar`; confirmar llama a `confirmarCiv`
+      (T52). Rivales con tilde, compañeros con la civ a la vista (`estado.equipo`).
+- [ ] Serpiente: `OrdenDeSerpiente`, aviso "te toca", civs bloqueadas según las opciones y
+      `elegirCivSerpiente`.
+- [ ] Sacar "Tu civ…, podés cambiarla hasta que elijan todos" (ahora hay confirmar); mantener el
+      "Reiniciar" del staff.
+- [ ] Casos: espectador sin botones; draft viejo sin `civ_pick_mode` se trata como ciego; revelado.
+
+### T58 · Pestaña Draft y pantalla de crear — dif. 2 · junior · 1 d
+
+- [ ] `web/src/App.tsx`: `NavLink` "Draft" a `/draft`, visible siempre, junto a "Torneos" y "Crear
+      torneo"; ruta `/draft`.
+- [ ] `web/src/pages/DraftNuevo.tsx`: formulario en dos columnas como la maqueta (opciones a la
+      izquierda, resumen fijo a la derecha): jugadores por equipo, equipos (2 fijo), quién elige el
+      mapa, bans de mapa, bans de civ, modo de pick, repetir entre equipos (solo serpiente) y dentro del
+      equipo.
+- [ ] Pool de mapas con `MapPicker` de `PoolPicker.tsx` (todos por defecto, con buscador).
+- [ ] "Crear y copiar link": `crearDraftSuelto` (T53), copia `…/d/{id}` al portapapeles y navega a la
+      sala; muestra el error de `validarOpcionesDeCiv` si falta pool. Sin sesión, el botón dice "Entrá
+      para crear" y manda a `/entrar`.
+- [ ] Frontera: la ruta `/d/:id` la agrega T59 en su propia línea del `<Routes>` de `App.tsx`; si chocan
+      al mergear, quedan las dos.
+
+### T59 · Sala: lobby y espectadores — dif. 3 · junior · 1 d
+
+- [ ] `web/src/pages/DraftSala.tsx` y la ruta `/d/:id`: carga con `useDraftSuelto`; "Este draft no
+      existe" si el id no está; con `closed`, solo el resultado.
+- [ ] Lobby: link con "Copiar link"; `EquiposDelDraft` en modo lugares: "Unirme" en cada lugar libre,
+      salir y cambiar de equipo; sin sesión, botón de entrar que vuelve a la sala.
+- [ ] Creador: "Empezar" (inactivo hasta completar los lugares), sacar jugador, "Reiniciar" y "Cerrar
+      sala", con `confirm` como el reinicio de `DraftBoard.tsx`.
+- [ ] Nombre y avatar de cada jugador con `leerPorIds('users', …)` de `datos/base.ts`; "conectado" con
+      `usePresencia('draft:{id}')` (opcional).
+- [ ] Frontera: las fases en curso las hace T60; acá, al empezar, la pantalla muestra "Draft en curso".
+
+### T61 · Documentación — dif. 1 · junior · 2 h
+
+- [ ] `docs/firestore-modelo.md`: secciones `quick_drafts/{draftId}` y `quick_drafts/{id}/picks/{uid}`,
+      campos nuevos del torneo y del draft de partida, salas `draft_` y `draftteam_` y la ventana de
+      lectura del creador al cerrar. Actualizar también `matches/{matchId}/drafts/{gameNo}`, que hoy
+      describe el modelo viejo de pasos.
+- [ ] `PLAN.md`: tildar T48–T62 y dejar las decisiones D12 a D14 en su estado final.
+- [ ] `README.md`: mencionar la pestaña Draft y las opciones de civ.
+
+### T60 · Sala en curso — dif. 3 · junior · 1 d
+
+- [ ] En `DraftSala.tsx`, según `state`, con los componentes de T56: `bans_mapa` y `mapa` (grilla de
+      mapas del pool con los baneados tachados, clic para banear o elegir según el turno; con
+      `map_chooser == 'random'`, el navegador que da el último ban escribe el mapa), `bans_civ`,
+      `picks` (ciego con confirmar, o serpiente con orden) y `listo` (resultado).
+- [ ] Banner de fases (Mapa, Bans, Picks, Revelado) y aviso de turno ("Banea Equipo B", "te toca"), igual
+      que el `aviso` de `DraftBoard.tsx`.
+- [ ] `ChatPanel` (ya existe) a la derecha con dos salas: "Todos" (`draft:{id}`) y el equipo propio
+      (`draftteam:{id}:{a|b}`) para los jugadores; espectadores y creador árbitro solo "Todos". Aviso
+      "El chat se borra al cerrar la sala".
+- [ ] "Cerrar sala" (creador): confirmar, `cerrarDraft` (T53), mostrar el progreso y poder reintentar si
+      falla; después, solo el resultado.
+- [ ] Celular: columnas apiladas; el chat pasa a pestaña o cajón.
+
+### T62 · Prueba completa del draft — dif. 2 · junior · 4 h
+
+- [ ] Emuladores (`npm run dev`) con cuatro navegadores: draft suelto 2v2 en ciego (lobby, empezar,
+      bans de mapa y de civ, elegir y confirmar). Los rivales ven el tilde y no la civ, el compañero la
+      ve y el revelado es a la vez.
+- [ ] Draft suelto en serpiente sin repetir entre equipos: orden A, B, B, A; la civ tomada queda
+      bloqueada para el rival y no para el compañero si se permite repetir en el equipo.
+- [ ] Desde la consola de un navegador rival: leer el pick ajeno antes de revelar, escribir fuera de
+      turno y listar `quick_drafts` deben dar `permission-denied`.
+- [ ] Chat: el general lo ve todo el que tenga el link, el de equipo solo ese equipo; al cerrar la sala
+      no quedan mensajes (verificar en la UI de los emuladores, :4000).
+- [ ] Torneo en ciego con "Confirmar pick", torneo en serpiente (con la demo) y un torneo existente
+      sin los campos nuevos.
+- [ ] Celular (ancho 375): mapa, grilla y chat sin cortes. Anotar en este plan lo que falle.
+
 ## Decisiones abiertas
 
 | ID | Decisión | Opciones | Bloquea |
@@ -341,3 +642,6 @@ Ola 3  ─ T33                                      · 2 h
 | D9 | Quién elige mapa | **Cerrada: el que perdió la partida anterior; la primera, fija del creador o al azar.** | — |
 | D10 | Bans de civ | **Cerrada: los configura el creador (0 a 3 por equipo).** | — |
 | D11 | Reloj del draft | **Cerrada: sin reloj.** El staff reinicia el draft o carga el resultado. | — |
+| D12 | Equipos del draft suelto | **Cerrada (2026-10-27): dos fijos.** Más de dos queda fuera. | — |
+| D13 | Chat de equipo al cerrar el draft suelto | **Cerrada (2026-10-27): el creador lee y borra todas las salas solo durante el cierre.** Si no se acepta esa ventana, la salida es un contador de mensajes. | — |
+| D14 | TTL de Firestore como respaldo del chat | Hay que verificar que esté disponible y gratis en Spark; si no, no se hace. | T54 (solo esa viñeta) |

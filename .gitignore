@@ -13,3 +13,6 @@ local.env
 *.tsbuildinfo
 functions/.secret.local
 functions/.env.local
+
+# Maquetas de brainstorming
+.superpowers/
