@@ -2,8 +2,9 @@
 // a mano, por slug (web/src/logica/datos/maps.json los regenera `npm run assets`
 // y esto no lo pisa).
 //
-//   región   donde queda el lugar que representa; los genéricos o de fantasía van
-//            en "otros".
+//   región   donde queda el lugar que representa; un mapa puede estar en más de
+//            una (el Estrecho de Bering, en Asia y América) y los genéricos o de
+//            fantasía van en "otros".
 //   terreno  agua si el mapa es de islas o de mar abierto (se juega con barcos),
 //            ambos si mezcla tierra y agua (costa, lagos, grandes ríos), tierra si
 //            es sin agua o casi. Sale de la proporción de agua del minimapa
@@ -22,7 +23,7 @@ export const ETIQUETA_TERRENO = { tierra: 'Tierra', agua: 'Agua', ambos: 'Ambos'
 const POR_REGION = {
   america: [
     'alaska', 'amazonas', 'andes', 'araucania', 'artico', 'bahia-de-hudson', 'baja-california', 'bayou', 'california',
-    'caribe', 'carolina', 'colorado', 'cordillera-de-las-cascadas', 'dakota', 'desierto-pintado', 'espanola', 'florida',
+    'caribe', 'carolina', 'colorado', 'cordillera-de-las-cascadas', 'dakota', 'desierto-pintado', 'espanola', 'estrecho-de-bering', 'florida',
     'frontera-de-texas', 'gran-chaco', 'grandes-lagos', 'grandes-llanuras', 'groenlandia', 'guayanas', 'islas-virgenes',
     'labrador', 'mexico', 'minas-gerais', 'nueva-escocia', 'nueva-inglaterra', 'nunavut', 'orinoco', 'ozarks',
     'paisaje-altoandino', 'pampa', 'panama', 'paso-del-noroeste', 'patagonia', 'plymouth', 'quebec', 'rocosas', 'saguenay',
@@ -42,8 +43,9 @@ const POR_REGION = {
   ],
   asia: [
     'anatolia', 'arabia', 'asia-central', 'bengala', 'borneo', 'ceilan', 'corea', 'decan', 'estepa-euroasiatica',
-    'estepa-euroasiatica-perdido', 'estepa-euroasiatica-supervivencia', 'himalaya', 'himalaya-superior', 'hokkaido',
-    'honshu', 'indochina', 'indonesia', 'kamchatka', 'malasia', 'manchuria', 'mar-caspio', 'media-luna-fertil', 'mongolia',
+    'estepa-euroasiatica-perdido', 'estepa-euroasiatica-supervivencia', 'estrecho-de-bering', 'himalaya',
+    'himalaya-superior', 'hokkaido', 'honshu', 'indochina', 'indonesia', 'kamchatka', 'llanura-central', 'malasia',
+    'manchuria', 'mar-caspio', 'media-luna-fertil', 'mongolia',
     'punyab', 'rio-amarillo', 'rios-paralelos', 'ruta-de-la-seda', 'siberia', 'yamal',
   ],
   africa: [
@@ -54,7 +56,7 @@ const POR_REGION = {
   ],
   otros: [
     'archipielago', 'bahia', 'desconocido', 'desconocido-perdido', 'desconocido-supervivencia', 'el-diluvio',
-    'estrecho-de-bering', 'llanura-central', 'montanas',
+    'montanas',
   ],
 };
 
@@ -78,16 +80,23 @@ const AMBOS = [
   'territorios-del-noroeste', 'tripolitania', 'valaquia', 'yamal', 'yucatan',
 ];
 
-export const SLUGS_CON_REGION = Object.values(POR_REGION).flat();
+export const SLUGS_CON_REGION = [...new Set(Object.values(POR_REGION).flat())];
 export const SLUGS_AGUA = AGUA;
 export const SLUGS_AMBOS = AMBOS;
 
-const REGION_DE = new Map(Object.entries(POR_REGION).flatMap(([region, slugs]) => slugs.map((s) => [s, region])));
+// Las regiones de cada mapa, en el orden de REGIONES.
+/** @type {Map<string, string[]>} */
+const REGIONES_DE = new Map();
+for (const region of REGIONES) {
+  for (const slug of /** @type {Record<string, string[]>} */ (POR_REGION)[region] ?? []) {
+    REGIONES_DE.set(slug, [...(REGIONES_DE.get(slug) ?? []), region]);
+  }
+}
 const TERRENO_DE = new Map([...AGUA.map((s) => [s, 'agua']), ...AMBOS.map((s) => [s, 'ambos'])]);
 
-/** { region, terreno } de un mapa por su slug. Un slug que no está en las listas es "otros" y tierra. */
+/** { regiones, terreno } de un mapa por su slug. Un slug que no está en las listas es "otros" y tierra. */
 export function infoDeMapa(slug) {
-  return { region: REGION_DE.get(slug) ?? 'otros', terreno: TERRENO_DE.get(slug) ?? 'tierra' };
+  return { regiones: REGIONES_DE.get(slug) ?? ['otros'], terreno: TERRENO_DE.get(slug) ?? 'tierra' };
 }
 
 const normalizar = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -108,6 +117,6 @@ export function filtrarMapas(mapas, { q = '', elegidos = null, terreno = '', reg
       (!buscado || normalizar(m.name_es).includes(buscado) || normalizar(m.slug).includes(buscado)) &&
       (!solo || solo.has(m.id)) &&
       (!terreno || m.terreno === terreno) &&
-      (!region || m.region === region)
+      (!region || m.regiones.includes(region))
   );
 }

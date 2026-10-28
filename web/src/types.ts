@@ -28,8 +28,8 @@ export type GameMap = {
   slug: string;
   name_es: string;
   img: string;
-  /** Dónde queda (`web/src/logica/mapas-info.js`): america, europa, asia, africa u otros. */
-  region?: string;
+  /** Dónde queda (`web/src/logica/mapas-info.js`): america, europa, asia, africa u otros; puede ser más de una. */
+  regiones?: string[];
   /** tierra, agua o ambos. */
   terreno?: string;
 };

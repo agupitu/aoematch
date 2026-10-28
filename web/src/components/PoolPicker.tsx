@@ -147,7 +147,9 @@ export function MapPicker({
         )}
         {filtrados.map((m) => {
           const on = value.includes(m.id);
-          const detalle = [etiquetaDe(etiquetasTerreno, m.terreno), etiquetaDe(etiquetasRegion, m.region)].filter(Boolean).join(' · ');
+          const detalle = [etiquetaDe(etiquetasTerreno, m.terreno), (m.regiones ?? []).map((r) => etiquetasRegion[r]).join(' y ')]
+            .filter(Boolean)
+            .join(' · ');
           return (
             <button
               type="button"

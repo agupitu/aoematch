@@ -69,7 +69,8 @@ mayúsculas: `decan` encuentra `Decán`.
 **Mapas.** Al armar el pool se puede ver solo lo elegido y filtrar por terreno
 (tierra, agua o ambos) y por región (América, Europa, Asia, África); "Agregar los
 visibles" suma al pool lo que queda a la vista y "Quitar los visibles" lo saca.
-La clasificación es aproximada y está en `web/src/logica/mapas-info.js`.
+Un mapa puede estar en más de una región (el Estrecho de Bering, en América y en
+Asia). La clasificación es aproximada y está en `web/src/logica/mapas-info.js`.
 
 **Repeticiones del draft.** Hay tres opciones: repetir civ en el mismo equipo,
 repetir civ contra el mismo rival y repetir mapa contra el mismo rival (estas dos
