@@ -84,25 +84,47 @@ export function Bracket({ matches, previa = false }: { matches: Match[]; previa?
 
   return (
     <div className="space-y-8">
-      {[...porBracket.entries()].map(([bracket, lista]) => {
+      {[...porBracket.entries()].map(([bracket, todos]) => {
+        // El tercer puesto no es parte del árbol: va aparte, debajo de la final.
+        const tercer = todos.filter((m) => m.label === 'Tercer puesto');
+        const lista = todos.filter((m) => m.label !== 'Tercer puesto');
         const rondas = [...new Set(lista.map((m) => m.round))].sort((a, b) => a - b);
         return (
           <div key={bracket}>
             {!soloW && <h4 className="title mb-3 text-sm text-parch-400">{titulos[bracket] ?? bracket}</h4>}
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {rondas.map((r) => {
-                const deRonda = lista.filter((m) => m.round === r).sort((a, b) => a.position - b.position);
-                return (
-                  <div key={r} className="flex min-w-[200px] flex-col justify-around gap-3">
-                    <p className="text-center text-[11px] tracking-wide text-parch-400 uppercase">
-                      {deRonda[0]?.label ?? `Ronda ${r}`}
-                    </p>
-                    {deRonda.map((m) => (
-                      <MatchCard key={m.id} m={m} previa={previa} />
-                    ))}
+            <div className="overflow-x-auto pb-2">
+              <div className="w-max min-w-full">
+                {/* Las columnas miden lo mismo y los partidos de cada una se reparten parejo en toda la altura:
+                    cada partido queda a mitad de camino de los dos que llegan a él. Los títulos van fuera de ese
+                    reparto, en un mismo renglón. */}
+                <div className="flex gap-4">
+                  {rondas.map((r) => {
+                    const deRonda = lista.filter((m) => m.round === r).sort((a, b) => a.position - b.position);
+                    return (
+                      <div key={r} className="flex min-w-[200px] flex-col">
+                        <p className="mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">
+                          {deRonda[0]?.label ?? `Ronda ${r}`}
+                        </p>
+                        <div className="flex flex-1 flex-col justify-around gap-3">
+                          {deRonda.map((m) => (
+                            <MatchCard key={m.id} m={m} previa={previa} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {tercer.length > 0 && (
+                  <div className="mt-5 flex justify-end">
+                    <div className="min-w-[200px]">
+                      <p className="mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">Tercer puesto</p>
+                      {tercer.map((m) => (
+                        <MatchCard key={m.id} m={m} previa={previa} />
+                      ))}
+                    </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           </div>
         );

@@ -2,7 +2,7 @@
 // salir con la configuración del formulario, usando equipos de prueba. No toca
 // la base ni los equipos reales (web/src/logica/llaves.js).
 
-import { cuadroDeClasificados, generarCuadro } from './llaves.js';
+import { generarCuadro, previaDePlayoffs } from './llaves.js';
 
 /** Más que esto no se dibuja: una eliminación doble de 64 equipos ya son 126 partidos. */
 export const MAX_EQUIPOS_PREVIA = 64;
@@ -55,17 +55,12 @@ export function armarPrevia(b, cantidad, nombres = []) {
 
   if (torneo.format === 'grupos_playoff') {
     // Primeros de cada grupo arriba, después los segundos...: como siembra los playoffs de verdad.
-    const clasificados = [];
-    for (let pos = 1; pos <= torneo.group_advance; pos++) {
-      for (const g of etapas[0].groups) {
-        if (g.team_ids.length >= pos) clasificados.push({ id: `c${pos}${g.id}`, name: `${pos}º ${g.name}`, _pos: pos, _grupo: g.id });
-      }
-    }
-    if (clasificados.length >= 2) {
-      const playoffs = cuadroDeClasificados(torneo, clasificados, ids);
+    const grupos = etapas[0].groups.map((g) => ({ id: g.id, name: g.name, cantidad: g.team_ids.length }));
+    const playoffs = previaDePlayoffs(torneo, grupos, ids);
+    if (playoffs) {
       etapas = [...etapas, ...playoffs.etapas];
       partidos = [...partidos, ...playoffs.partidos];
-      for (const c of clasificados) nombreDe.set(c.id, c.name);
+      for (const [id, nombre] of playoffs.nombres) nombreDe.set(id, nombre);
     }
   }
 

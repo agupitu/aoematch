@@ -48,7 +48,10 @@ describe('rondas del cuadro', () => {
     const t = torneo({ format: 'grupos_playoff', group_count: 2, group_advance: 2 });
     const generador = ids();
     const grupos = generarCuadro(t, equipos(6), generador);
-    const playoffs = cuadroDePlayoffs(t, grupos.etapas, equipos(6), grupos.partidos, generador);
+    // Los playoffs se arman con los grupos cerrados: gana siempre el primero de cada partido.
+    const cerrados = mapaDe(grupos.partidos);
+    for (const p of cerrados.values()) cerrarEnMemoria(cerrados, p.id, p.team_a_id, 2, 0);
+    const playoffs = cuadroDePlayoffs(t, grupos.etapas, equipos(6), [...cerrados.values()], generador);
     const rondas = rondasDelCuadro(
       [...playoffs.partidos, ...grupos.partidos],
       [...playoffs.etapas, ...grupos.etapas]

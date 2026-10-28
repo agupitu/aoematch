@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cargarPartidas, cerrarEnMemoria, cerrarPartido, cuadroDeClasificados, cuadroDePlayoffs, darWalkover, generarCuadro,
-  ordenarManual, ordenSiembra, repartirEnGrupos, rondaSuiza, sembrarClasificados, tablaDesde,
+  ordenarManual, ordenSiembra, previaDePlayoffs, repartirEnGrupos, rondaSuiza, sembrarClasificados, tablaDesde,
 } from '../src/logica/llaves.js';
 
 const equipos = (n) => Array.from({ length: n }, (_, i) => ({ id: `E${i + 1}`, name: `E${i + 1}`, seed: null }));
@@ -221,6 +221,32 @@ describe('playoffs y suizo', () => {
     assert.equal(p.partidos.length, 3);
     assert.deepEqual(p.seeds.map((s) => s.id), ['E1', 'E2', 'E4', 'E3']); // primeros de grupo, después segundos
     assert.throws(() => cuadroDePlayoffs(t, [...c.etapas, ...p.etapas], equipos(7), jugados, ids()), /ya estaban generados/);
+  });
+
+  it('los playoffs no se arman con la fase de grupos sin terminar', () => {
+    const t = torneo({ format: 'grupos_playoff', group_count: 2, group_advance: 2 });
+    const c = generarCuadro(t, equipos(6), ids());
+    assert.throws(() => cuadroDePlayoffs(t, c.etapas, equipos(6), c.partidos, ids()), /faltan 6 partidos/);
+    const casi = [...jugarTodo(c.partidos).values()].map((m, i) => (i === 0 ? { ...m, status: 'pendiente' } : m));
+    assert.throws(() => cuadroDePlayoffs(t, c.etapas, equipos(6), casi, ids()), /falta 1 partido/);
+  });
+
+  it('playoffs previstos: los lugares se llaman "1º Grupo A", "2º Grupo B"...', () => {
+    const t = torneo({ format: 'grupos_playoff', group_count: 2, group_advance: 2 });
+    const grupos = [{ id: 'A', name: 'Grupo A', cantidad: 3 }, { id: 'B', name: 'Grupo B', cantidad: 3 }];
+    const p = previaDePlayoffs(t, grupos, ids());
+    const nombre = (id) => p.nombres.get(id) ?? null;
+    const primera = p.partidos.filter((m) => m.round === 1).map((m) => [nombre(m.team_a_id), nombre(m.team_b_id)]);
+    assert.deepEqual(primera, [['1º Grupo A', '2º Grupo B'], ['1º Grupo B', '2º Grupo A']]);
+    assert.deepEqual([...p.nombres.values()].sort(), ['1º Grupo A', '1º Grupo B', '2º Grupo A', '2º Grupo B']);
+    assert.equal(p.etapas[0].name, 'Playoffs');
+  });
+
+  it('playoffs previstos: un grupo corto no aporta lugares que no tiene; sin dos clasificados, nada', () => {
+    const t = torneo({ format: 'grupos_playoff', group_advance: 2 });
+    const p = previaDePlayoffs(t, [{ id: 'A', name: 'Grupo A', cantidad: 2 }, { id: 'B', name: 'Grupo B', cantidad: 1 }], ids());
+    assert.deepEqual([...p.nombres.values()].sort(), ['1º Grupo A', '1º Grupo B', '2º Grupo A']);
+    assert.equal(previaDePlayoffs(t, [{ id: 'A', name: 'Grupo A', cantidad: 1 }], ids()), null);
   });
 
   it('suizo de 6 con 3 rondas, sin revanchas', () => {

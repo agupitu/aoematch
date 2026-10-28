@@ -507,6 +507,10 @@ export function cuadroDePlayoffs(torneo, etapas, equipos, partidos, ids) {
   const deGrupos = etapas.find((e) => e.type === 'grupos');
   if (!deGrupos) throw new Error('Este torneo no tiene fase de grupos.');
   if (etapas.some((e) => e.type !== 'grupos')) throw new Error('Los playoffs ya estaban generados.');
+  const sinCerrar = partidos.filter((m) => m.stage_id === deGrupos.id && !terminado(m)).length;
+  if (sinCerrar) {
+    throw new Error(`La fase de grupos no terminó: ${sinCerrar === 1 ? 'falta 1 partido' : `faltan ${sinCerrar} partidos`}.`);
+  }
 
   const porId = new Map(equipos.map((e) => [e.id, e]));
   const clasificados = [];
@@ -600,6 +604,26 @@ export function cuadroDeClasificados(torneo, clasificados, ids) {
     partidos: [...c.partidos.values()],
     seeds: sembrados.map((t, i) => ({ id: t.id, seed: i + 1 })),
   };
+}
+
+/**
+ * Los playoffs tal como van a quedar, antes de saber quién clasifica: cada
+ * lugar se llama "1º Grupo A", "2º Grupo B"... `grupos` son `{ id, name,
+ * cantidad }` (cuántos equipos tiene cada uno) y `torneo.group_advance` cuántos
+ * pasan por grupo. Devuelve { etapas, partidos, nombres } con los partidos
+ * apuntando a ids de clasificados de mentira y `nombres` (id -> nombre) para
+ * ponerles texto; null si no hay al menos dos clasificados.
+ */
+export function previaDePlayoffs(torneo, grupos, ids) {
+  const clasificados = [];
+  for (let pos = 1; pos <= torneo.group_advance; pos++) {
+    for (const g of grupos) {
+      if (g.cantidad >= pos) clasificados.push({ id: `c${pos}${g.id}`, name: `${pos}º ${g.name}`, _pos: pos, _grupo: g.id });
+    }
+  }
+  if (clasificados.length < 2) return null;
+  const { etapas, partidos } = cuadroDeClasificados(torneo, clasificados, ids);
+  return { etapas, partidos, nombres: new Map(clasificados.map((c) => [c.id, c.name])) };
 }
 
 // -------------------------------------------------------------------- suizo
