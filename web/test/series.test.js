@@ -5,8 +5,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  estadoDeSerie, etiquetaDeSerie, modoDeSerie, opcionesDeSerie, paraGanar, partidasMaximas, proximaPartida,
-  victoriasDeWalkover,
+  estadoDeSerie, etiquetaDeSerie, modoDeSerie, opcionesDeSerie, paraGanar, partidasJugables, partidasMaximas,
+  proximaPartida, victoriasDeWalkover,
 } from '../src/logica/series.js';
 
 const mejorDe = (n) => ({ series_mode: 'mejor_de', best_of: n });
@@ -74,5 +74,29 @@ describe('estado de la serie', () => {
     assert.equal(victoriasDeWalkover(mejorDe(7)), 4);
     assert.equal(victoriasDeWalkover(fijas(3)), 3);
     assert.equal(victoriasDeWalkover(fijas(2)), 2);
+  });
+});
+
+describe('partidas que se pueden cargar', () => {
+  it('al mejor de: se cierran las que vienen después de definida la serie', () => {
+    assert.deepEqual(partidasJugables(mejorDe(3), []), [true, true, true]);
+    assert.deepEqual(partidasJugables(mejorDe(3), ['a', 'a', null]), [true, true, false]);
+    assert.deepEqual(partidasJugables(mejorDe(3), ['a', 'b', null]), [true, true, true]);
+    assert.deepEqual(partidasJugables(mejorDe(5), ['b', 'b', 'b', null, null]), [true, true, true, false, false]);
+    assert.deepEqual(partidasJugables(mejorDe(1), ['a']), [true]);
+  });
+
+  it('a N partidas: se habilitan todas, y la extra solo si empatan', () => {
+    assert.deepEqual(partidasJugables(fijas(3), ['a', 'a', null]), [true, true, true]);
+    assert.deepEqual(partidasJugables(fijas(2), []), [true, true, false]);
+    assert.deepEqual(partidasJugables(fijas(2), ['a', 'a', null]), [true, true, false]);
+    assert.deepEqual(partidasJugables(fijas(2), ['a', 'b', null]), [true, true, true]);
+    assert.deepEqual(partidasJugables(fijas(4), ['a', 'a', 'b', 'b', null]), [true, true, true, true, true]);
+    assert.deepEqual(partidasJugables(fijas(4), ['a', 'a', 'a', 'b', null]), [true, true, true, true, false]);
+  });
+
+  it('una partida cerrada no cuenta para las que siguen', () => {
+    // Si la tercera quedó cerrada, su ganador no mueve la cuenta de las demás.
+    assert.deepEqual(partidasJugables(mejorDe(5), ['a', 'a', 'a', 'b', 'b']), [true, true, true, false, false]);
   });
 });

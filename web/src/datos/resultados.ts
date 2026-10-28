@@ -44,30 +44,49 @@ export type Partida = {
   replay_url?: string | null;
 };
 
+export type PartidaDeSerie = Partida & { game_no: number };
+
+const linkValido = (url: string | null | undefined) => {
+  const limpio = url?.trim() || null;
+  if (limpio && !/^https?:\/\//i.test(limpio)) throw new Error('El link del replay tiene que empezar con http:// o https://.');
+  return limpio;
+};
+
 /**
- * Carga o corrige la partida `gameNo`. Lo que no viene se conserva de la carga
- * anterior. Sin ganador, la partida queda sin contar (sirve para borrar una
- * carga equivocada).
+ * Carga o corrige varias partidas de la serie de una sola vez (en una
+ * transacción: la serie se cierra recién con todas cargadas). Lo que no viene
+ * se conserva de la carga anterior. El link: sin `replay_url` se conserva el
+ * anterior, y con uno vacío se borra. Sin ganador, la partida queda sin contar
+ * (sirve para borrar una carga equivocada) y, si no tiene nada más, se saca.
  */
-export function cargarPartida(matchId: string, gameNo: number, datos: Partida) {
-  const replay = datos.replay_url?.trim() || null;
-  if (replay && !/^https?:\/\//i.test(replay)) throw new Error('El link del replay tiene que empezar con http:// o https://.');
+export function cargarSerie(matchId: string, partidas: PartidaDeSerie[]) {
+  const links = partidas.map((p) => (p.replay_url === undefined ? undefined : linkValido(p.replay_url)));
   return conMensaje(() =>
     enLaLlave(matchId, (partidos) => {
       const m = partidos.find((p) => p.id === matchId)!;
-      const games: Doc[] = m.games ?? [];
-      const previa = games.find((g) => g.game_no === gameNo);
-      const nueva = {
-        game_no: gameNo,
-        map_id: datos.map_id ?? previa?.map_id ?? null,
-        winner_team_id: datos.winner_team_id,
-        replay_url: replay ?? previa?.replay_url ?? null,
-        notes: previa?.notes ?? null,
-        civs: datos.civs ?? previa?.civs ?? [],
-      };
-      return cargarPartidas(partidos, matchId, [...games.filter((g) => g.game_no !== gameNo), nueva]);
+      // Las partidas de `games` no tienen `id` propio (a diferencia de un `Doc`).
+      let games: Record<string, any>[] = m.games ?? [];
+      partidas.forEach((datos, i) => {
+        const previa = games.find((g) => g.game_no === datos.game_no);
+        const nueva = {
+          game_no: datos.game_no,
+          map_id: datos.map_id ?? previa?.map_id ?? null,
+          winner_team_id: datos.winner_team_id,
+          replay_url: links[i] === undefined ? previa?.replay_url ?? null : links[i],
+          notes: previa?.notes ?? null,
+          civs: datos.civs ?? previa?.civs ?? [],
+        };
+        games = [...games.filter((g) => g.game_no !== datos.game_no), nueva];
+      });
+      games = games.filter((g) => g.winner_team_id || g.replay_url || g.map_id || g.civs?.length);
+      return cargarPartidas(partidos, matchId, games);
     })
   );
+}
+
+/** Carga o corrige la partida `gameNo`: lo mismo que `cargarSerie` con una sola. */
+export function cargarPartida(matchId: string, gameNo: number, datos: Partida) {
+  return cargarSerie(matchId, [{ ...datos, game_no: gameNo }]);
 }
 
 /** Walkover: el rival no se presentó. */

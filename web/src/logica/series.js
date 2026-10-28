@@ -45,6 +45,28 @@ export function estadoDeSerie(x, a, b) {
 /** Partidas que puede tener la serie como mucho, con el desempate incluido. */
 export const partidasMaximas = (x) => estadoDeSerie(x, 0, 0).maximo;
 
+/**
+ * Qué partidas de la serie se pueden cargar según los ganadores ya elegidos
+ * (`ganadores[i]` es 'a', 'b' o null para la partida i + 1). Al mejor de N, una
+ * partida se habilita mientras las anteriores no hayan definido la serie; a N
+ * partidas se habilitan las N, y la extra de una serie par solo si empataron.
+ * @returns {boolean[]} una entrada por partida posible, con el desempate incluido
+ */
+export function partidasJugables(x, ganadores) {
+  const fija = modoDeSerie(x) === 'fijas';
+  let a = 0;
+  let b = 0;
+  return Array.from({ length: partidasMaximas(x) }, (_, i) => {
+    const { ganador, desempate } = estadoDeSerie(x, a, b);
+    const habilitada = fija ? i < x.best_of || desempate : !ganador;
+    if (habilitada) {
+      if (ganadores[i] === 'a') a++;
+      else if (ganadores[i] === 'b') b++;
+    }
+    return habilitada;
+  });
+}
+
 /** Número de la partida que se juega ahora; null si la serie ya tiene ganador. */
 export const proximaPartida = (x, a, b) => (estadoDeSerie(x, a, b).ganador ? null : a + b + 1);
 

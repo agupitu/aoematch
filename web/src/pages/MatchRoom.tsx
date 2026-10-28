@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { agendar, detallePartido, guardarVodPartido, horariosDelPartido } from '../datos/partidos';
 import { type EstadoDraft, civsDeLaPartida, partidaActual, useDraft } from '../datos/drafts';
-import { cargarPartida, walkover } from '../datos/resultados';
+import { cargarSerie, walkover } from '../datos/resultados';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
+import { CargarPartidas, type DelDraft } from '../components/CargarPartidas';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
 import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado, useLive } from '../live';
 import { usePresencia } from '../presence';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, zonaDelNavegador } from '../lib';
-import { etiquetaDeSerie, partidasMaximas } from '../logica/series.js';
+import { etiquetaDeSerie } from '../logica/series.js';
 import type { MatchDetail, Ventana } from '../types';
 
 export function MatchRoom() {
@@ -337,17 +338,14 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
 
 function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; onDone: () => void }) {
   const [abierto, setAbierto] = useState(false);
-  const [gameNo, setGameNo] = useState(String(Math.min(partidasMaximas(m), m.score_a + m.score_b + 1)));
-  const [ganador, setGanador] = useState('');
-  const [replay, setReplay] = useState('');
   const [wo, setWo] = useState('');
   const [error, setError] = useState('');
 
-  // Mapa y civs del draft de esa partida, si ya se reveló.
+  // Mapa y civs del draft de la partida en juego, si ya se reveló.
   const { draft, picks } = estado;
-  const delDraft =
-    draft && draft.revealed && picks && draft.game_no === Number(gameNo)
-      ? { map_id: draft.map_id, civs: civsDeLaPartida(draft, picks) }
+  const delDraft: DelDraft | null =
+    draft && draft.revealed && picks
+      ? { game_no: draft.game_no, map_id: draft.map_id, civs: civsDeLaPartida(draft, picks) }
       : null;
 
   const hacer = async (fn: () => Promise<unknown>) => {
@@ -355,7 +353,6 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
     try {
       await fn();
       setAbierto(false);
-      setReplay('');
       onDone();
     } catch (err) {
       setError((err as Error).message);
@@ -369,60 +366,20 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
       <button
         className="btn btn-primary"
         onClick={() => {
-          setGameNo(String(Math.min(partidasMaximas(m), m.score_a + m.score_b + 1)));
-          setGanador('');
           setError('');
           setAbierto(true);
         }}
       >
         Cargar resultado
       </button>
-      <Modal open={abierto} onClose={() => setAbierto(false)} title="Cargar una partida">
+      <Modal open={abierto} onClose={() => setAbierto(false)} title="Cargar las partidas">
         <div className="space-y-4">
-          <div>
-            <label className="label">Partida</label>
-            <select className="field" value={gameNo} onChange={(e) => setGameNo(e.target.value)}>
-              {Array.from({ length: partidasMaximas(m) }, (_, i) => (
-                <option key={i} value={i + 1}>
-                  Partida {i + 1}
-                  {i + 1 > m.best_of ? ' (desempate)' : ''}
-                  {m.games.some((g) => g.game_no === i + 1 && g.winner_team_id) ? ' (cargada)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Ganador</label>
-            <select className="field" value={ganador} onChange={(e) => setGanador(e.target.value)}>
-              <option value="">Elegir…</option>
-              {m.teams.a && <option value={m.teams.a.id}>{m.teams.a.name}</option>}
-              {m.teams.b && <option value={m.teams.b.id}>{m.teams.b.name}</option>}
-              <option value="ninguno">Sin ganador (borrar esta partida)</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Link del replay (opcional)</label>
-            <input className="field" value={replay} onChange={(e) => setReplay(e.target.value)} placeholder="https://…" />
-          </div>
-          {delDraft && (
-            <p className="hint text-xs">Se guardan el mapa y las civs del draft de esta partida.</p>
-          )}
-          {error && <Alerta>{error}</Alerta>}
-          <button
-            className="btn btn-primary w-full"
-            disabled={!ganador}
-            onClick={() =>
-              hacer(() =>
-                cargarPartida(m.id, Number(gameNo), {
-                  winner_team_id: ganador === 'ninguno' ? null : ganador,
-                  replay_url: replay || undefined,
-                  ...(delDraft ?? {}),
-                })
-              )
-            }
-          >
-            Guardar
-          </button>
+          <CargarPartidas
+            m={m}
+            delDraft={delDraft}
+            error={error}
+            onGuardar={(partidas) => hacer(() => cargarSerie(m.id, partidas))}
+          />
 
           {!terminado && (
             <div className="border-t border-ink-700 pt-4">
