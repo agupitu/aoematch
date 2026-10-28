@@ -231,9 +231,9 @@ async function sembrarMockup(rnd, organizador) {
     civ_repeat_series: 0,
     entry_fee_cents: 300000,
     currency: 'ARS',
-    payment_links: [
-      { label: 'Mercado Pago', url: 'https://link.mercadopago.com.ar/ejemplo' },
-      { label: 'PayPal', url: 'https://www.paypal.com/paypalme/ejemplo' },
+    payment_methods: [
+      { method: 'Mercado Pago', name: 'Organización AoE III Draft', alias: 'aoe3draft.mp', url: 'https://link.mercadopago.com.ar/ejemplo' },
+      { method: 'PayPal', url: 'https://www.paypal.com/paypalme/ejemplo' },
     ],
     payment_notes: 'Transferencia o Mercado Pago. Mandá el comprobante por Discord.',
     allow_solo: 0,
@@ -355,7 +355,7 @@ export async function sembrarDemo() {
     civ_repeat_series: 0,
     entry_fee_cents: 500000,
     currency: 'ARS',
-    payment_links: [{ label: 'Mercado Pago', url: 'https://link.mercadopago.com.ar/ejemplo' }],
+    payment_methods: [{ method: 'Transferencia bancaria', name: 'Kaiser', alias: 'kaiser.aoe3' }],
     allow_solo: 1,
     third_place: 1,
     prize_pool_mode: 'inscripciones',

@@ -155,20 +155,24 @@ describe('torneos y etapas', () => {
     await assertFails(como('org').doc('tournaments/copa').update({ series_mode: 'mitad' }));
   });
 
-  it('los links de pago: hasta 5, con nombre y dirección http(s)', async () => {
+  it('los medios de pago: hasta 5, con medio, nombre, alias y link opcionales', async () => {
     const db = como('nuevo');
-    const link = (n) => ({ label: `Pago ${n}`, url: `https://pagos.example.com/${n}` });
-    const con = (slug, payment_links) => db.doc(`tournaments/${slug}`).set(torneo({ slug, organizer_id: 'nuevo', payment_links }));
-    await assertSucceeds(con('p1', [link(1), link(2)]));
+    const medio = (n) => ({ method: `Medio ${n}`, name: 'Titular', alias: `alias.${n}`, url: `https://pagos.example.com/${n}` });
+    const con = (slug, payment_methods) => db.doc(`tournaments/${slug}`).set(torneo({ slug, organizer_id: 'nuevo', payment_methods }));
+    await assertSucceeds(con('p1', [medio(1), medio(2)]));
     await assertSucceeds(con('p2', []));
-    await assertSucceeds(con('p3', [1, 2, 3, 4, 5].map(link)));
-    await assertFails(con('p4', [1, 2, 3, 4, 5, 6].map(link)));
-    await assertFails(con('p5', [{ label: 'Banco', url: 'alias.banco' }]));
-    await assertFails(con('p6', [{ label: '', url: 'https://x.example.com/a' }]));
-    await assertFails(con('p7', 'https://x.example.com'));
-    await assertFails(con('p8', [{ label: 'x', url: 'https://x.example.com/a', extra: 1 }]));
-    await assertSucceeds(como('org').doc('tournaments/copa').update({ payment_links: [link(1)] }));
-    await assertFails(como('org').doc('tournaments/copa').update({ payment_links: [{ label: 'x', url: 'ftp://x.example.com' }] }));
+    await assertSucceeds(con('p3', [1, 2, 3, 4, 5].map(medio)));
+    await assertSucceeds(con('p4', [{ alias: 'solo.alias' }, { method: 'Efectivo' }, { name: 'Ana' }, { url: 'https://x.example.com/a' }]));
+    await assertFails(con('p5', [1, 2, 3, 4, 5, 6].map(medio)));
+    await assertFails(con('p6', [{ method: 'Banco', url: 'alias.banco' }]));
+    await assertFails(con('p7', [{}]));
+    await assertFails(con('p8', [{ method: 'x', extra: 1 }]));
+    await assertFails(con('p9', [{ method: 'm'.repeat(61) }]));
+    await assertFails(con('p10', [{ alias: 'a'.repeat(101) }]));
+    await assertFails(con('p11', ['Mercado Pago']));
+    await assertFails(con('p12', 'https://x.example.com'));
+    await assertSucceeds(como('org').doc('tournaments/copa').update({ payment_methods: [medio(1)] }));
+    await assertFails(como('org').doc('tournaments/copa').update({ payment_methods: [{ url: 'ftp://x.example.com' }] }));
   });
 
   it('pisar un torneo ajeno con set no pasa', async () => {

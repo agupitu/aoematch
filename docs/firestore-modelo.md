@@ -114,9 +114,11 @@ mapa. Además:
   que los compañeros lean el pick del otro antes de revelar (el rival no) y no dejan guardar la civ que ya
   tiene un compañero. `civ_repeat_series` y `map_repeat` valen dentro de una serie (las partidas de un mismo
   cruce entre dos equipos), no en toda la fase.
-- `payment_links`: `[{ label, url }]`, hasta 5, con `url` http(s) (las reglas lo validan). Reemplaza al
-  `payment_link` único: un torneo que solo lo tiene se lee como un link llamado "Pagar acá", y al guardar la
-  configuración se escribe `payment_links` y se borra `payment_link` (`web/src/logica/pagos.js`).
+- `payment_methods`: `[{ method, name, alias, url }]`, hasta 5. Medio de pago, nombre del titular, alias y
+  link: todos opcionales (cada medio trae al menos uno) y el link, si hay, es http(s); las reglas lo validan.
+  Reemplaza a `payment_links` y al `payment_link` único: un torneo que solo tiene esos se lee igual (un
+  medio por link), al leer se descartan los links que no son http(s) y al guardar la configuración se
+  escribe `payment_methods` y se borran los otros dos (`web/src/logica/pagos.js`).
 - Los contadores reemplazan los `COUNT(*)` del listado y de `premiosDe`. Se actualizan con
   `FieldValue.increment` en la misma transacción que cambia la inscripción o el equipo (T16, T17,
   T20). Si alguna vez se desajustan, se recalculan leyendo las subcolecciones.

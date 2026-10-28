@@ -10,7 +10,6 @@ import {
 } from '../datos/equipos';
 import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { pedidosPendientes } from '../logica/equipos.js';
-import { textoDelLink } from '../logica/pagos.js';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
@@ -19,7 +18,7 @@ import { Bracket, MatchCard } from '../components/Bracket';
 import { FechasDeRonda } from '../components/FechasDeRonda';
 import { MatchCalendar } from '../components/MatchCalendar';
 import { MisHorarios } from '../components/MisHorarios';
-import { TournamentForm, type Borrador, type PestaniaForm } from '../components/TournamentForm';
+import { TournamentForm, medioVacio, type Borrador, type PestaniaForm } from '../components/TournamentForm';
 import { ChatPanel } from '../components/ChatPanel';
 import { EditorVod, ListaVod } from '../components/VodLinks';
 import { useChat, useConectado } from '../live';
@@ -28,7 +27,7 @@ import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
   fechaCorta, monto, plata, zonaDelNavegador,
 } from '../lib';
-import type { Civ, GameMap, Registration, StandingRow, Team, Tournament, User } from '../types';
+import type { Civ, GameMap, PagoMedio, Registration, StandingRow, Team, Tournament, User } from '../types';
 
 type Pestania = 'resumen' | 'inscripciones' | 'equipos' | 'llaves' | 'horarios' | 'chat' | 'config';
 
@@ -185,15 +184,11 @@ function AccionesInscripcion({
         <div className="space-y-4">
           {t.entry_fee_cents > 0 && (
             <Alerta tone="info">
-              Costo: {plata(t.entry_fee_cents, t.currency)}.{' '}
-              {t.payment_links.length > 0 && (
-                <span className="inline-flex flex-wrap items-center gap-x-3">
-                  {t.payment_links.map((l) => (
-                    <a key={l.url} className="text-gold-400 underline" href={l.url} target="_blank" rel="noreferrer">
-                      {textoDelLink(l)}
-                    </a>
-                  ))}
-                </span>
+              Costo: {plata(t.entry_fee_cents, t.currency)}.
+              {t.payment_methods.length > 0 && (
+                <div className="my-2">
+                  <ComoPagar medios={t.payment_methods} />
+                </div>
               )}
               {t.payment_notes && <span className="mt-1 block text-parch-400">{t.payment_notes}</span>}
               <span className="mt-1 block text-parch-400">
@@ -346,14 +341,11 @@ function Resumen({ t }: { t: Tournament }) {
           </dl>
         </section>
 
-        {t.payment_links.length > 0 && (
-          <div className="space-y-2">
-            {t.payment_links.map((l) => (
-              <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="btn btn-ghost w-full">
-                {textoDelLink(l)}
-              </a>
-            ))}
-          </div>
+        {t.payment_methods.length > 0 && (
+          <section className="card p-5">
+            <h3 className="title mb-3 text-lg">Cómo pagar</h3>
+            <ComoPagar medios={t.payment_methods} />
+          </section>
         )}
       </aside>
     </div>
@@ -407,6 +399,54 @@ function Premios({ t }: { t: Tournament }) {
       )}
       {t.prize_notes && <p className="mt-2 text-xs text-parch-400">{t.prize_notes}</p>}
     </section>
+  );
+}
+
+/** Un texto (el alias) que se copia con un clic. */
+function CopiarTexto({ texto }: { texto: string }) {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <button
+      type="button"
+      className="text-xs text-gold-400 hover:underline"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(texto);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 1500);
+        } catch {
+          // Sin permiso para el portapapeles: se copia a mano.
+        }
+      }}
+    >
+      {copiado ? 'Copiado' : 'Copiar'}
+    </button>
+  );
+}
+
+/** Cómo pagar la inscripción: cada medio con su titular, su alias (que se copia) y su link. */
+function ComoPagar({ medios }: { medios: PagoMedio[] }) {
+  return (
+    <ul className="space-y-2">
+      {medios.map((m, i) => (
+        <li key={i} className="rounded-lg border border-ink-700 px-3 py-2 text-sm">
+          <p className="font-medium text-parch-100">{m.method ?? 'Pago'}</p>
+          {m.name && <p className="text-parch-200">{m.name}</p>}
+          {m.alias && (
+            <p className="flex flex-wrap items-center gap-2 text-parch-200">
+              <span className="text-parch-400">Alias</span>
+              <code className="rounded bg-ink-800 px-1.5 py-0.5 text-parch-100">{m.alias}</code>
+              <CopiarTexto texto={m.alias} />
+            </p>
+          )}
+          {m.url && (
+            <a className="text-gold-400 underline" href={m.url} target="_blank" rel="noreferrer">
+              Abrir link de pago
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -1119,7 +1159,9 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       civ_repeat_team: t.civ_repeat_team !== 0,
       entry_fee_cents: t.entry_fee_cents,
       currency: t.currency,
-      payment_links: t.payment_links.map((l) => ({ ...l })),
+      payment_methods: t.payment_methods.length
+        ? t.payment_methods.map((m) => ({ method: m.method ?? '', name: m.name ?? '', alias: m.alias ?? '', url: m.url ?? '' }))
+        : [medioVacio()],
       payment_notes: t.payment_notes ?? '',
       allow_solo: !!t.allow_solo,
       reg_closes_at: t.reg_closes_at?.slice(0, 16) ?? '',

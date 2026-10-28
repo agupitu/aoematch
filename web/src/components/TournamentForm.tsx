@@ -1,7 +1,7 @@
-import type { Civ, GameMap, PagoLink, SerieModo } from '../types';
+import type { Civ, GameMap, SerieModo } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
-import { MAX_LINKS_DE_PAGO } from '../logica/pagos.js';
+import { MAX_MEDIOS_DE_PAGO, MEDIOS_SUGERIDOS } from '../logica/pagos.js';
 import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
 import { VistaPrevia } from './VistaPrevia';
@@ -13,6 +13,13 @@ export type PremioBorrador = {
   percent: number;
   extra: string;
 };
+
+/** Un medio de pago en el formulario: todos los campos son opcionales, vacíos si no se cargan. */
+export type PagoMedioBorrador = { method: string; name: string; alias: string; url: string };
+
+export function medioVacio(): PagoMedioBorrador {
+  return { method: '', name: '', alias: '', url: '' };
+}
 
 export type Borrador = {
   name: string;
@@ -36,7 +43,7 @@ export type Borrador = {
   civ_repeat_team: boolean;
   entry_fee_cents: number;
   currency: string;
-  payment_links: PagoLink[];
+  payment_methods: PagoMedioBorrador[];
   payment_notes: string;
   allow_solo: boolean;
   reg_closes_at: string;
@@ -72,7 +79,7 @@ export const BORRADOR_INICIAL: Borrador = {
   civ_repeat_team: true,
   entry_fee_cents: 0,
   currency: 'ARS',
-  payment_links: [],
+  payment_methods: [medioVacio()],
   payment_notes: '',
   allow_solo: true,
   reg_closes_at: '',
@@ -465,7 +472,7 @@ export function TournamentForm({
               </Campo>
             </div>
 
-            <LinksDePago value={value.payment_links} onChange={(v) => set('payment_links', v)} />
+            <MediosDePago value={value.payment_methods} onChange={(v) => set('payment_methods', v)} />
 
             <div className="mt-4 max-w-2xl">
               <Campo label="Instrucciones de pago">
@@ -517,62 +524,90 @@ export function TournamentForm({
   );
 }
 
-// ------------------------------------------------------------ links de pago
+// ----------------------------------------------------------- medios de pago
 
-/** Los links para pagar la inscripción: cada uno con el nombre que ven los jugadores. */
-function LinksDePago({ value, onChange }: { value: PagoLink[]; onChange: (v: PagoLink[]) => void }) {
-  const editar = (i: number, cambio: Partial<PagoLink>) =>
-    onChange(value.map((l, j) => (i === j ? { ...l, ...cambio } : l)));
+/**
+ * Cómo se puede pagar la inscripción: medio de pago, nombre, alias y link, todos
+ * opcionales, y un + para sumar otro con los mismos campos. Las filas vacías no
+ * se guardan.
+ */
+function MediosDePago({ value, onChange }: { value: PagoMedioBorrador[]; onChange: (v: PagoMedioBorrador[]) => void }) {
+  const editar = (i: number, cambio: Partial<PagoMedioBorrador>) =>
+    onChange(value.map((m, j) => (i === j ? { ...m, ...cambio } : m)));
+  // Siempre queda una fila: quitar la única la vacía.
+  const quitar = (i: number) => onChange(value.length > 1 ? value.filter((_, j) => j !== i) : [medioVacio()]);
 
   return (
     <div className="mt-4">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h4 className="label mb-0">Links de pago</h4>
-        <span className="text-xs text-parch-400">Mercado Pago, PayPal, Ko-fi, lo que uses. Hasta {MAX_LINKS_DE_PAGO}.</span>
-        <button
-          type="button"
-          className="btn btn-ghost ml-auto"
-          disabled={value.length >= MAX_LINKS_DE_PAGO}
-          onClick={() => onChange([...value, { label: '', url: '' }])}
-        >
-          Agregar link
-        </button>
-      </div>
+      <h4 className="label">Medios de pago</h4>
+      <p className="hint mb-2 text-xs">Ningún campo es obligatorio: lo que cargues lo ven los jugadores al inscribirse.</p>
+      <datalist id="medios-de-pago">
+        {MEDIOS_SUGERIDOS.map((m) => (
+          <option key={m} value={m} />
+        ))}
+      </datalist>
 
-      {value.length === 0 ? (
-        <p className="hint rounded-lg border border-dashed border-ink-700 p-4 text-center text-sm">
-          Sin links de pago: el organizador cobra por fuera.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {value.map((l, i) => (
-            <div key={i} className="grid items-center gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
+      <div className="space-y-2">
+        {value.map((m, i) => (
+          <div
+            key={i}
+            className="grid items-end gap-3 rounded-lg border border-ink-700 p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.4fr_auto]"
+          >
+            <Campo label="Medio de pago">
               <input
                 className="field"
-                aria-label={`Nombre del link ${i + 1}`}
-                value={l.label}
-                placeholder="Nombre (Mercado Pago)"
-                onChange={(e) => editar(i, { label: e.target.value })}
+                list="medios-de-pago"
+                value={m.method}
+                placeholder="Mercado Pago"
+                onChange={(e) => editar(i, { method: e.target.value })}
               />
+            </Campo>
+            <Campo label="Nombre">
               <input
                 className="field"
-                aria-label={`Dirección del link ${i + 1}`}
-                value={l.url}
+                value={m.name}
+                placeholder="Titular de la cuenta"
+                onChange={(e) => editar(i, { name: e.target.value })}
+              />
+            </Campo>
+            <Campo label="Alias">
+              <input
+                className="field"
+                value={m.alias}
+                placeholder="mi.alias"
+                onChange={(e) => editar(i, { alias: e.target.value })}
+              />
+            </Campo>
+            <Campo label="Link">
+              <input
+                className="field"
+                value={m.url}
                 placeholder="https://…"
                 onChange={(e) => editar(i, { url: e.target.value })}
               />
-              <button
-                type="button"
-                className="btn btn-danger px-2"
-                title="Quitar"
-                onClick={() => onChange(value.filter((_, j) => j !== i))}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+            </Campo>
+            <button
+              type="button"
+              className="btn btn-danger px-2"
+              title={value.length > 1 ? 'Quitar este medio' : 'Vaciar'}
+              aria-label={value.length > 1 ? `Quitar el medio de pago ${i + 1}` : 'Vaciar el medio de pago'}
+              onClick={() => quitar(i)}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        className="btn btn-ghost mt-2"
+        disabled={value.length >= MAX_MEDIOS_DE_PAGO}
+        title={value.length >= MAX_MEDIOS_DE_PAGO ? `Hasta ${MAX_MEDIOS_DE_PAGO} medios de pago` : undefined}
+        onClick={() => onChange([...value, medioVacio()])}
+      >
+        + Agregar otro medio de pago
+      </button>
     </div>
   );
 }

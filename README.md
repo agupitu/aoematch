@@ -62,8 +62,8 @@ draft, inscripción, premios, mapas y civilizaciones**— y es el mismo que desp
 aparece en **Configuración**. Ahí se define el formato (**eliminación simple,
 doble, liga, grupos + playoff o suizo**), el tamaño de equipo (1v1 a 4v4), el
 tipo y largo de las series, el pool de mapas, las civilizaciones habilitadas, el
-costo de inscripción con sus links de pago (hasta 5, cada uno con su nombre) y el
-reparto de premios. Los buscadores de mapas y civilizaciones ignoran tildes y
+costo de inscripción con sus medios de pago (hasta 5; cada uno con medio, nombre,
+alias y link, todos opcionales) y el reparto de premios. Los buscadores de mapas y civilizaciones ignoran tildes y
 mayúsculas: `decan` encuentra `Decán`.
 
 **Mapas.** Al armar el pool se puede ver solo lo elegido y filtrar por terreno

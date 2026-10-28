@@ -68,14 +68,25 @@ service cloud.firestore {
         && (links.size() < 20 || vodLinkValido(links[19]));
     }
 
-    // Links de pago de un torneo: hasta 5, cada uno con nombre y dirección http(s).
-    function pagoLinksValidos(links) {
-      return links is list && links.size() <= 5
-        && (links.size() < 1 || vodLinkValido(links[0]))
-        && (links.size() < 2 || vodLinkValido(links[1]))
-        && (links.size() < 3 || vodLinkValido(links[2]))
-        && (links.size() < 4 || vodLinkValido(links[3]))
-        && (links.size() < 5 || vodLinkValido(links[4]));
+    // Medios de pago de un torneo: hasta 5. Cada uno trae medio, nombre, alias y
+    // link, todos opcionales (al menos uno); el link, si hay, es http(s).
+    function medioDePagoValido(p) {
+      return p is map
+        && p.keys().size() >= 1
+        && p.keys().hasOnly(['method', 'name', 'alias', 'url'])
+        && textoOpcional(p.get('method', null), 60)
+        && textoOpcional(p.get('name', null), 100)
+        && textoOpcional(p.get('alias', null), 100)
+        && (!p.keys().hasAny(['url']) || urlHttp(p.url));
+    }
+
+    function pagoMediosValidos(medios) {
+      return medios is list && medios.size() <= 5
+        && (medios.size() < 1 || medioDePagoValido(medios[0]))
+        && (medios.size() < 2 || medioDePagoValido(medios[1]))
+        && (medios.size() < 3 || medioDePagoValido(medios[2]))
+        && (medios.size() < 4 || medioDePagoValido(medios[3]))
+        && (medios.size() < 5 || medioDePagoValido(medios[4]));
     }
 
     function rutaTorneo(slug) {
@@ -149,7 +160,7 @@ service cloud.firestore {
         && enteroEntre(d.get('civ_bans', 0), 0, 3)
         && enteroEntre(d.get('best_of', 1), 1, 9)
         && d.get('series_mode', 'mejor_de') in ['mejor_de', 'fijas']
-        && pagoLinksValidos(d.get('payment_links', []));
+        && pagoMediosValidos(d.get('payment_methods', []));
     }
 
     match /tournaments/{slug} {

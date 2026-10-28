@@ -34,8 +34,8 @@ export type GameMap = {
   terreno?: string;
 };
 
-/** Un link para pagar la inscripción, con el nombre que ven los jugadores. */
-export type PagoLink = { label: string; url: string };
+/** Un medio para pagar la inscripción (`web/src/logica/pagos.js`); todos los campos son opcionales. */
+export type PagoMedio = { method?: string; name?: string; alias?: string; url?: string };
 
 export type Member = {
   id: string;
@@ -179,7 +179,7 @@ export type Tournament = {
   civ_repeat_team?: number;
   entry_fee_cents: number;
   currency: string;
-  payment_links: PagoLink[];
+  payment_methods: PagoMedio[];
   payment_notes: string | null;
   allow_solo: number;
   reg_opens_at: string | null;

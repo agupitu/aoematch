@@ -16,7 +16,7 @@ import { firestore } from '../firebase';
 import { mapaPorId, civs as todasLasCivs } from '../logica/catalogo.js';
 import { poolCivs, poolMapas } from '../logica/draft.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
-import { limpiarLinksDePago, linksDePago } from '../logica/pagos.js';
+import { limpiarMediosDePago, mediosDePago } from '../logica/pagos.js';
 import { MODOS_DE_SERIE } from '../logica/series.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
@@ -97,7 +97,7 @@ export function camposDe(body: Record<string, unknown>) {
   if (typeof cambios.civ_bans === 'number') cambios.civ_bans = Math.max(0, Math.min(3, Math.round(cambios.civ_bans)));
 
   if (Array.isArray(body.prizes)) cambios.prizes = premiosLimpios(body.prizes);
-  if (Array.isArray(body.payment_links)) cambios.payment_links = limpiarLinksDePago(body.payment_links);
+  if (Array.isArray(body.payment_methods)) cambios.payment_methods = limpiarMediosDePago(body.payment_methods);
   if (Array.isArray(body.map_ids)) cambios.map_ids = idsLimpios(body.map_ids);
   if (Array.isArray(body.civ_ids)) cambios.civ_ids = idsLimpios(body.civ_ids);
   return cambios;
@@ -136,7 +136,7 @@ const POR_DEFECTO = {
   description: null, rules_md: null, banner_url: null, status: 'borrador', format: 'eliminacion_simple',
   team_size: 1, max_teams: null, best_of: 3, best_of_final: null, series_mode: 'mejor_de', group_count: 0, group_advance: 2,
   swiss_rounds: 0, third_place: 0, map_repeat: 0, first_map_id: null,
-  civ_bans: 0, civ_repeat_series: 1, civ_repeat_team: 1, entry_fee_cents: 0, currency: 'ARS', payment_links: [], payment_notes: null,
+  civ_bans: 0, civ_repeat_series: 1, civ_repeat_team: 1, entry_fee_cents: 0, currency: 'ARS', payment_methods: [], payment_notes: null,
   allow_solo: 1, reg_opens_at: null, reg_closes_at: null, starts_at: null, prize_pool_mode: 'ninguno',
   prize_pool_cents: 0, prize_pool_pct: 100, prize_notes: null, admin_ids: [], map_ids: [], civ_ids: [], prizes: [],
 };
@@ -175,11 +175,14 @@ export function guardarVodFase(slug: string, stageId: string, links: { label: st
   return conMensaje(() => updateDoc(doc(firestore, 'tournaments', slug, 'stages', stageId), { vod_links: links }));
 }
 
-/** Cambios del staff. `orden` sigue a `starts_at`. Saca los modos del draft viejo y el `payment_link` único de antes. */
+/** Cambios del staff. `orden` sigue a `starts_at`. Saca los modos del draft viejo y los campos de pago de antes. */
 export async function actualizarTorneo(t: Doc | Tournament, body: Record<string, unknown>) {
   const cambios = camposDe(body);
   for (const c of CAMPOS_VIEJOS) cambios[c] = deleteField();
-  if (cambios.payment_links !== undefined) cambios.payment_link = deleteField();
+  if (cambios.payment_methods !== undefined) {
+    cambios.payment_links = deleteField();
+    cambios.payment_link = deleteField();
+  }
   if (!Object.keys(cambios).length) return;
   if (cambios.starts_at !== undefined) cambios.orden = cambios.starts_at ?? (t as Doc).created_at;
   await conMensaje(() => updateDoc(refTorneo(t.id), cambios));
@@ -308,7 +311,7 @@ export async function detalleTorneo(slug: string, uid: string | null): Promise<T
     ...t,
     organizer: organizador ? { id: organizador.id, display_name: organizador.display_name } : null,
     first_map: t.first_map_id ? mapaPorId(t.first_map_id) : null,
-    payment_links: linksDePago(t),
+    payment_methods: mediosDePago(t),
     ...premiosDe(t, pagas),
     maps: poolMapas(t),
     civs: poolCivs(t),

@@ -1,57 +1,85 @@
-// Links de pago de un torneo (web/src/logica/pagos.js).
+// Medios de pago de un torneo (web/src/logica/pagos.js).
 //
 //   npm --prefix web test
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_LINKS_DE_PAGO, limpiarLinksDePago, linksDePago, textoDelLink } from '../src/logica/pagos.js';
+import { MAX_MEDIOS_DE_PAGO, limpiarMediosDePago, mediosDePago } from '../src/logica/pagos.js';
 
-describe('links de pago guardados', () => {
-  it('lo que dice cada link: con el nombre, o "Pagar acá" si no lo tiene', () => {
-    assert.equal(textoDelLink({ label: 'Mercado Pago', url: 'https://mp.com/x' }), 'Pagar con Mercado Pago');
-    assert.equal(textoDelLink({ label: 'Pagar acá', url: 'https://mp.com/x' }), 'Pagar acá');
+describe('medios de pago guardados', () => {
+  it('lee `payment_methods` con los campos que tengan', () => {
+    const medios = [
+      { method: 'Mercado Pago', name: 'Organización', alias: 'aoe.mp', url: 'https://mp.com/x' },
+      { alias: 'solo.alias' },
+    ];
+    assert.deepEqual(mediosDePago({ payment_methods: medios }), medios);
+    assert.deepEqual(mediosDePago({ payment_methods: [] }), []);
   });
 
-  it('un torneo viejo con un solo `payment_link` muestra ese link', () => {
-    assert.deepEqual(linksDePago({ payment_link: 'https://mp.com/x' }), [{ label: 'Pagar acá', url: 'https://mp.com/x' }]);
-    assert.deepEqual(linksDePago({ payment_link: null }), []);
-    assert.deepEqual(linksDePago({}), []);
+  it('la versión anterior (`payment_links`, con nombre y link) se lee como medio y link', () => {
+    assert.deepEqual(
+      mediosDePago({ payment_links: [{ label: 'PayPal', url: 'https://paypal.me/x' }] }),
+      [{ method: 'PayPal', url: 'https://paypal.me/x' }]
+    );
   });
 
-  it('si ya tiene `payment_links`, mandan esos', () => {
-    const links = [{ label: 'PayPal', url: 'https://paypal.me/x' }];
-    assert.deepEqual(linksDePago({ payment_links: links, payment_link: 'https://viejo.com' }), links);
-    assert.deepEqual(linksDePago({ payment_links: [], payment_link: 'https://viejo.com' }), []);
+  it('un torneo viejo con un solo `payment_link` muestra un medio con ese link', () => {
+    assert.deepEqual(mediosDePago({ payment_link: 'https://mp.com/x' }), [{ method: 'Link de pago', url: 'https://mp.com/x' }]);
+    assert.deepEqual(mediosDePago({ payment_link: null }), []);
+    assert.deepEqual(mediosDePago({}), []);
+  });
+
+  it('si ya tiene `payment_methods`, mandan esos aunque queden campos viejos', () => {
+    const medios = [{ method: 'Efectivo' }];
+    assert.deepEqual(mediosDePago({ payment_methods: medios, payment_links: [{ label: 'x', url: 'https://x.com/a' }], payment_link: 'https://v.com/a' }), medios);
+  });
+
+  it('al leer se descartan los links que no son http(s): nunca queda un javascript: en un href', () => {
+    assert.deepEqual(mediosDePago({ payment_methods: [{ method: 'X', url: 'javascript:alert(1)' }] }), [{ method: 'X' }]);
+    assert.deepEqual(mediosDePago({ payment_link: 'javascript:alert(1)' }), [{ method: 'Link de pago' }]);
+    assert.deepEqual(mediosDePago({ payment_methods: [{ url: 'data:text/html,hola' }] }), []);
+  });
+
+  it('ignora lo que no es una lista de medios y recorta lo largo y lo que sobra', () => {
+    assert.deepEqual(mediosDePago({ payment_methods: 'https://x.com' }), []);
+    assert.deepEqual(mediosDePago({ payment_methods: [null, 3, 'x', {}] }), []);
+    const [largo] = mediosDePago({ payment_methods: [{ method: 'm'.repeat(90), name: 'n'.repeat(150), alias: 'a'.repeat(150) }] });
+    assert.deepEqual([largo.method.length, largo.name.length, largo.alias.length], [60, 100, 100]);
+    const muchos = Array.from({ length: MAX_MEDIOS_DE_PAGO + 3 }, (_, i) => ({ method: `M${i}` }));
+    assert.equal(mediosDePago({ payment_methods: muchos }).length, MAX_MEDIOS_DE_PAGO);
   });
 });
 
-describe('links de pago del formulario', () => {
-  it('saca las filas vacías y los espacios, y pone nombre a los que no lo tienen', () => {
+describe('medios de pago del formulario', () => {
+  it('todos los campos son opcionales: saca los vacíos y los espacios', () => {
     assert.deepEqual(
-      limpiarLinksDePago([
-        { label: ' Mercado Pago ', url: ' https://mp.com/x ' },
-        { label: '', url: '' },
-        { label: '', url: 'https://ko-fi.com/x' },
+      limpiarMediosDePago([
+        { method: ' Mercado Pago ', name: ' ', alias: ' aoe.mp ', url: '' },
+        { method: '', name: '', alias: '', url: '' },
+        { alias: 'solo.alias' },
       ]),
-      [
-        { label: 'Mercado Pago', url: 'https://mp.com/x' },
-        { label: 'Pagar acá', url: 'https://ko-fi.com/x' },
-      ]
+      [{ method: 'Mercado Pago', alias: 'aoe.mp' }, { alias: 'solo.alias' }]
     );
-    assert.deepEqual(limpiarLinksDePago([]), []);
+    assert.deepEqual(limpiarMediosDePago([]), []);
+    assert.deepEqual(limpiarMediosDePago([{ method: '', name: '', alias: '', url: '' }]), []);
   });
 
-  it('un nombre largo se corta', () => {
-    const [l] = limpiarLinksDePago([{ label: 'x'.repeat(100), url: 'https://mp.com/x' }]);
-    assert.equal(l.label.length, 60);
+  it('acorta lo muy largo', () => {
+    const [m] = limpiarMediosDePago([{ method: 'm'.repeat(90), name: 'n'.repeat(150), alias: 'a'.repeat(150) }]);
+    assert.deepEqual([m.method.length, m.name.length, m.alias.length], [60, 100, 100]);
   });
 
-  it('rechaza lo que no es un link http(s) y a quien se pasa del máximo', () => {
-    assert.throws(() => limpiarLinksDePago([{ label: 'Banco', url: 'alias.banco' }]), /Banco.*http/);
-    assert.throws(() => limpiarLinksDePago([{ label: 'x', url: 'ftp://x.com/a' }]), /http/);
-    assert.throws(() => limpiarLinksDePago([{ label: '', url: 'https://x.com/a b' }]), /http/);
-    const muchos = Array.from({ length: MAX_LINKS_DE_PAGO + 1 }, (_, i) => ({ label: `L${i}`, url: `https://x.com/${i}` }));
-    assert.throws(() => limpiarLinksDePago(muchos), /Hasta/);
-    assert.equal(limpiarLinksDePago(muchos.slice(0, MAX_LINKS_DE_PAGO)).length, MAX_LINKS_DE_PAGO);
+  it('el link, si hay, tiene que ser http(s)', () => {
+    assert.deepEqual(limpiarMediosDePago([{ url: ' https://mp.com/x ' }]), [{ url: 'https://mp.com/x' }]);
+    assert.throws(() => limpiarMediosDePago([{ method: 'Banco', url: 'alias.banco' }]), /Banco.*http/);
+    assert.throws(() => limpiarMediosDePago([{ url: 'ftp://x.com/a' }]), /medio 1.*http/);
+    assert.throws(() => limpiarMediosDePago([{ url: 'https://x.com/a b' }]), /http/);
+    assert.throws(() => limpiarMediosDePago([{ url: `https://x.com/${'a'.repeat(500)}` }]), /http/);
+  });
+
+  it('hasta el máximo de medios', () => {
+    const muchos = Array.from({ length: MAX_MEDIOS_DE_PAGO + 1 }, (_, i) => ({ method: `M${i}` }));
+    assert.throws(() => limpiarMediosDePago(muchos), /Hasta/);
+    assert.equal(limpiarMediosDePago(muchos.slice(0, MAX_MEDIOS_DE_PAGO)).length, MAX_MEDIOS_DE_PAGO);
   });
 });
