@@ -915,6 +915,7 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
         tab={tabForm}
         onTab={setTabForm}
         recaudadoCents={t.prize_pool.collected_cents}
+        nombresDeEquipos={t.teams.map((te) => te.name)}
       />
       <div className="sticky bottom-0 mt-6 flex items-center gap-3 border-t border-ink-700 bg-ink-950/90 py-4 backdrop-blur">
         <button className="btn btn-primary" onClick={guardar}>

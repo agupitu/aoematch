@@ -477,7 +477,11 @@ export function cuadroDePlayoffs(torneo, etapas, equipos, partidos, ids) {
     clasificados.push(...tabla.slice(0, torneo.group_advance).map((fila, i) => ({ ...fila.team, _pos: i + 1 })));
   }
   clasificados.sort((a, b) => a._pos - b._pos);
+  return cuadroDeClasificados(torneo, clasificados, ids);
+}
 
+/** Playoffs de eliminación simple con los clasificados ya ordenados por siembra. */
+export function cuadroDeClasificados(torneo, clasificados, ids) {
   const c = cuadroNuevo(torneo, ids);
   const stageId = crearEtapa(c, 2, 'Playoffs', 'eliminacion_simple');
   eliminacionSimple(c, clasificados, { stageId });

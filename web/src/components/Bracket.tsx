@@ -7,11 +7,13 @@ import { IconosVod } from './VodLinks';
 function Lado({
   nombre,
   score,
-  ganador,
+  ganador = false,
+  vacio = 'por definir',
 }: {
   nombre: string | null;
-  score: number;
-  ganador: boolean;
+  score?: number;
+  ganador?: boolean;
+  vacio?: string;
 }) {
   return (
     <div
@@ -19,13 +21,33 @@ function Lado({
         ganador ? 'text-gold-400' : nombre ? 'text-parch-200' : 'text-ink-600 italic'
       }`}
     >
-      <span className="truncate">{nombre ?? 'por definir'}</span>
-      <span className="tabular-nums">{score}</span>
+      <span className="truncate">{nombre ?? vacio}</span>
+      {score !== undefined && <span className="tabular-nums">{score}</span>}
     </div>
   );
 }
 
-export function MatchCard({ m }: { m: Match }) {
+/**
+ * Un partido de la llave. En la vista previa del formulario (`previa`) no hay
+ * partido al que entrar ni marcador: solo el cruce y el largo de la serie.
+ */
+export function MatchCard({ m, previa = false }: { m: Match; previa?: boolean }) {
+  if (previa) {
+    const libre = m.status === 'walkover';
+    const vacio = libre ? 'libre' : 'por definir';
+    return (
+      <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-850">
+        <div className="flex items-center justify-between gap-2 border-b border-ink-700 bg-ink-900 px-2.5 py-1 text-[10px] text-parch-400">
+          <span className="min-w-0 flex-1 truncate">{m.label ?? `Ronda ${m.round}`}</span>
+          <span>{libre ? 'Pasa directo' : etiquetaDeSerie(m)}</span>
+        </div>
+        <Lado nombre={m.team_a_name} vacio={vacio} />
+        <div className="border-t border-ink-800" />
+        <Lado nombre={m.team_b_name} vacio={vacio} />
+      </div>
+    );
+  }
+
   const listo = ['finalizado', 'walkover'].includes(m.status);
   return (
     <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-850 transition-colors hover:border-gold-600">
@@ -47,7 +69,7 @@ export function MatchCard({ m }: { m: Match }) {
   );
 }
 
-export function Bracket({ matches }: { matches: Match[] }) {
+export function Bracket({ matches, previa = false }: { matches: Match[]; previa?: boolean }) {
   if (!matches.length) return null;
 
   const porBracket = new Map<string, Match[]>();
@@ -76,7 +98,7 @@ export function Bracket({ matches }: { matches: Match[] }) {
                       {deRonda[0]?.label ?? `Ronda ${r}`}
                     </p>
                     {deRonda.map((m) => (
-                      <MatchCard key={m.id} m={m} />
+                      <MatchCard key={m.id} m={m} previa={previa} />
                     ))}
                   </div>
                 );

@@ -3,6 +3,7 @@ import { CivPicker, MapPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
 import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
+import { VistaPrevia } from './VistaPrevia';
 
 export type PremioBorrador = {
   label: string;
@@ -150,6 +151,7 @@ export function TournamentForm({
   tab,
   onTab,
   recaudadoCents = 0,
+  nombresDeEquipos = [],
 }: {
   value: Borrador;
   onChange: (v: Borrador) => void;
@@ -159,6 +161,8 @@ export function TournamentForm({
   onTab: (t: PestaniaForm) => void;
   /** Lo ya cobrado en inscripciones, para estimar la bolsa en vivo. */
   recaudadoCents?: number;
+  /** Equipos que el torneo ya tiene: la vista previa los usa para los primeros lugares. */
+  nombresDeEquipos?: string[];
 }) {
   const set = <K extends keyof Borrador>(k: K, v: Borrador[K]) => onChange({ ...value, [k]: v });
 
@@ -240,6 +244,7 @@ export function TournamentForm({
         )}
 
         {tab === 'formato' && (
+          <>
           <section className="card p-5">
             <h3 className="title mb-4 text-lg">Formato</h3>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -363,6 +368,8 @@ export function TournamentForm({
               </div>
             )}
           </section>
+          <VistaPrevia value={value} nombres={nombresDeEquipos} />
+          </>
         )}
 
         {tab === 'draft' && (
