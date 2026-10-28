@@ -124,7 +124,8 @@ function Cuerpo({ value, previa, partidos }: { value: Borrador; previa: Previa; 
           </div>
           <p className="hint mt-2 text-xs">
             Se reparten en serpiente según la siembra. Dentro de cada grupo juegan todos contra todos
-            ({plural(fechas, 'fecha', 'fechas')}) y pasan {value.group_advance} por grupo.
+            ({plural(fechas, 'fecha', 'fechas')}) y pasan {value.group_advance} por grupo. En los playoffs
+            se mezclan para que los del mismo grupo se crucen lo más tarde posible.
           </p>
         </div>
 

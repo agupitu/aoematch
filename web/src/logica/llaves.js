@@ -8,6 +8,7 @@
 // todos), grupos + playoff y suizo. Los partidos tienen la forma de
 // matches/{id} (docs/firestore-modelo.md) con su `id`.
 
+import { asignacionMinima } from './asignacion.js';
 import { ordenarPor } from './orden.js';
 import { estadoDeSerie, modoDeSerie, partidasMaximas, victoriasDeWalkover } from './series.js';
 
@@ -474,21 +475,90 @@ export function cuadroDePlayoffs(torneo, etapas, equipos, partidos, ids) {
       grupo.team_ids.map((id) => porId.get(id)).filter(Boolean),
       partidos.filter((m) => m.stage_id === deGrupos.id && m.group_id === grupo.id && terminado(m))
     );
-    clasificados.push(...tabla.slice(0, torneo.group_advance).map((fila, i) => ({ ...fila.team, _pos: i + 1 })));
+    clasificados.push(
+      ...tabla.slice(0, torneo.group_advance).map((fila, i) => ({ ...fila.team, _pos: i + 1, _grupo: grupo.id }))
+    );
   }
   clasificados.sort((a, b) => a._pos - b._pos);
   return cuadroDeClasificados(torneo, clasificados, ids);
 }
 
-/** Playoffs de eliminación simple con los clasificados ya ordenados por siembra. */
+/**
+ * Ordena los clasificados de una fase de grupos por siembra para armar los
+ * playoffs. Los primeros de grupo tienen las mejores siembras, después los
+ * segundos, y así (`_pos`). Dentro de cada puesto se reparten por el cuadro
+ * (`_grupo` es el grupo de cada uno) para que dos equipos del mismo grupo se
+ * encuentren lo más tarde posible: con dos por grupo, recién en la final. Si
+ * hay primeros contra segundos en la primera ronda, el primero de un grupo juega
+ * contra el segundo del grupo vecino (A-B, C-D...), cuando se puede.
+ *
+ * `clasificados` viene ordenada por puesto y por grupo; la lista que devuelve es
+ * la misma reordenada (el índice más uno es la siembra). Sin `_pos` y `_grupo`
+ * en todos, queda como vino.
+ */
+export function sembrarClasificados(clasificados) {
+  const total = clasificados.length;
+  if (total < 3 || clasificados.some((t) => t._pos == null || t._grupo == null)) return clasificados;
+
+  const lugares = potenciaDe2(total);
+  const rondas = Math.log2(lugares);
+  const siembraDeHoja = ordenSiembra(lugares);
+  const hojaDeSiembra = new Map(siembraDeHoja.map((siembra, hoja) => [siembra, hoja]));
+  const grupos = [...new Set(clasificados.map((t) => t._grupo))];
+  const indiceDeGrupo = new Map(grupos.map((g, i) => [g, i]));
+
+  const sembrados = new Array(total);
+  const hojaDe = new Map(); // equipo -> hoja del cuadro
+  const ocupante = new Array(lugares).fill(null); // hoja -> equipo
+  const puestos = [...new Set(clasificados.map((t) => t._pos))].sort((a, b) => a - b);
+
+  // Lo que cuesta ubicar a `t` en esa hoja: por cada compañero de grupo que ya está en el cuadro, 4 veces más
+  // cuanto antes se pueden encontrar (en la ronda 1 son 4^(rondas-1) y en la final, 1). A igualdad, el
+  // primero de un grupo juega contra el segundo del grupo vecino.
+  const costoDeHoja = (t, hoja) => {
+    let costo = 0;
+    for (const [otro, hojaDelOtro] of hojaDe) {
+      if (otro._grupo !== t._grupo) continue;
+      const ronda = 1 + Math.floor(Math.log2(hoja ^ hojaDelOtro));
+      costo += 4 ** (rondas - ronda) * 1000;
+    }
+    const rival = ocupante[hoja ^ 1];
+    if (rival && indiceDeGrupo.get(rival._grupo) !== (indiceDeGrupo.get(t._grupo) ^ 1)) costo += 1;
+    return costo;
+  };
+
+  let siembra = 1;
+  for (const puesto of puestos) {
+    const deEstePuesto = clasificados.filter((t) => t._pos === puesto);
+    const hojas = deEstePuesto.map((_, j) => hojaDeSiembra.get(siembra + j));
+    // Los primeros, en el orden de los grupos; los demás, donde menos cuesta.
+    const elegidas =
+      puesto === puestos[0]
+        ? hojas
+        : asignacionMinima(deEstePuesto.map((t) => hojas.map((hoja) => costoDeHoja(t, hoja)))).map((columna) => hojas[columna]);
+    deEstePuesto.forEach((t, j) => {
+      hojaDe.set(t, elegidas[j]);
+      ocupante[elegidas[j]] = t;
+      sembrados[siembraDeHoja[elegidas[j]] - 1] = t;
+    });
+    siembra += deEstePuesto.length;
+  }
+  return sembrados;
+}
+
+/**
+ * Playoffs de eliminación simple con los clasificados de una fase de grupos
+ * (`sembrarClasificados` los ordena y reparte por el cuadro).
+ */
 export function cuadroDeClasificados(torneo, clasificados, ids) {
+  const sembrados = sembrarClasificados(clasificados);
   const c = cuadroNuevo(torneo, ids);
   const stageId = crearEtapa(c, 2, 'Playoffs', 'eliminacion_simple');
-  eliminacionSimple(c, clasificados, { stageId });
+  eliminacionSimple(c, sembrados, { stageId });
   return {
     etapas: c.etapas,
     partidos: [...c.partidos.values()],
-    seeds: clasificados.map((t, i) => ({ id: t.id, seed: i + 1 })),
+    seeds: sembrados.map((t, i) => ({ id: t.id, seed: i + 1 })),
   };
 }
 

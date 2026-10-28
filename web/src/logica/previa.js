@@ -58,7 +58,7 @@ export function armarPrevia(b, cantidad, nombres = []) {
     const clasificados = [];
     for (let pos = 1; pos <= torneo.group_advance; pos++) {
       for (const g of etapas[0].groups) {
-        if (g.team_ids.length >= pos) clasificados.push({ id: `c${pos}${g.id}`, name: `${pos}º ${g.name}` });
+        if (g.team_ids.length >= pos) clasificados.push({ id: `c${pos}${g.id}`, name: `${pos}º ${g.name}`, _pos: pos, _grupo: g.id });
       }
     }
     if (clasificados.length >= 2) {

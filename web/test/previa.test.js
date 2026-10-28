@@ -86,8 +86,13 @@ describe('vista previa por formato', () => {
 
     const playoffs = p.partidos.filter((m) => m.stage_id === p.etapas[1].id && m.round === 1)
       .sort((a, b) => a.position - b.position);
-    assert.deepEqual(nombres(playoffs[0]), ['1º Grupo A', '2º Grupo D']);
-    assert.deepEqual(nombres(playoffs[1]), ['1º Grupo D', '2º Grupo A']);
+    // Los primeros juegan contra segundos de otro grupo, y los dos de un grupo quedan en mitades opuestas.
+    assert.deepEqual(playoffs.map(nombres), [
+      ['1º Grupo A', '2º Grupo B'],
+      ['1º Grupo D', '2º Grupo C'],
+      ['1º Grupo B', '2º Grupo A'],
+      ['1º Grupo C', '2º Grupo D'],
+    ]);
   });
 
   it('grupos con pocos equipos no inventa clasificados', () => {

@@ -94,6 +94,13 @@ Las llaves se generan con siembra clásica (1-8, 4-5, 2-7, 3-6), byes
 automáticos y avance del ganador —y del perdedor, en doble eliminación— al
 partido siguiente.
 
+En **grupos + playoff**, los clasificados no entran por orden de grupo: se
+reparten por el cuadro para que dos equipos del mismo grupo se crucen lo más
+tarde posible. Con dos por grupo, los primeros juegan contra segundos de otro
+grupo y los dos de un mismo grupo quedan en mitades opuestas, así que solo
+pueden volver a verse en la final (con 4 grupos: 1A-2B y 1D-2C en una mitad,
+1B-2A y 1C-2D en la otra).
+
 ### Inscripciones y pagos
 Cada jugador se anota solo o con equipo. El organizador ve la lista con elo,
 zona horaria y estado, y marca a mano quién pagó. No hay cobro automático: se

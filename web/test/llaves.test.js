@@ -5,8 +5,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cargarPartidas, cerrarEnMemoria, cerrarPartido, cuadroDePlayoffs, darWalkover, generarCuadro, ordenSiembra,
-  rondaSuiza, tablaDesde,
+  cargarPartidas, cerrarEnMemoria, cerrarPartido, cuadroDeClasificados, cuadroDePlayoffs, darWalkover, generarCuadro,
+  ordenSiembra, rondaSuiza, sembrarClasificados, tablaDesde,
 } from '../src/logica/llaves.js';
 
 const equipos = (n) => Array.from({ length: n }, (_, i) => ({ id: `E${i + 1}`, name: `E${i + 1}`, seed: null }));
@@ -328,5 +328,106 @@ describe('series a cantidad fija de partidas', () => {
     const abierta = cargarPartidas(cerrada, semi.id, [partida(1, 'E1'), partida(2, 'E1')]);
     assert.deepEqual(estado(abierta), ['en_juego', null, 2, 0]);
     assert.equal(abierta.cambios.find((c) => c.id === final.id).team_a_id, null);
+  });
+});
+
+describe('playoffs de grupos: los clasificados se reparten por el cuadro', () => {
+  /** Clasificados de `grupos` grupos con `porGrupo` cada uno: "1A", "1B"... primero, después "2A", "2B"... */
+  const clasificados = (grupos, porGrupo) => {
+    const letras = Array.from({ length: grupos }, (_, i) => String.fromCharCode(65 + i));
+    const lista = [];
+    for (let pos = 1; pos <= porGrupo; pos++) for (const g of letras) lista.push({ id: `${pos}${g}`, _pos: pos, _grupo: g });
+    return lista;
+  };
+  const playoffs = (lista) => cuadroDeClasificados(torneo(), lista, ids());
+  const cruces = (partidos) =>
+    partidos.filter((p) => p.round === 1).sort((x, y) => x.position - y.position).map((p) => [p.team_a_id, p.team_b_id]);
+
+  /** Ronda en la que pueden encontrarse dos equipos: la del primer partido que comparten camino a la final. */
+  function rondaDeEncuentro(partidos, a, b) {
+    const porId = new Map(partidos.map((p) => [p.id, p]));
+    const camino = (equipo) => {
+      let p = partidos.find((m) => m.round === 1 && (m.team_a_id === equipo || m.team_b_id === equipo));
+      const recorrido = [];
+      while (p) {
+        recorrido.push(p.id);
+        p = p.next_match_id ? porId.get(p.next_match_id) : null;
+      }
+      return recorrido;
+    };
+    const deB = camino(b);
+    return porId.get(camino(a).find((id) => deB.includes(id))).round;
+  }
+  const rondaFinal = (partidos) => Math.max(...partidos.map((p) => p.round));
+
+  it('4 grupos de 2: los primeros juegan contra segundos de otro grupo y los del mismo grupo van a mitades opuestas', () => {
+    const { partidos } = playoffs(clasificados(4, 2));
+    assert.deepEqual(cruces(partidos), [['1A', '2B'], ['1D', '2C'], ['1B', '2A'], ['1C', '2D']]);
+    for (const g of 'ABCD') assert.equal(rondaDeEncuentro(partidos, `1${g}`, `2${g}`), rondaFinal(partidos), g);
+  });
+
+  it('de 2 a 9 grupos de 2, también con byes: los del mismo grupo solo se cruzan en la final', () => {
+    for (let grupos = 2; grupos <= 9; grupos++) {
+      const { partidos } = playoffs(clasificados(grupos, 2));
+      const final = rondaFinal(partidos);
+      for (let i = 0; i < grupos; i++) {
+        const g = String.fromCharCode(65 + i);
+        assert.equal(rondaDeEncuentro(partidos, `1${g}`, `2${g}`), final, `${grupos} grupos, grupo ${g}`);
+      }
+    }
+  });
+
+  it('con tres o cuatro por grupo, nadie se cruza con alguien de su grupo en la primera ronda', () => {
+    for (const [grupos, porGrupo] of [[2, 4], [3, 3], [4, 3], [4, 4], [6, 3]]) {
+      const { partidos } = playoffs(clasificados(grupos, porGrupo));
+      for (const [a, b] of cruces(partidos)) {
+        if (a && b) assert.notEqual(a.slice(1), b.slice(1), `${grupos} grupos de ${porGrupo}: ${a} contra ${b}`);
+      }
+    }
+  });
+
+  it('los primeros de grupo conservan las mejores siembras y la lista es una permutación de la que entra', () => {
+    const lista = clasificados(4, 2);
+    const sembrados = sembrarClasificados(lista);
+    assert.deepEqual([...sembrados].map((t) => t.id).sort(), lista.map((t) => t.id).sort());
+    assert.deepEqual(sembrados.slice(0, 4).map((t) => t._pos), [1, 1, 1, 1]);
+    assert.deepEqual(sembrados.slice(4).map((t) => t._pos), [2, 2, 2, 2]);
+    assert.deepEqual(playoffs(lista).seeds.map((s) => s.id), sembrados.map((t) => t.id));
+  });
+
+  it('con grupos que clasifican distinta cantidad no se rompe ni repite a nadie', () => {
+    const lista = [
+      { id: '1A', _pos: 1, _grupo: 'A' }, { id: '1B', _pos: 1, _grupo: 'B' }, { id: '1C', _pos: 1, _grupo: 'C' },
+      { id: '2A', _pos: 2, _grupo: 'A' }, { id: '2C', _pos: 2, _grupo: 'C' },
+    ];
+    const { partidos, seeds } = playoffs(lista);
+    assert.equal(new Set(seeds.map((s) => s.id)).size, 5);
+    for (const [a, b] of cruces(partidos)) if (a && b) assert.notEqual(a.slice(1), b.slice(1));
+  });
+
+  it('lo que no trae grupo y puesto queda como vino', () => {
+    const lista = [{ id: 'x' }, { id: 'y' }, { id: 'z' }, { id: 'w' }];
+    assert.deepEqual(sembrarClasificados(lista), lista);
+    assert.deepEqual(sembrarClasificados(clasificados(1, 2)), clasificados(1, 2));
+  });
+
+  it('es estable: la misma entrada da siempre el mismo cuadro', () => {
+    const lista = clasificados(6, 2);
+    assert.deepEqual(sembrarClasificados(lista).map((t) => t.id), sembrarClasificados(lista).map((t) => t.id));
+  });
+
+  it('con los grupos jugados, los playoffs de verdad también separan a los del mismo grupo', () => {
+    const t = torneo({ format: 'grupos_playoff', group_count: 4, group_advance: 2 });
+    const c = generarCuadro(t, equipos(16), ids());
+    const jugados = [...jugarTodo(c.partidos).values()];
+    const p = cuadroDePlayoffs(t, c.etapas, equipos(16), jugados, ids());
+    const grupoDe = new Map(c.etapas[0].groups.flatMap((g) => g.team_ids.map((id) => [id, g.id])));
+    const ids8 = p.seeds.map((s) => s.id);
+    assert.equal(ids8.length, 8);
+    for (const a of ids8) {
+      for (const b of ids8) {
+        if (a < b && grupoDe.get(a) === grupoDe.get(b)) assert.equal(rondaDeEncuentro(p.partidos, a, b), rondaFinal(p.partidos), `${a} y ${b}`);
+      }
+    }
   });
 });
