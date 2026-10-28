@@ -229,6 +229,7 @@ function crearTercerPuesto(c, stageId) {
 
 function eliminacionDoble(c, teams) {
   const { torneo } = c;
+  if (teams.length < 3) throw new Error('La eliminación doble necesita al menos tres equipos.');
   const stageId = crearEtapa(c, 1, 'Eliminación doble', 'eliminacion_doble');
   const n = potenciaDe2(Math.max(2, teams.length));
   const k = Math.log2(n);
@@ -451,6 +452,20 @@ export function ordenarManual(torneo, teams, orden = {}) {
 }
 
 export const terminado = (m) => m.status === 'finalizado' || m.status === 'walkover';
+
+/**
+ * ¿Terminó el torneo? No alcanza con que todos los partidos generados estén
+ * cerrados: en grupos + playoff faltan los playoffs hasta que el staff los
+ * genera, y en el suizo las rondas que quedan.
+ */
+export function torneoTerminado(torneo, partidos) {
+  if (!partidos.length || !partidos.every(terminado)) return false;
+  if (torneo.format === 'grupos_playoff') return partidos.some((m) => m.group_id == null);
+  if (torneo.format === 'suizo' && torneo.swiss_rounds) {
+    return Math.max(...partidos.map((m) => m.round)) >= torneo.swiss_rounds;
+  }
+  return true;
+}
 
 /** Tabla de posiciones: 3 puntos por partido ganado; desempata por diferencia y por tantos a favor. */
 export function tablaDesde(teams, matches) {

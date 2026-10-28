@@ -6,7 +6,7 @@
 
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from 'firebase/firestore';
 import { firestore } from '../firebase';
-import { cargarPartidas, darWalkover } from '../logica/llaves.js';
+import { cargarPartidas, darWalkover, torneoTerminado } from '../logica/llaves.js';
 import { type Doc, Rechazo, conMensaje } from './base';
 
 type Resultado = { cambios: Doc[]; terminado: boolean };
@@ -29,8 +29,10 @@ async function enLaLlave(matchId: string, calcular: (partidos: Doc[]) => Resulta
       ...ids.map((id) => tx.get(doc(firestore, 'matches', id))),
     ]);
     const partidos = snaps.filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }) as Doc);
-    const { cambios, terminado } = calcular(partidos);
+    const { cambios } = calcular(partidos);
     for (const { id, ...campos } of cambios) tx.update(doc(firestore, 'matches', id), campos);
+    const despues = partidos.map((p) => ({ ...p, ...cambios.find((c) => c.id === p.id) }));
+    const terminado = torneoTerminado(torneo.data(), despues);
     const estado = torneo.data()?.status;
     if (terminado && estado !== 'finalizado') tx.update(refTorneo, { status: 'finalizado' });
     if (!terminado && estado === 'finalizado') tx.update(refTorneo, { status: 'en_curso' });
