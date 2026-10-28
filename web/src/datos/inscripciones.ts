@@ -10,7 +10,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
-import { sinMiembro } from '../logica/equipos.js';
+import { nombreDeEquipo, sinMiembro } from '../logica/equipos.js';
 import type { Tournament, User } from '../types';
 import { type Doc, Rechazo, ahora, conMensaje } from './base';
 import { vigente } from './torneos';
@@ -55,10 +55,10 @@ export function inscribirse(t: Tournament, user: User, { kind, team_name, team_i
           else equipo = elegido;
         } else {
           if (!team_name) throw new Rechazo('Poné un nombre de equipo.');
-          nuevo = String(team_name).slice(0, 60);
+          nuevo = nombreDeEquipo(team_name);
         }
       } else if (t.team_size === 1) {
-        nuevo = user.display_name.slice(0, 60);
+        nuevo = nombreDeEquipo(user.display_name);
       } else if (!t.allow_solo) {
         throw new Rechazo('Este torneo no acepta jugadores sueltos.');
       }

@@ -5,6 +5,12 @@
 
 const conIds = (members) => ({ members, member_ids: members.map((m) => m.user_id) });
 
+/** Largo máximo del nombre de un equipo: más no entra en las tablas y los cruces. */
+export const MAX_NOMBRE_EQUIPO = 30;
+
+/** El nombre de un equipo sin espacios de más y cortado al máximo. */
+export const nombreDeEquipo = (nombre) => String(nombre ?? '').trim().slice(0, MAX_NOMBRE_EQUIPO);
+
 /**
  * Capitán, miembros y `member_ids` del equipo una vez que entra `uid`. En un
  * equipo sin capitán, el primero que entra pasa a serlo. No toca `equipo`.

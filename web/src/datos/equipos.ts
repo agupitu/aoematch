@@ -5,7 +5,7 @@
 
 import { collection, doc, runTransaction, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { firestore } from '../firebase';
-import { conMiembro } from '../logica/equipos.js';
+import { conMiembro, nombreDeEquipo } from '../logica/equipos.js';
 import type { Team, Tournament, User } from '../types';
 import { type Doc, Rechazo, ahora, conMensaje } from './base';
 import { inscribirse } from './inscripciones';
@@ -15,7 +15,7 @@ const refInscripcion = (slug: string, uid: string) => doc(firestore, 'tournament
 
 /** Equipo vacío del organizador: los jugadores piden lugar y el staff los aprueba. */
 export function crearEquipoDelOrganizador(t: Tournament, nombre: string) {
-  const name = nombre.trim().slice(0, 60);
+  const name = nombreDeEquipo(nombre);
   if (!name) throw new Error('Poné un nombre de equipo.');
   if (t.team_size < 2) throw new Error('En 1v1 cada jugador es su propio equipo.');
   if (t.max_teams && t.teams.length >= t.max_teams) throw new Error('Ya están todos los equipos del torneo.');
@@ -37,7 +37,7 @@ export function crearEquipoDelOrganizador(t: Tournament, nombre: string) {
 }
 
 export function renombrarEquipo(teamId: string, nombre: string) {
-  const name = nombre.trim().slice(0, 60);
+  const name = nombreDeEquipo(nombre);
   if (!name) throw new Error('El equipo necesita un nombre.');
   return conMensaje(() => updateDoc(refEquipo(teamId), { name }));
 }

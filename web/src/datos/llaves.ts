@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { proponerEquipos } from '../logica/armador.js';
+import { nombreDeEquipo } from '../logica/equipos.js';
 import { cuadroDePlayoffs, generarCuadro, ordenarManual, rondaSuiza } from '../logica/llaves.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
@@ -185,7 +186,7 @@ export function confirmarEquipos(t: Tournament, propuesta: Propuesta) {
       const equipos = propuesta.teams
         .map((p) => ({
           ref: doc(collection(firestore, 'teams')),
-          name: String(p.name || 'Equipo').slice(0, 60),
+          name: nombreDeEquipo(p.name) || 'Equipo',
           ids: [...new Set((p.members ?? []).map((m) => String(m.id)))],
         }))
         .filter((e) => e.ids.length);

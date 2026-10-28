@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   setDoc,
   type DocumentData,
+  type DocumentReference,
 } from 'firebase/firestore';
 import { onValue, ref } from 'firebase/database';
 import { useAuth } from './auth';
@@ -77,15 +78,27 @@ async function datosDeSala(parsed: { tipo: keyof typeof PREFIJOS; id: string }) 
   };
 }
 
+/**
+ * ¿Existe la sala? Las reglas leen `resource.data`: con la sala sin crear no hay
+ * `resource` y la lectura se rechaza. Eso es una sala que falta, no un error.
+ */
+async function existeLaSala(refSala: DocumentReference) {
+  try {
+    return (await getDoc(refSala)).exists();
+  } catch {
+    return false;
+  }
+}
+
 async function asegurarSala(room: string) {
   const parsed = parsearSala(room);
   if (!parsed) throw new Error('Sala inválida.');
   const refSala = doc(firestore, 'rooms', parsed.roomId);
-  if ((await getDoc(refSala)).exists()) return parsed.roomId;
+  if (await existeLaSala(refSala)) return parsed.roomId;
   try {
     await setDoc(refSala, await datosDeSala(parsed));
   } catch (err) {
-    if (!(await getDoc(refSala)).exists()) throw err;
+    if (!(await existeLaSala(refSala))) throw err;
   }
   return parsed.roomId;
 }

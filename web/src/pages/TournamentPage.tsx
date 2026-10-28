@@ -9,7 +9,7 @@ import {
   rechazarPedido, renombrarEquipo,
 } from '../datos/equipos';
 import { type PagoElegido, inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
-import { pedidosPendientes } from '../logica/equipos.js';
+import { MAX_NOMBRE_EQUIPO, pedidosPendientes } from '../logica/equipos.js';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { costosDe, montoEscrito, opcionesDePago } from '../logica/pagos.js';
 import { etiquetaDeSerie } from '../logica/series.js';
@@ -40,11 +40,25 @@ const PESTANIAS_POR_URL: Pestania[] = ['resumen', 'inscripciones', 'equipos', 'l
 export function TournamentPage() {
   const { slug } = useParams();
   const { user } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const pedida = params.get('tab') as Pestania | null;
   const [t, setT] = useState<Tournament | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Pestania>(pedida && PESTANIAS_POR_URL.includes(pedida) ? pedida : 'resumen');
+
+  // La pestaña queda en la URL: al volver desde un partido con "atrás" se abre la misma.
+  const cambiarTab = (p: Pestania) => {
+    setTab(p);
+    setParams(
+      (actual) => {
+        const nuevos = new URLSearchParams(actual);
+        if (PESTANIAS_POR_URL.includes(p)) nuevos.set('tab', p);
+        else nuevos.delete('tab');
+        return nuevos;
+      },
+      { replace: true }
+    );
+  };
 
   const cargar = useCallback(async () => {
     try {
@@ -95,7 +109,7 @@ export function TournamentPage() {
         {t.description && <p className="hint mt-3 max-w-3xl text-sm">{t.description}</p>}
       </header>
 
-      <Tabs value={tab} onChange={setTab} items={tabs} />
+      <Tabs value={tab} onChange={cambiarTab} items={tabs} />
 
       <div className="py-6">
         {tab === 'resumen' && <Resumen t={t} />}
@@ -212,6 +226,7 @@ function AccionesInscripcion({
                 <div className="flex gap-2">
                   <input
                     className="field"
+                    maxLength={MAX_NOMBRE_EQUIPO}
                     placeholder={`Nombre del equipo (${t.team_size} jugadores)`}
                     value={nombreEquipo}
                     onChange={(e) => setNombreEquipo(e.target.value)}
@@ -797,7 +812,13 @@ function EquiposDelOrganizador({ t, onDone }: { t: Tournament; onDone: () => voi
       >
         <div className="min-w-0 flex-1">
           <label className="label">Nombre del equipo</label>
-          <input className="field" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Los Tercios" />
+          <input
+            className="field"
+            maxLength={MAX_NOMBRE_EQUIPO}
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Los Tercios"
+          />
         </div>
         <button className="btn btn-primary" disabled={!nombre.trim() || completo}>
           Agregar equipo
@@ -894,7 +915,13 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
                 });
               }}
             >
-              <input className="field !py-1" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+              <input
+                className="field !py-1"
+                maxLength={MAX_NOMBRE_EQUIPO}
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                autoFocus
+              />
               <button className="btn btn-primary !px-2 !py-1">Guardar</button>
               <button
                 type="button"
