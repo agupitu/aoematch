@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { DraftRevelado } from '../datos/drafts';
 import type { PartidaDeSerie } from '../datos/resultados';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
 import { civsALugares, civsDelEquipo, lugaresACivs, lugaresDelEquipo } from '../logica/detallePartida.js';
@@ -6,9 +7,6 @@ import { estadoDeSerie, partidasJugables, partidasMaximas } from '../logica/seri
 import type { Civ, GameMap, MatchDetail } from '../types';
 import { ElegirConImagen, type ItemElegible } from './ElegirConImagen';
 import { Alerta } from './ui';
-
-/** Mapa y civs del draft ya revelado de una partida: se guardan junto con su resultado. */
-export type DelDraft = { game_no: number; map_id: number | null; civs: NonNullable<PartidaDeSerie['civs']> };
 
 /** Mapa y civs elegidos para una partida, como texto ('' = sin cargar): las civs por lugar de cada equipo. */
 type Detalle = { mapa: string; a: string[]; b: string[] };
@@ -28,13 +26,14 @@ export const necesitaAncho = (m: MatchDetail) =>
  * Staff: carga todas las partidas de la serie en un solo cuadro. Las partidas
  * van en las columnas y, de arriba abajo: el mapa, una fila por equipo (el
  * círculo amarillo marca a quien ganó y al lado va la civ que usó cada jugador)
- * y el link del replay de esa partida. Debajo, un link para todas.
+ * y el link del replay de esa partida. Debajo, un link para todas. Las partidas
+ * sin mapa ni civs cargados salen precargadas con las de su draft revelado.
  */
 export function CargarPartidas({
-  m, delDraft, error, onGuardar,
+  m, delDrafts, error, onGuardar,
 }: {
   m: MatchDetail;
-  delDraft: DelDraft | null;
+  delDrafts: DraftRevelado[];
   error: string;
   onGuardar: (partidas: PartidaDeSerie[]) => void;
 }) {
@@ -54,22 +53,24 @@ export function CargarPartidas({
   const lugares = Object.fromEntries(
     LADOS.map((l) => {
       const e = m.teams[l];
-      return [l, e ? lugaresDelEquipo(e, Math.max(m.tournament.team_size, civsDelEquipo(m.games, e.id))) : []];
+      return [l, e ? lugaresDelEquipo(e, Math.max(m.tournament.team_size, civsDelEquipo([...m.games, ...delDrafts], e.id))) : []];
     })
   ) as Record<'a' | 'b', ReturnType<typeof lugaresDelEquipo>>;
-  const [detalles, setDetalles] = useState<Detalle[]>(() =>
+  const delDraft = (n: number) => delDrafts.find((d) => d.game_no === n);
+  const detallesDe = (drafts: DraftRevelado[]): Detalle[] =>
     Array.from({ length: total }, (_, i) => {
       const propia = cargada(i + 1);
-      const fuente = propia && (propia.map_id || propia.civs?.length) ? propia : delDraft?.game_no === i + 1 ? delDraft : propia;
+      const fuente = propia && (propia.map_id || propia.civs?.length) ? propia : drafts.find((d) => d.game_no === i + 1) ?? propia;
       const civs = fuente?.civs ?? [];
       return {
         mapa: fuente?.map_id ? String(fuente.map_id) : '',
         a: m.teams.a ? civsALugares(civs, m.teams.a, lugares.a) : [],
         b: m.teams.b ? civsALugares(civs, m.teams.b, lugares.b) : [],
       };
-    })
-  );
-  const [inicial] = useState(() => JSON.stringify({ ganadores, replays, global, detalles }));
+    });
+  const [detalles, setDetalles] = useState<Detalle[]>(() => detallesDe(delDrafts));
+  // Lo ya guardado, sin el draft: lo que el draft completa cuenta como cambio y deja guardar.
+  const [inicial] = useState(() => JSON.stringify({ ganadores, replays, global, detalles: detallesDe([]) }));
 
   const lados = ganadores.map((id) => (id && id === m.team_a_id ? 'a' : id && id === m.team_b_id ? 'b' : null));
   const jugables: boolean[] = partidasJugables(m, lados);
@@ -104,6 +105,11 @@ export function CargarPartidas({
   const sinCambios = JSON.stringify({ ganadores, replays, global, detalles }) === inicial;
   const nombreGanador = ganador === 'a' ? m.teams.a?.name : ganador === 'b' ? m.teams.b?.name : null;
   const columnas = Array.from({ length: total }, (_, i) => i);
+  // Las partidas que se completaron con el draft (no tenían mapa ni civs guardados).
+  const conDraft = columnas.filter((i) => {
+    const propia = cargada(i + 1);
+    return delDraft(i + 1) && !(propia && (propia.map_id || propia.civs?.length));
+  });
 
   return (
     <div className="space-y-4">
@@ -243,8 +249,11 @@ export function CargarPartidas({
         <p className="hint mt-1 text-xs">Lo usan las partidas que no tienen su propio link.</p>
       </div>
 
-      {delDraft && (
-        <p className="hint text-xs">Se guardan el mapa y las civs del draft de la partida {delDraft.game_no}.</p>
+      {conDraft.length > 0 && (
+        <p className="hint text-xs">
+          Mapa y civs de {conDraft.length > 1 ? 'las partidas' : 'la partida'} {conDraft.map((i) => i + 1).join(', ')} tomados del
+          draft: se guardan con el resultado.
+        </p>
       )}
       {error && <Alerta>{error}</Alerta>}
       <button className="btn btn-primary w-full" disabled={sinCambios} onClick={guardar}>

@@ -6,11 +6,12 @@ type Partida = MatchDetail['games'][number];
 /**
  * Las partidas jugadas de la serie: quién ganó cada una, el mapa y las civs de
  * cada equipo (lo que se cargó o salió del draft). Una partida sin mapa ni
- * civs muestra solo el resultado.
+ * civs muestra solo el resultado. `partidas` son las del partido ya
+ * completadas con el draft revelado (`partidasConDraft`).
  */
-export function PartidasDeLaSerie({ m }: { m: MatchDetail }) {
+export function PartidasDeLaSerie({ m, partidas }: { m: MatchDetail; partidas: Partida[] }) {
   const nombres = { a: m.teams.a?.name ?? 'Equipo A', b: m.teams.b?.name ?? 'Equipo B' };
-  const jugadas = m.games.filter((g) => g.winner_team_id || g.map || g.civs.length);
+  const jugadas = partidas.filter((g) => g.winner_team_id || g.map || g.civs.length);
   if (!jugadas.length) return null;
 
   const civsDe = (g: Partida, teamId: string | null) => g.civs.filter((c) => c.team_id === teamId);

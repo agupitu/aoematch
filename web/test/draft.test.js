@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { civs, maps } from '../src/logica/catalogo.js';
 import {
-  banear, civsPermitidas, elegirMapa, eligieronTodos, planDeDraft, revelar, turnoDeBan, validarPick,
+  banear, civsElegidas, civsPermitidas, elegirMapa, eligieronTodos, planDeDraft, revelar, turnoDeBan, validarPick,
 } from '../src/logica/draft.js';
 
 const MAPAS = maps().slice(0, 5).map((m) => m.id);
@@ -163,5 +163,21 @@ describe('picks ciegos', () => {
       { user_id: 'b1', team_id: 'B', civ_id: CIVS[0] },
     ]);
     assert.throws(() => validarPick(draft, 'a1', CIVS[2]), /No es momento/);
+  });
+
+  it('las civs de un draft ya revelado se leen igual (ya no está en picks)', () => {
+    const { draft } = revelar(picks(), { a1: CIVS[0], a2: CIVS[1], b2: CIVS[2], b1: CIVS[3] });
+    assert.equal(draft.state, 'listo');
+    assert.deepEqual(civsElegidas(draft, { a1: CIVS[0], a2: CIVS[1], b2: CIVS[2], b1: CIVS[3] }), [
+      { user_id: 'a1', team_id: 'A', civ_id: CIVS[0] },
+      { user_id: 'a2', team_id: 'A', civ_id: CIVS[1] },
+      { user_id: 'b2', team_id: 'B', civ_id: CIVS[2] },
+      { user_id: 'b1', team_id: 'B', civ_id: CIVS[3] },
+    ]);
+  });
+
+  it('las civs elegidas dejan afuera al que no eligió', () => {
+    const d = picks();
+    assert.deepEqual(civsElegidas(d, { a1: CIVS[0] }), [{ user_id: 'a1', team_id: 'A', civ_id: CIVS[0] }]);
   });
 });

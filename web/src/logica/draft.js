@@ -187,14 +187,22 @@ export function eligieronTodos(draft, picks) {
 }
 
 /**
+ * Las civs que eligieron los jugadores del draft, listas para `games[].civs`
+ * del partido. Sirve con el draft en cualquier estado (también ya revelado,
+ * que está en 'listo'); el que no eligió no aparece.
+ */
+export function civsElegidas(draft, picks) {
+  return draft.player_ids
+    .filter((uid) => picks[uid] != null)
+    .map((uid) => ({ user_id: uid, team_id: draft.team_of[uid], civ_id: picks[uid] }));
+}
+
+/**
  * Draft revelado y cerrado, con las civs de cada uno listas para copiar a
  * `games[].civs` del partido. Tira un error si falta alguien.
  */
 export function revelar(draft, picks) {
   if (draft.state !== 'picks') throw new Error('No es momento de revelar.');
   if (!eligieronTodos(draft, picks)) throw new Error('Falta que elijan todos.');
-  return {
-    draft: { ...draft, revealed: true, state: 'listo' },
-    civs: draft.player_ids.map((uid) => ({ user_id: uid, team_id: draft.team_of[uid], civ_id: picks[uid] })),
-  };
+  return { draft: { ...draft, revealed: true, state: 'listo' }, civs: civsElegidas(draft, picks) };
 }

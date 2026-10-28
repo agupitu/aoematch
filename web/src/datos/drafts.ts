@@ -4,7 +4,7 @@
 // de firestore.rules repiten cada validación: un paso fuera de turno falla
 // aunque alguien se saltee la pantalla.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   arrayUnion,
   collection,
@@ -17,8 +17,10 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
-import { banear, elegirMapa, eligieronTodos, planDeDraft, revelar, validarPick } from '../logica/draft.js';
+import { civPorId, mapaPorId } from '../logica/catalogo.js';
+import { banear, civsElegidas, elegirMapa, eligieronTodos, planDeDraft, validarPick } from '../logica/draft.js';
 import { proximaPartida } from '../logica/series.js';
+import type { MatchDetail } from '../types';
 import { type Doc, Rechazo, conMensaje } from './base';
 
 export type Draft = Omit<ReturnType<typeof planDeDraft>, 'banned_civ_ids' | 'map_id' | 'map_chooser_team_id'> & {
@@ -160,9 +162,91 @@ export function reiniciarDraft(matchId: string, gameNo: number) {
   });
 }
 
-/** Civs de una partida revelada, listas para `games[].civs` (T40). */
-export function civsDeLaPartida(draft: Draft, picks: Record<string, number>) {
-  return revelar(draft, picks).civs;
+/** Mapa y civs del draft ya revelado de una partida, listos para `games[]` (T40). */
+export type DraftRevelado = {
+  game_no: number;
+  map_id: number | null;
+  civs: { user_id: string | null; team_id: string; civ_id: number }[];
+};
+
+/**
+ * Escucha los drafts ya revelados de todas las partidas del partido (no solo la
+ * actual): con la serie avanzada o cerrada, el mapa y las civs de cada draft
+ * siguen ahí para mostrarse y para precargar el cuadro de resultados.
+ */
+export function useDraftsRevelados(matchId: string | undefined): DraftRevelado[] {
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [picks, setPicks] = useState<Record<number, Record<string, number>>>({});
+
+  useEffect(() => {
+    setDrafts([]);
+    setPicks({});
+    if (!matchId) return;
+    return onSnapshot(
+      collection(firestore, 'matches', matchId, 'drafts'),
+      { includeMetadataChanges: true },
+      // Con la escritura local pendiente las reglas todavía no dejan leer los picks ajenos.
+      (qs) =>
+        setDrafts(
+          qs.docs
+            .filter((d) => d.data().revealed && Array.isArray(d.data().player_ids) && !d.metadata.hasPendingWrites)
+            .map((d) => ({ id: d.id, ...d.data() }) as Draft)
+        ),
+      () => setDrafts([])
+    );
+  }, [matchId]);
+
+  const partidas = drafts.map((d) => d.game_no).sort((a, b) => a - b).join(',');
+  useEffect(() => {
+    if (!matchId || !partidas) return;
+    const bajas = partidas.split(',').map((n) =>
+      onSnapshot(
+        picksDe(matchId, Number(n)),
+        (qs) =>
+          setPicks((p) => ({ ...p, [n]: Object.fromEntries(qs.docs.map((d) => [d.id, d.data().civ_id as number])) })),
+        () => undefined
+      )
+    );
+    return () => bajas.forEach((baja) => baja());
+  }, [matchId, partidas]);
+
+  return useMemo(
+    () =>
+      drafts
+        .filter((d) => picks[d.game_no])
+        .map((d) => ({ game_no: d.game_no, map_id: d.map_id, civs: civsElegidas(d, picks[d.game_no]) }))
+        .sort((a, b) => a.game_no - b.game_no),
+    [drafts, picks]
+  );
+}
+
+/**
+ * Las partidas del partido con el mapa y las civs de su draft revelado en las
+ * que no tienen nada cargado: lo cargado a mano o ya guardado manda, y el draft
+ * rellena el resto. Una partida solo con draft queda sin ganador.
+ */
+export function partidasConDraft(m: MatchDetail, reveladas: DraftRevelado[]): MatchDetail['games'] {
+  const nombres = new Map([...(m.teams.a?.roster ?? []), ...(m.teams.b?.roster ?? [])].map((j) => [j.id, j.display_name]));
+  const delDraft = (r: DraftRevelado) => ({
+    map_id: r.map_id,
+    map: r.map_id ? mapaPorId(r.map_id) : null,
+    civs: r.civs.map((c) => ({
+      ...c,
+      user_id: c.user_id as string,
+      name_es: civPorId(c.civ_id)?.name_es ?? '',
+      flag: civPorId(c.civ_id)?.flag ?? '',
+      display_name: (c.user_id && nombres.get(c.user_id)) || 'Jugador',
+    })),
+  });
+
+  const partidas = m.games.map((g) => {
+    const r = reveladas.find((x) => x.game_no === g.game_no);
+    return r && !g.map_id && !g.civs.length ? { ...g, ...delDraft(r) } : g;
+  });
+  const sueltas = reveladas
+    .filter((r) => !m.games.some((g) => g.game_no === r.game_no))
+    .map((r) => ({ id: `${m.id}_${r.game_no}`, game_no: r.game_no, winner_team_id: null, replay_url: null, ...delDraft(r) }));
+  return [...partidas, ...sueltas].sort((a, b) => a.game_no - b.game_no);
 }
 
 export type EstadoDraft = {

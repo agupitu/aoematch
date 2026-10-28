@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { agendar, detallePartido, guardarVodPartido, horariosDelPartido } from '../datos/partidos';
-import { type EstadoDraft, civsDeLaPartida, partidaActual, useDraft } from '../datos/drafts';
+import { type DraftRevelado, partidaActual, partidasConDraft, useDraft, useDraftsRevelados } from '../datos/drafts';
 import { cargarSerie, walkover } from '../datos/resultados';
 import { useAuth } from '../auth';
 import { Alerta, Badge, Modal, Spinner } from '../components/ui';
-import { CargarPartidas, type DelDraft, necesitaAncho } from '../components/CargarPartidas';
+import { CargarPartidas, necesitaAncho } from '../components/CargarPartidas';
 import { PartidasDeLaSerie } from '../components/PartidasDeLaSerie';
 import { ChatPanel, type SalaChat } from '../components/ChatPanel';
 import { DraftBoard } from '../components/DraftBoard';
@@ -45,6 +45,7 @@ export function MatchRoom() {
 
   const gameNo = m ? partidaActual(m) : null;
   const estadoDraft = useDraft(id, gameNo, user?.id ?? null);
+  const reveladas = useDraftsRevelados(id);
   const avisar = (mensaje: string) => {
     setAviso(mensaje);
     setTimeout(() => setAviso(''), 4000);
@@ -69,8 +70,10 @@ export function MatchRoom() {
 
   const nombres = { a: m.teams.a?.name ?? 'Equipo A', b: m.teams.b?.name ?? 'Equipo B' };
   const faltanEquipos = !m.team_a_id || !m.team_b_id;
+  // Lo cargado de cada partida, completado con lo que salió de su draft revelado.
+  const partidas = partidasConDraft(m, reveladas);
   // Con la serie cerrada y partidas cargadas, el lugar del draft muestra lo que se jugó.
-  const serieCerrada = !faltanEquipos && gameNo === null && m.games.some((g) => g.winner_team_id || g.map || g.civs.length);
+  const serieCerrada = !faltanEquipos && gameNo === null && partidas.some((g) => g.winner_team_id || g.map || g.civs.length);
 
   const salasChat: SalaChat[] = [
     { id: `match:${id}`, label: 'Sala del partido', hint: 'La ven los dos equipos y el organizador.' },
@@ -112,7 +115,7 @@ export function MatchRoom() {
           {m.me.team_id && <Badge tone="gold">Jugás este partido</Badge>}
           {m.me.is_staff && <Badge>Organizador</Badge>}
           <Agendar m={m} onDone={cargar} />
-          {m.me.is_staff && <Reportar m={m} estado={estadoDraft} onDone={cargar} />}
+          {m.me.is_staff && <Reportar m={m} reveladas={reveladas} onDone={cargar} />}
         </div>
       </header>
 
@@ -164,7 +167,7 @@ export function MatchRoom() {
             </div>
           ) : serieCerrada ? (
             <div className="h-full overflow-auto">
-              <PartidasDeLaSerie m={m} />
+              <PartidasDeLaSerie m={m} partidas={partidas} />
             </div>
           ) : (
             <DraftBoard m={m} gameNo={gameNo} estado={estadoDraft} uid={user?.id ?? null} onError={avisar} />
@@ -174,7 +177,7 @@ export function MatchRoom() {
 
       {!serieCerrada && (
         <div className="mt-4">
-          <PartidasDeLaSerie m={m} />
+          <PartidasDeLaSerie m={m} partidas={partidas} />
         </div>
       )}
     </div>
@@ -326,17 +329,10 @@ function Agendar({ m, onDone }: { m: MatchDetail; onDone: () => void }) {
 
 // --------------------------------------------------------------- reportar
 
-function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; onDone: () => void }) {
+function Reportar({ m, reveladas, onDone }: { m: MatchDetail; reveladas: DraftRevelado[]; onDone: () => void }) {
   const [abierto, setAbierto] = useState(false);
   const [wo, setWo] = useState('');
   const [error, setError] = useState('');
-
-  // Mapa y civs del draft de la partida en juego, si ya se reveló.
-  const { draft, picks } = estado;
-  const delDraft: DelDraft | null =
-    draft && draft.revealed && picks
-      ? { game_no: draft.game_no, map_id: draft.map_id, civs: civsDeLaPartida(draft, picks) }
-      : null;
 
   const hacer = async (fn: () => Promise<unknown>) => {
     setError('');
@@ -366,7 +362,7 @@ function Reportar({ m, estado, onDone }: { m: MatchDetail; estado: EstadoDraft; 
         <div className="space-y-4">
           <CargarPartidas
             m={m}
-            delDraft={delDraft}
+            delDrafts={reveladas}
             error={error}
             onGuardar={(partidas) => hacer(() => cargarSerie(m.id, partidas))}
           />
