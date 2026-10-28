@@ -330,27 +330,34 @@ function roundRobin(c, teams, { stageId, groupId = null }) {
 
 // --------------------------------------------------------- grupos + playoff
 
-function gruposPlayoff(c, teams) {
+/** Cuántos grupos tiene el torneo: los que pide la configuración, y nunca menos de dos. */
+export const cantidadDeGrupos = (torneo) => Math.max(2, torneo.group_count || 2);
+
+/** Reparte los equipos (ya por siembra) en `cantidad` grupos en serpiente, para que queden parejos. Devuelve los ids de cada grupo. */
+export function repartirEnGrupos(teams, cantidad) {
+  const grupos = Array.from({ length: cantidad }, () => []);
+  teams.forEach((t, i) => {
+    const vuelta = Math.floor(i / cantidad);
+    const pos = i % cantidad;
+    grupos[vuelta % 2 === 0 ? pos : cantidad - 1 - pos].push(t.id);
+  });
+  return grupos;
+}
+
+/** `manual`: los ids de cada grupo ya elegidos (ver `ordenarManual`); sin eso se reparte en serpiente. */
+function gruposPlayoff(c, teams, manual = null) {
   const stageId = crearEtapa(c, 1, 'Fase de grupos', 'grupos');
   const etapa = c.etapas.find((e) => e.id === stageId);
-  const g = Math.max(2, c.torneo.group_count || 2);
+  const porId = new Map(teams.map((t) => [t.id, t]));
   // Los grupos van dentro de la etapa; su id es la letra.
-  etapa.groups = Array.from({ length: g }, (_, i) => {
+  etapa.groups = (manual ?? repartirEnGrupos(teams, cantidadDeGrupos(c.torneo))).map((ids, i) => {
     const letra = String.fromCharCode(65 + i);
-    return { id: letra, name: `Grupo ${letra}`, team_ids: [] };
-  });
-  const integrantes = etapa.groups.map(() => []);
-
-  // Serpiente por siembra para repartir parejo.
-  teams.forEach((t, i) => {
-    const vuelta = Math.floor(i / g);
-    const pos = i % g;
-    const idx = vuelta % 2 === 0 ? pos : g - 1 - pos;
-    integrantes[idx].push(t);
-    etapa.groups[idx].team_ids.push(t.id);
+    return { id: letra, name: `Grupo ${letra}`, team_ids: [...ids] };
   });
 
-  etapa.groups.forEach((grupo, i) => roundRobin(c, integrantes[i], { stageId, groupId: grupo.id }));
+  etapa.groups.forEach((grupo) =>
+    roundRobin(c, grupo.team_ids.map((id) => porId.get(id)), { stageId, groupId: grupo.id })
+  );
   return stageId;
 }
 
@@ -382,9 +389,10 @@ function suizo(c, teams) {
 /**
  * Arma en memoria el cuadro de un torneo con sus equipos ya ordenados por
  * siembra. Devuelve { etapas, partidos, seeds }: `seeds` son los equipos sin
- * siembra con la que les toca por su lugar en la lista.
+ * siembra con la que les toca por su lugar en la lista. `grupos` (solo en
+ * grupos + playoff) son los ids de cada grupo elegidos a mano.
  */
-export function generarCuadro(torneo, teams, ids) {
+export function generarCuadro(torneo, teams, ids, { grupos = /** @type {string[][] | null} */ (null) } = {}) {
   const c = cuadroNuevo(torneo, ids);
 
   if (torneo.format === 'eliminacion_simple') {
@@ -396,7 +404,7 @@ export function generarCuadro(torneo, teams, ids) {
   } else if (torneo.format === 'liga') {
     roundRobin(c, teams, { stageId: crearEtapa(c, 1, 'Liga', 'liga') });
   } else if (torneo.format === 'grupos_playoff') {
-    gruposPlayoff(c, teams);
+    gruposPlayoff(c, teams, grupos);
   } else if (torneo.format === 'suizo') {
     suizo(c, teams);
   } else {
@@ -407,6 +415,38 @@ export function generarCuadro(torneo, teams, ids) {
     etapas: c.etapas,
     partidos: [...c.partidos.values()],
     seeds: teams.map((t, i) => (t.seed == null ? { id: t.id, seed: i + 1 } : null)).filter(Boolean),
+  };
+}
+
+/**
+ * Orden elegido a mano por el staff: `{ equipos }` (una lista, la posición es la
+ * siembra) o, en grupos + playoff, `{ grupos }` (los ids de cada grupo en orden).
+ * Todos los equipos del torneo tienen que estar, una sola vez. Devuelve
+ * { teams, grupos }: los equipos en ese orden y sin siembra (se vuelve a asignar
+ * por el lugar) y los grupos para `generarCuadro` (null si el formato no tiene).
+ */
+export function ordenarManual(torneo, teams, orden = {}) {
+  const conGrupos = torneo.format === 'grupos_playoff';
+  const listas = conGrupos ? orden.grupos : [orden.equipos];
+  if (!Array.isArray(listas) || listas.some((l) => !Array.isArray(l))) throw new Error('Falta el orden de los equipos.');
+  if (conGrupos) {
+    const g = cantidadDeGrupos(torneo);
+    if (listas.length !== g) throw new Error(`Hacen falta ${g} grupos.`);
+    if (listas.some((l) => l.length < 2)) throw new Error('Cada grupo necesita al menos dos equipos.');
+  }
+
+  const porId = new Map(teams.map((t) => [t.id, t]));
+  const vistos = new Set();
+  for (const id of listas.flat()) {
+    if (!porId.has(id)) throw new Error('Hay un equipo que no es del torneo.');
+    if (vistos.has(id)) throw new Error('Un equipo está más de una vez.');
+    vistos.add(id);
+  }
+  if (vistos.size < teams.length) throw new Error('Faltan equipos por ubicar.');
+
+  return {
+    teams: listas.flat().map((id) => ({ ...porId.get(id), seed: null })),
+    grupos: conGrupos ? listas.map((l) => [...l]) : null,
   };
 }
 

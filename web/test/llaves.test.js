@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cargarPartidas, cerrarEnMemoria, cerrarPartido, cuadroDeClasificados, cuadroDePlayoffs, darWalkover, generarCuadro,
-  ordenSiembra, rondaSuiza, sembrarClasificados, tablaDesde,
+  ordenarManual, ordenSiembra, repartirEnGrupos, rondaSuiza, sembrarClasificados, tablaDesde,
 } from '../src/logica/llaves.js';
 
 const equipos = (n) => Array.from({ length: n }, (_, i) => ({ id: `E${i + 1}`, name: `E${i + 1}`, seed: null }));
@@ -139,6 +139,72 @@ describe('resultados', () => {
     const m = (a, b, sa, sb) => ({ team_a_id: a, team_b_id: b, score_a: sa, score_b: sb, winner_team_id: sa > sb ? a : b });
     const tabla = tablaDesde(t, [m('E1', 'E2', 2, 1), m('E2', 'E3', 2, 0), m('E3', 'E1', 2, 0)]);
     assert.deepEqual(tabla.map((f) => [f.team.id, f.pts]), [['E2', 3], ['E3', 3], ['E1', 3]]);
+  });
+});
+
+describe('orden manual', () => {
+  const grupal = torneo({ format: 'grupos_playoff', group_count: 2, group_advance: 2 });
+
+  it('repartirEnGrupos: serpiente por siembra', () => {
+    assert.deepEqual(repartirEnGrupos(equipos(6), 2), [['E1', 'E4', 'E5'], ['E2', 'E3', 'E6']]);
+  });
+
+  it('eliminación: la posición en la lista es la siembra', () => {
+    const { teams, grupos } = ordenarManual(torneo(), equipos(4), { equipos: ['E3', 'E1', 'E4', 'E2'] });
+    assert.equal(grupos, null);
+    assert.deepEqual(teams.map((t) => t.id), ['E3', 'E1', 'E4', 'E2']);
+
+    const c = generarCuadro(torneo(), teams, ids());
+    const semi = (equipo) => c.partidos.find((p) => p.round === 1 && p.team_a_id === equipo);
+    assert.equal(semi('E3').team_b_id, 'E2'); // 1.º contra el último
+    assert.equal(semi('E1').team_b_id, 'E4');
+    assert.deepEqual(c.seeds, [{ id: 'E3', seed: 1 }, { id: 'E1', seed: 2 }, { id: 'E4', seed: 3 }, { id: 'E2', seed: 4 }]);
+  });
+
+  it('la siembra anterior se pisa con el orden nuevo', () => {
+    const viejos = equipos(2).map((e, i) => ({ ...e, seed: i + 1 }));
+    const { teams } = ordenarManual(torneo(), viejos, { equipos: ['E2', 'E1'] });
+    assert.deepEqual(generarCuadro(torneo(), teams, ids()).seeds, [{ id: 'E2', seed: 1 }, { id: 'E1', seed: 2 }]);
+  });
+
+  it('grupos: cada grupo lleva los equipos elegidos', () => {
+    const orden = { grupos: [['E5', 'E1', 'E2'], ['E3', 'E4', 'E6']] };
+    const { teams, grupos } = ordenarManual(grupal, equipos(6), orden);
+    assert.deepEqual(grupos, orden.grupos);
+    assert.deepEqual(teams.map((t) => t.id), ['E5', 'E1', 'E2', 'E3', 'E4', 'E6']);
+
+    const c = generarCuadro(grupal, teams, ids(), { grupos });
+    assert.deepEqual(c.etapas[0].groups.map((g) => [g.id, g.team_ids]), [['A', orden.grupos[0]], ['B', orden.grupos[1]]]);
+    // Solo se juegan entre los del mismo grupo: 3 partidos por grupo.
+    for (const g of c.etapas[0].groups) {
+      const delGrupo = c.partidos.filter((p) => p.group_id === g.id);
+      assert.equal(delGrupo.length, 3);
+      assert.ok(delGrupo.every((p) => g.team_ids.includes(p.team_a_id) && g.team_ids.includes(p.team_b_id)));
+    }
+  });
+
+  it('grupos de distinto tamaño', () => {
+    const { teams, grupos } = ordenarManual(grupal, equipos(5), { grupos: [['E1', 'E2'], ['E3', 'E4', 'E5']] });
+    const c = generarCuadro(grupal, teams, ids(), { grupos });
+    assert.deepEqual(c.etapas[0].groups.map((g) => g.team_ids.length), [2, 3]);
+    assert.equal(c.partidos.length, 1 + 3);
+  });
+
+  it('sin orden manual los grupos se reparten solos', () => {
+    const c = generarCuadro(grupal, equipos(6), ids());
+    assert.deepEqual(c.etapas[0].groups.map((g) => g.team_ids), repartirEnGrupos(equipos(6), 2));
+  });
+
+  it('valida que estén todos, una vez y en la cantidad de grupos', () => {
+    const ok = [['E1', 'E2'], ['E3', 'E4']];
+    assert.throws(() => ordenarManual(torneo(), equipos(4), { equipos: ['E1', 'E2', 'E3'] }), /Faltan equipos/);
+    assert.throws(() => ordenarManual(torneo(), equipos(4), { equipos: ['E1', 'E1', 'E2', 'E3', 'E4'] }), /más de una vez/);
+    assert.throws(() => ordenarManual(torneo(), equipos(4), { equipos: ['E1', 'E2', 'E3', 'E9'] }), /no es del torneo/);
+    assert.throws(() => ordenarManual(torneo(), equipos(4), {}), /Falta el orden/);
+    assert.throws(() => ordenarManual(grupal, equipos(4), { grupos: [ok[0]] }), /Hacen falta 2 grupos/);
+    assert.throws(() => ordenarManual(grupal, equipos(5), { grupos: [['E1'], ['E2', 'E3', 'E4', 'E5']] }), /al menos dos equipos/);
+    assert.throws(() => ordenarManual(grupal, equipos(5), { grupos: ok }), /Faltan equipos/);
+    assert.doesNotThrow(() => ordenarManual(grupal, equipos(4), { grupos: ok }));
   });
 });
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
-  confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
+  type OrdenManual, confirmarEquipos, generarLlaves, generarPlayoffs, proponerEquiposDelTorneo, siguienteRondaSuiza,
 } from '../datos/llaves';
 import { actualizarTorneo, detalleTorneo, guardarVodFase } from '../datos/torneos';
 import {
@@ -15,6 +15,7 @@ import { costosDe, montoEscrito, opcionesDePago } from '../logica/pagos.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
+import { ArmadoManual } from '../components/ArmadoManual';
 import { Bracket, MatchCard } from '../components/Bracket';
 import { FechasDeRonda } from '../components/FechasDeRonda';
 import { MatchCalendar } from '../components/MatchCalendar';
@@ -788,7 +789,7 @@ function EquiposDelOrganizador({ t, onDone }: { t: Tournament; onDone: () => voi
       <h3 className="title mb-1 text-lg">Equipos del organizador</h3>
       <p className="mb-4 text-sm text-parch-400">
         Armá los equipos vacíos: los jugadores piden lugar y vos aprobás quién entra. El primero que entra queda de
-        capitán. Los equipos que sigan vacíos no entran a las llaves.
+        capitán. Los equipos vacíos entran igual a las llaves: los jugadores se pueden sumar después.
       </p>
 
       <form
@@ -1001,13 +1002,15 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const [error, setError] = useState('');
 
   const [mensaje, setMensaje] = useState('');
-  const accion = async (cual: 'llaves' | 'playoffs' | 'suizo') => {
+  const [armando, setArmando] = useState(false);
+  const accion = async (cual: 'llaves' | 'playoffs' | 'suizo', orden?: OrdenManual) => {
     setError('');
     setMensaje('');
     try {
       if (cual === 'llaves') {
         if (t.matches.length && !confirm('Regenerar borra los partidos, sus drafts y los chats de partido. ¿Seguimos?')) return;
-        await generarLlaves(t.id);
+        await generarLlaves(t.id, orden);
+        setArmando(false);
       } else if (cual === 'playoffs') {
         await generarPlayoffs(t.id);
       } else {
@@ -1029,6 +1032,9 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
           <button className="btn btn-primary" onClick={() => accion('llaves')}>
             {t.matches.length ? 'Regenerar llaves' : 'Generar llaves'}
           </button>
+          <button className="btn btn-ghost" onClick={() => setArmando((a) => !a)}>
+            {t.format === 'grupos_playoff' ? 'Armar grupos a mano' : 'Ordenar a mano'}
+          </button>
           {hayGrupos && (
             <button className="btn btn-ghost" onClick={() => accion('playoffs')}>
               Generar playoffs
@@ -1047,6 +1053,10 @@ function Llaves({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
       {error && <Alerta>{error}</Alerta>}
       {mensaje && <Alerta tone="info">{mensaje}</Alerta>}
+
+      {staff && armando && (
+        <ArmadoManual t={t} onGenerar={(orden) => accion('llaves', orden)} onCerrar={() => setArmando(false)} />
+      )}
 
       {staff && t.matches.length > 0 && <FechasDeRonda t={t} onDone={onDone} />}
 

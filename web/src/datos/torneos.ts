@@ -307,9 +307,8 @@ export async function detalleTorneo(slug: string, uid: string | null): Promise<T
     team_b_name: nombreEquipo.get(m.team_b_id) ?? null,
   }));
 
-  // La tabla es de los equipos que juegan: un equipo del organizador sin jugadores no aparece.
   const standings = ['liga', 'suizo'].includes(t.format)
-    ? tablaDesde(equiposEnOrden.filter((e) => (e.member_ids ?? []).length > 0).map(filaEquipo), partidos.filter(terminado))
+    ? tablaDesde(equiposEnOrden.map(filaEquipo), partidos.filter(terminado))
     : null;
 
   const organizador = usuarios.get(t.organizer_id);

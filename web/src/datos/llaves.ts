@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { proponerEquipos } from '../logica/armador.js';
-import { cuadroDePlayoffs, generarCuadro, rondaSuiza } from '../logica/llaves.js';
+import { cuadroDePlayoffs, generarCuadro, ordenarManual, rondaSuiza } from '../logica/llaves.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
 import { vigente } from './torneos';
@@ -41,8 +41,7 @@ async function torneo(slug: string) {
  */
 async function equiposEnOrden(slug: string) {
   const filas = await consultar(query(collection(firestore, 'teams'), where('tournament_id', '==', slug)));
-  const conJugadores = filas.filter((e) => (e.member_ids ?? []).length > 0);
-  return ordenarPor(conJugadores, (e: Doc) => e.seed ?? 9999, 'created_at', 'id');
+  return ordenarPor(filas, (e: Doc) => e.seed ?? 9999, 'created_at', 'id');
 }
 
 const partidosDe = (slug: string) => consultar(query(partidos(), where('tournament_id', '==', slug)));
@@ -104,13 +103,21 @@ async function borrarLlaves(slug: string) {
   await escribirEnTandas(refs.map((r) => (b) => b.delete(r)));
 }
 
-/** Genera (o vuelve a generar) las llaves y pasa el torneo a 'en_curso'. */
-export function generarLlaves(slug: string) {
+/** Orden elegido a mano: la lista de equipos (la posición es la siembra) o, en grupos + playoff, los equipos de cada grupo. */
+export type OrdenManual = { equipos?: string[]; grupos?: string[][] };
+
+/**
+ * Genera (o vuelve a generar) las llaves y pasa el torneo a 'en_curso'. Con
+ * `manual`, el staff decide el orden de los equipos y qué equipos forman cada
+ * grupo; sin eso, van por siembra y los grupos se reparten solos.
+ */
+export function generarLlaves(slug: string, manual?: OrdenManual) {
   return conMensaje(async () => {
     const t = await torneo(slug);
-    const equipos = await equiposEnOrden(slug);
-    if (equipos.length < 2) throw new Error('Hacen falta al menos dos equipos con jugadores.');
-    const cuadro = generarCuadro(t, equipos, ids(slug));
+    const todos = await equiposEnOrden(slug);
+    if (todos.length < 2) throw new Error('Hacen falta al menos dos equipos.');
+    const { teams: equipos, grupos } = manual ? ordenarManual(t, todos, manual) : { teams: todos, grupos: null };
+    const cuadro = generarCuadro(t, equipos, ids(slug), { grupos });
     await borrarLlaves(slug);
     await escribirEnTandas([
       ...escriturasDelCuadro(slug, cuadro),
