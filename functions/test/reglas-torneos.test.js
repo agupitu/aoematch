@@ -175,6 +175,29 @@ describe('torneos y etapas', () => {
     await assertFails(como('org').doc('tournaments/copa').update({ payment_methods: [{ url: 'ftp://x.example.com' }] }));
   });
 
+  it('cada medio de pago trae su costo y su moneda, juntos, y pueden ser distintos entre medios', async () => {
+    const db = como('nuevo');
+    const con = (slug, payment_methods) => db.doc(`tournaments/${slug}`).set(torneo({ slug, organizer_id: 'nuevo', payment_methods }));
+    await assertSucceeds(con('c1', [
+      { method: 'Mercado Pago', amount_cents: 500000, currency: 'ARS' },
+      { method: 'PayPal', amount_cents: 500, currency: 'USD', url: 'https://paypal.me/aoe' },
+      { method: 'Efectivo' },
+    ]));
+    await assertSucceeds(con('c2', [{ amount_cents: 1, currency: 'CLP' }, { amount_cents: 10000000000, currency: 'EUR' }]));
+    await assertFails(con('c3', [{ method: 'PayPal', amount_cents: 500 }]));
+    await assertFails(con('c4', [{ method: 'PayPal', currency: 'USD' }]));
+    await assertFails(con('c5', [{ method: 'PayPal', amount_cents: 0, currency: 'USD' }]));
+    await assertFails(con('c6', [{ method: 'PayPal', amount_cents: -5, currency: 'USD' }]));
+    await assertFails(con('c7', [{ method: 'PayPal', amount_cents: 10000000001, currency: 'USD' }]));
+    await assertFails(con('c8', [{ method: 'PayPal', amount_cents: 12.5, currency: 'USD' }]));
+    await assertFails(con('c9', [{ method: 'PayPal', amount_cents: '500', currency: 'USD' }]));
+    await assertFails(con('c10', [{ method: 'PayPal', amount_cents: 500, currency: 'XXX' }]));
+    await assertSucceeds(como('org').doc('tournaments/copa').update({
+      payment_methods: [{ method: 'Efectivo', amount_cents: 300000, currency: 'ARS' }],
+    }));
+    await assertFails(como('org').doc('tournaments/copa').update({ payment_methods: [{ amount_cents: 300000 }] }));
+  });
+
   it('pisar un torneo ajeno con set no pasa', async () => {
     await assertFails(como('nuevo').doc('tournaments/copa').set(torneo({ organizer_id: 'nuevo' })));
   });
@@ -271,6 +294,14 @@ describe('inscripciones', () => {
     await assertSucceeds(ref(como('org'), 'suelto').update({ paid: 1, paid_at: '2026-10-26T00:00:00.000Z', status: 'confirmada' }));
     await assertSucceeds(ref(como('adm'), 'suelto').update({ note: 'pagó por transferencia' }));
     await assertFails(ref(como('cap'), 'suelto').update({ status: 'rechazada' }));
+  });
+
+  it('el staff anota por qué medio y cuánto se pagó; el jugador no', async () => {
+    const pago = { paid: 1, paid_at: '2026-10-26T00:00:00.000Z', paid_method: 'PayPal', paid_amount_cents: 500, paid_currency: 'USD' };
+    await assertSucceeds(ref(como('org'), 'suelto').update(pago));
+    await assertSucceeds(ref(como('adm'), 'suelto').update({ paid: 0, paid_at: null, paid_method: null, paid_amount_cents: null, paid_currency: null }));
+    await assertFails(ref(como('suelto'), 'suelto').update({ paid_method: 'PayPal', paid_amount_cents: 500, paid_currency: 'USD' }));
+    await assertFails(ref(como('nuevo'), 'nuevo').set(inscripcion('nuevo', { paid_amount_cents: 500, paid_currency: 'USD' })));
   });
 
   it('se leen sin sesión; las borra solo el staff', async () => {

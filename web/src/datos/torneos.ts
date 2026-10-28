@@ -16,7 +16,7 @@ import { firestore } from '../firebase';
 import { mapaPorId, civs as todasLasCivs } from '../logica/catalogo.js';
 import { poolCivs, poolMapas } from '../logica/draft.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
-import { limpiarMediosDePago, mediosDePago } from '../logica/pagos.js';
+import { limpiarMediosDePago, mediosConCosto, recaudadoEn, recaudadoPorMoneda } from '../logica/pagos.js';
 import { MODOS_DE_SERIE } from '../logica/series.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
@@ -62,7 +62,7 @@ export async function listarTorneos() {
 const CAMPOS_EDITABLES = [
   'name', 'description', 'rules_md', 'banner_url', 'status', 'format', 'team_size',
   'max_teams', 'best_of', 'best_of_final', 'series_mode', 'group_count', 'group_advance', 'swiss_rounds',
-  'third_place', 'map_repeat', 'first_map_id', 'civ_bans', 'civ_repeat_series', 'civ_repeat_team', 'entry_fee_cents',
+  'third_place', 'map_repeat', 'first_map_id', 'civ_bans', 'civ_repeat_series', 'civ_repeat_team',
   'currency', 'payment_notes', 'allow_solo', 'reg_opens_at', 'reg_closes_at',
   'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes',
 ];
@@ -70,7 +70,7 @@ const CAMPOS_EDITABLES = [
 const CAMPOS_NUMERICOS = [
   'team_size', 'max_teams', 'best_of', 'best_of_final', 'group_count', 'group_advance',
   'swiss_rounds', 'third_place', 'map_repeat', 'civ_bans', 'civ_repeat_series', 'civ_repeat_team',
-  'entry_fee_cents', 'allow_solo',
+  'allow_solo',
   'prize_pool_cents', 'prize_pool_pct', 'first_map_id',
 ];
 
@@ -175,13 +175,17 @@ export function guardarVodFase(slug: string, stageId: string, links: { label: st
   return conMensaje(() => updateDoc(doc(firestore, 'tournaments', slug, 'stages', stageId), { vod_links: links }));
 }
 
-/** Cambios del staff. `orden` sigue a `starts_at`. Saca los modos del draft viejo y los campos de pago de antes. */
+/**
+ * Cambios del staff. `orden` sigue a `starts_at`. Saca los modos del draft viejo y los campos de pago de
+ * antes; el costo único de antes pasa a cada medio al guardar (se pone en 0 para que no reaparezca).
+ */
 export async function actualizarTorneo(t: Doc | Tournament, body: Record<string, unknown>) {
   const cambios = camposDe(body);
   for (const c of CAMPOS_VIEJOS) cambios[c] = deleteField();
   if (cambios.payment_methods !== undefined) {
     cambios.payment_links = deleteField();
     cambios.payment_link = deleteField();
+    cambios.entry_fee_cents = 0;
   }
   if (!Object.keys(cambios).length) return;
   if (cambios.starts_at !== undefined) cambios.orden = cambios.starts_at ?? (t as Doc).created_at;
@@ -192,10 +196,12 @@ export async function actualizarTorneo(t: Doc | Tournament, body: Record<string,
 
 /**
  * Bolsa de premios y cuánto le toca a cada puesto. La bolsa puede ser un monto
- * declarado por el organizador o salir de lo que se recaudó en inscripciones.
+ * declarado por el organizador o salir de lo que se recaudó en inscripciones, y
+ * de eso solo cuenta lo cobrado en la moneda de los premios.
  */
-function premiosDe(t: Doc, pagas: number) {
-  const recaudado = pagas * t.entry_fee_cents;
+function premiosDe(t: Doc, inscripciones: Doc[]) {
+  const pagas = inscripciones.filter((r) => vigente(r) && r.paid).length;
+  const recaudado = recaudadoEn(inscripciones, t, t.currency);
   const bolsa =
     t.prize_pool_mode === 'fijo'
       ? t.prize_pool_cents
@@ -216,6 +222,7 @@ function premiosDe(t: Doc, pagas: number) {
       mode: t.prize_pool_mode,
       total_cents: bolsa,
       collected_cents: recaudado,
+      collected_by_currency: recaudadoPorMoneda(inscripciones, t),
       paid_count: pagas,
       assigned_cents: filas.reduce((s: number, p: Doc) => s + p.value_cents, 0),
       assigned_pct: filas.filter((p: Doc) => p.kind === 'porcentaje').reduce((s: number, p: Doc) => s + p.percent, 0),
@@ -305,14 +312,13 @@ export async function detalleTorneo(slug: string, uid: string | null): Promise<T
     ? tablaDesde(equiposEnOrden.filter((e) => (e.member_ids ?? []).length > 0).map(filaEquipo), partidos.filter(terminado))
     : null;
 
-  const pagas = inscripciones.filter((r) => vigente(r) && r.paid).length;
   const organizador = usuarios.get(t.organizer_id);
   return {
     ...t,
     organizer: organizador ? { id: organizador.id, display_name: organizador.display_name } : null,
     first_map: t.first_map_id ? mapaPorId(t.first_map_id) : null,
-    payment_methods: mediosDePago(t),
-    ...premiosDe(t, pagas),
+    payment_methods: mediosConCosto(t),
+    ...premiosDe(t, inscripciones),
     maps: poolMapas(t),
     civs: poolCivs(t),
     teams,

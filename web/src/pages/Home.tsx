@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { listarTorneos } from '../datos/torneos';
 import { useAuth } from '../auth';
 import { Badge, Empty, Spinner } from '../components/ui';
-import { bolsaDe, ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, monto, plata } from '../lib';
+import { costosDe, recaudadoEstimado } from '../logica/pagos.js';
+import { bolsaDe, costosEnTexto, ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, monto } from '../lib';
 import type { Tournament } from '../types';
 
 type Fila = Tournament & { organizer_name: string; inscriptos: number; pagos: number; equipos: number };
@@ -61,12 +62,10 @@ export function Home() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {lista.map((t) => {
-            const bolsa = bolsaDe(
-              t.prize_pool_mode,
-              t.prize_pool_cents,
-              t.pagos * t.entry_fee_cents,
-              t.prize_pool_pct
-            );
+            // Con varios costos no se sabe cuánto entró sin leer las inscripciones: se muestra el porcentaje.
+            const recaudado = recaudadoEstimado(t, t.pagos);
+            const bolsa = bolsaDe(t.prize_pool_mode, t.prize_pool_cents, recaudado ?? 0, t.prize_pool_pct);
+            const porcentual = t.prize_pool_mode === 'inscripciones' && recaudado === null;
             return (
             <Link
               key={t.id}
@@ -97,12 +96,14 @@ export function Home() {
                 </div>
                 <div>
                   <dt className="inline">Inscripción: </dt>
-                  <dd className="inline text-parch-200">{plata(t.entry_fee_cents, t.currency)}</dd>
+                  <dd className="inline text-parch-200">{costosEnTexto(costosDe(t))}</dd>
                 </div>
-                {bolsa > 0 && (
+                {(bolsa > 0 || porcentual) && (
                   <div>
                     <dt className="inline">Premios: </dt>
-                    <dd className="inline text-gold-400">{monto(bolsa, t.currency)}</dd>
+                    <dd className="inline text-gold-400">
+                      {porcentual ? `${t.prize_pool_pct}% de lo recaudado` : monto(bolsa, t.currency)}
+                    </dd>
                   </div>
                 )}
                 {t.starts_at && (

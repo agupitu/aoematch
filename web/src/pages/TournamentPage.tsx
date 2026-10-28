@@ -8,9 +8,10 @@ import {
   aprobarPedido, borrarEquipoDelOrganizador, cancelarPedido, crearEquipoDelOrganizador, pedirLugar,
   rechazarPedido, renombrarEquipo,
 } from '../datos/equipos';
-import { inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
+import { type PagoElegido, inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { pedidosPendientes } from '../logica/equipos.js';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
+import { costosDe, montoEscrito, opcionesDePago } from '../logica/pagos.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
 import { Alerta, Avatar, Badge, Empty, Modal, Spinner, Tabs } from '../components/ui';
@@ -25,7 +26,7 @@ import { useChat, useConectado } from '../live';
 import { usePresencia } from '../presence';
 import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
-  fechaCorta, monto, plata, zonaDelNavegador,
+  costo, costosEnTexto, fechaCorta, monto, zonaDelNavegador,
 } from '../lib';
 import type { Civ, GameMap, PagoMedio, Registration, StandingRow, Team, Tournament, User } from '../types';
 
@@ -134,6 +135,7 @@ function AccionesInscripcion({
   const reg = t.me?.registration;
   const activa = reg && reg.status !== 'retirada';
   const abiertoAhora = ['inscripcion', 'armado'].includes(t.status);
+  const costos = costosDe(t);
 
   const inscribir = async (kind: 'solo' | 'equipo') => {
     setError('');
@@ -152,9 +154,9 @@ function AccionesInscripcion({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {t.entry_fee_cents > 0 && (
+      {costos.length > 0 && (
         <Badge tone={reg?.paid ? 'good' : 'gold'}>
-          {plata(t.entry_fee_cents, t.currency)}
+          {costosEnTexto(costos)}
           {activa && (reg?.paid ? ' · pagado' : ' · impago')}
         </Badge>
       )}
@@ -182,12 +184,12 @@ function AccionesInscripcion({
 
       <Modal open={abierto} onClose={() => setAbierto(false)} title={`Inscripción · ${t.name}`}>
         <div className="space-y-4">
-          {t.entry_fee_cents > 0 && (
+          {costos.length > 0 && (
             <Alerta tone="info">
-              Costo: {plata(t.entry_fee_cents, t.currency)}.
+              {costos.length === 1 ? `Costo: ${costosEnTexto(costos)}.` : 'El costo depende del medio de pago:'}
               {t.payment_methods.length > 0 && (
                 <div className="my-2">
-                  <ComoPagar medios={t.payment_methods} />
+                  <ComoPagar medios={t.payment_methods} conCosto={costos.length > 1} />
                 </div>
               )}
               {t.payment_notes && <span className="mt-1 block text-parch-400">{t.payment_notes}</span>}
@@ -270,6 +272,7 @@ function AccionesInscripcion({
 function Resumen({ t }: { t: Tournament }) {
   const pagos = t.registrations.filter((r) => r.paid).length;
   const activos = t.registrations.filter((r) => r.status !== 'retirada');
+  const costos = costosDe(t);
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
@@ -328,8 +331,8 @@ function Resumen({ t }: { t: Tournament }) {
             <Dato k="Inscriptos" v={String(activos.length)} />
             <Dato k="Equipos" v={String(t.teams.length)} />
             <Dato k="Sueltos" v={String(activos.filter((r) => !r.team_id).length)} />
-            <Dato k="Inscripción" v={plata(t.entry_fee_cents, t.currency)} />
-            {t.entry_fee_cents > 0 && <Dato k="Pagaron" v={`${pagos} de ${activos.length}`} />}
+            <Dato k="Inscripción" v={costosEnTexto(costos)} />
+            {costos.length > 0 && <Dato k="Pagaron" v={`${pagos} de ${activos.length}`} />}
             {(t.prizes.length > 0 || t.prize_pool.total_cents > 0) && (
               <Dato
                 k="Premios"
@@ -344,7 +347,7 @@ function Resumen({ t }: { t: Tournament }) {
         {t.payment_methods.length > 0 && (
           <section className="card p-5">
             <h3 className="title mb-3 text-lg">Cómo pagar</h3>
-            <ComoPagar medios={t.payment_methods} />
+            <ComoPagar medios={t.payment_methods} conCosto={costos.length > 1} />
           </section>
         )}
       </aside>
@@ -355,6 +358,8 @@ function Resumen({ t }: { t: Tournament }) {
 function Premios({ t }: { t: Tournament }) {
   if (!t.prizes.length && !t.prize_pool.total_cents) return null;
   const enJuego = Math.max(t.prize_pool.total_cents, t.prize_pool.assigned_cents);
+  // Lo cobrado en otra moneda no suma a la bolsa.
+  const otras = t.prize_pool.collected_by_currency.filter((c) => c.currency !== t.currency);
 
   return (
     <section className="card p-5">
@@ -394,7 +399,9 @@ function Premios({ t }: { t: Tournament }) {
       {t.prize_pool_mode === 'inscripciones' && (
         <p className="mt-3 text-xs text-parch-400">
           La bolsa crece con cada inscripción paga: hoy son {monto(t.prize_pool.collected_cents, t.currency)}{' '}
-          recaudados.
+          recaudados en {t.currency}.
+          {otras.length > 0 &&
+            ` Lo cobrado en ${otras.map((c) => costo(c.amount_cents, c.currency)).join(' y ')} no suma a la bolsa.`}
         </p>
       )}
       {t.prize_notes && <p className="mt-2 text-xs text-parch-400">{t.prize_notes}</p>}
@@ -424,13 +431,21 @@ function CopiarTexto({ texto }: { texto: string }) {
   );
 }
 
-/** Cómo pagar la inscripción: cada medio con su titular, su alias (que se copia) y su link. */
-function ComoPagar({ medios }: { medios: PagoMedio[] }) {
+/**
+ * Cómo pagar la inscripción: cada medio con su titular, su alias (que se copia) y su link.
+ * Con `conCosto`, también lo que cobra cada uno (cuando los medios piden montos distintos).
+ */
+function ComoPagar({ medios, conCosto = false }: { medios: PagoMedio[]; conCosto?: boolean }) {
   return (
     <ul className="space-y-2">
       {medios.map((m, i) => (
         <li key={i} className="rounded-lg border border-ink-700 px-3 py-2 text-sm">
-          <p className="font-medium text-parch-100">{m.method ?? 'Pago'}</p>
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3 font-medium text-parch-100">
+            {m.method ?? 'Pago'}
+            {conCosto && m.amount_cents && m.currency && (
+              <span className="font-display text-gold-400">{costo(m.amount_cents, m.currency)}</span>
+            )}
+          </p>
           {m.name && <p className="text-parch-200">{m.name}</p>}
           {m.alias && (
             <p className="flex flex-wrap items-center gap-2 text-parch-200">
@@ -461,11 +476,49 @@ function Dato({ k, v }: { k: string; v: string }) {
 
 // ------------------------------------------------------------ inscripciones
 
+/** Lo que anotó el staff al marcar el pago: "US$ 5 · PayPal". */
+function detalleDelPago(r: Registration) {
+  const cobrado = r.paid_amount_cents && r.paid_currency ? costo(r.paid_amount_cents, r.paid_currency) : null;
+  return [cobrado, r.paid_method].filter(Boolean).join(' · ');
+}
+
+/** Marcar un pago: con un solo medio es un botón; con varios, se elige por cuál pagó. */
+function MarcarPagado({ opciones, onElegir }: { opciones: PagoElegido[]; onElegir: (pago: PagoElegido) => void }) {
+  if (opciones.length <= 1) {
+    return (
+      <button className="btn btn-ghost !px-2 !py-1" onClick={() => onElegir(opciones[0])}>
+        Marcar pagado
+      </button>
+    );
+  }
+  return (
+    <select
+      className="field !w-auto !px-2 !py-1"
+      value=""
+      aria-label="Marcar pagado por"
+      onChange={(e) => onElegir(opciones[Number(e.target.value)])}
+    >
+      <option value="" disabled>
+        Marcar pagado…
+      </option>
+      {opciones.map((o, i) => (
+        <option key={i} value={i}>
+          {o.method ?? 'Pago'}
+          {o.amount_cents && o.currency ? ` · ${costo(o.amount_cents, o.currency)}` : ''}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const staff = !!t.me?.is_staff;
   const filas = t.registrations.filter((r) => r.status !== 'retirada');
+  const costos = costosDe(t);
+  const opciones: PagoElegido[] = opcionesDePago(t);
+  const recaudado = t.prize_pool.collected_by_currency.map((c) => costo(c.amount_cents, c.currency)).join(' · ');
 
-  const marcar = async (r: Registration, campos: Partial<Registration>) => {
+  const marcar = async (r: Registration, campos: { status?: string; paid?: boolean; pago?: PagoElegido }) => {
     await marcarInscripcion(t, r, campos);
     onDone();
   };
@@ -474,6 +527,12 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
   return (
     <div className="card overflow-x-auto">
+      {staff && costos.length > 0 && (
+        <p className="border-b border-ink-700 p-3 text-sm text-parch-400">
+          Recaudado: <span className="text-parch-100">{recaudado || '—'}</span> · pagaron{' '}
+          {filas.filter((r) => r.paid).length} de {filas.length}
+        </p>
+      )}
       <table className="w-full text-sm">
         <thead className="border-b border-ink-700 text-left text-xs tracking-wide text-parch-400 uppercase">
           <tr>
@@ -512,20 +571,26 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
                 </Badge>
               </td>
               <td className="p-3">
-                {t.entry_fee_cents === 0 ? (
+                {costos.length === 0 ? (
                   <span className="text-parch-400">—</span>
                 ) : (
-                  <Badge tone={r.paid ? 'good' : 'bad'}>{r.paid ? 'pagado' : 'impago'}</Badge>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone={r.paid ? 'good' : 'bad'}>{r.paid ? 'pagado' : 'impago'}</Badge>
+                    {r.paid && <span className="text-xs text-parch-400">{detalleDelPago(r)}</span>}
+                  </span>
                 )}
               </td>
               {staff && (
                 <td className="p-3">
                   <div className="flex justify-end gap-1.5">
-                    {t.entry_fee_cents > 0 && (
-                      <button className="btn btn-ghost !px-2 !py-1" onClick={() => marcar(r, { paid: !r.paid })}>
-                        {r.paid ? 'Marcar impago' : 'Marcar pagado'}
-                      </button>
-                    )}
+                    {costos.length > 0 &&
+                      (r.paid ? (
+                        <button className="btn btn-ghost !px-2 !py-1" onClick={() => marcar(r, { paid: false })}>
+                          Marcar impago
+                        </button>
+                      ) : (
+                        <MarcarPagado opciones={opciones} onElegir={(pago) => marcar(r, { paid: true, pago })} />
+                      ))}
                     {r.status !== 'confirmada' && (
                       <button
                         className="btn btn-ghost !px-2 !py-1"
@@ -1164,10 +1229,16 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       civ_bans: t.civ_bans ?? 0,
       civ_repeat_series: !!t.civ_repeat_series,
       civ_repeat_team: t.civ_repeat_team !== 0,
-      entry_fee_cents: t.entry_fee_cents,
       currency: t.currency,
       payment_methods: t.payment_methods.length
-        ? t.payment_methods.map((m) => ({ method: m.method ?? '', name: m.name ?? '', alias: m.alias ?? '', url: m.url ?? '' }))
+        ? t.payment_methods.map((m) => ({
+            amount: montoEscrito(m.amount_cents),
+            currency: m.currency ?? medioVacio().currency,
+            method: m.method ?? '',
+            name: m.name ?? '',
+            alias: m.alias ?? '',
+            url: m.url ?? '',
+          }))
         : [medioVacio()],
       payment_notes: t.payment_notes ?? '',
       allow_solo: !!t.allow_solo,

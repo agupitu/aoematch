@@ -145,11 +145,19 @@ export function sacarMiembro(t: Tournament, teamId: string, userId: string) {
   );
 }
 
-/** Estado y pago de una inscripción: solo el staff. */
+/** Por dónde y cuánto pagó alguien: un medio del torneo con su costo, si lo tiene. */
+export type PagoElegido = { method: string | null; amount_cents?: number; currency?: string };
+
+/**
+ * Estado y pago de una inscripción: solo el staff. Al marcarla paga se anota por
+ * qué medio y cuánto (`pago`); al marcarla impaga se borra.
+ */
 export function marcarInscripcion(
   t: Tournament,
   r: { user_id: string; payment_ref: string | null },
-  { status, paid, payment_ref }: { status?: string; paid?: boolean; payment_ref?: string | null }
+  {
+    status, paid, payment_ref, pago,
+  }: { status?: string; paid?: boolean; payment_ref?: string | null; pago?: PagoElegido }
 ) {
   const cambios: Record<string, unknown> = {};
   if (status) cambios.status = status;
@@ -157,6 +165,9 @@ export function marcarInscripcion(
     cambios.paid = paid ? 1 : 0;
     cambios.paid_at = paid ? ahora() : null;
     cambios.payment_ref = payment_ref ?? r.payment_ref;
+    cambios.paid_method = paid ? (pago?.method ?? null) : null;
+    cambios.paid_amount_cents = paid ? (pago?.amount_cents ?? null) : null;
+    cambios.paid_currency = paid ? (pago?.currency ?? null) : null;
   }
   if (!Object.keys(cambios).length) return Promise.resolve();
   return conMensaje(() => updateDoc(refInscripcion(t.id, r.user_id), cambios));

@@ -68,12 +68,17 @@ service cloud.firestore {
         && (links.size() < 20 || vodLinkValido(links[19]));
     }
 
-    // Medios de pago de un torneo: hasta 5. Cada uno trae medio, nombre, alias y
-    // link, todos opcionales (al menos uno); el link, si hay, es http(s).
+    // Medios de pago de un torneo: hasta 5. Cada uno trae costo y moneda, medio,
+    // nombre, alias y link, todos opcionales (al menos uno); el costo (en
+    // centavos, hasta 100 millones) y la moneda van juntos o no van; el link, si
+    // hay, es http(s).
     function medioDePagoValido(p) {
       return p is map
         && p.keys().size() >= 1
-        && p.keys().hasOnly(['method', 'name', 'alias', 'url'])
+        && p.keys().hasOnly(['amount_cents', 'currency', 'method', 'name', 'alias', 'url'])
+        && p.keys().hasAny(['amount_cents']) == p.keys().hasAny(['currency'])
+        && (!p.keys().hasAny(['amount_cents']) || enteroEntre(p.amount_cents, 1, 10000000000))
+        && (!p.keys().hasAny(['currency']) || p.currency in ['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'MXN'])
         && textoOpcional(p.get('method', null), 60)
         && textoOpcional(p.get('name', null), 100)
         && textoOpcional(p.get('alias', null), 100)

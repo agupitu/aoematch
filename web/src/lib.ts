@@ -1,3 +1,5 @@
+import type { Costo } from './types';
+
 export function zonaDelNavegador(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
@@ -33,8 +35,20 @@ export function monto(centavos: number, moneda: string): string {
     .format(centavos / 100);
 }
 
-export function plata(centavos: number, moneda: string): string {
-  return centavos ? monto(centavos, moneda) : 'Gratis';
+/** Un costo de inscripción: con centavos solo si los tiene (US$ 12,50). */
+export function costo(centavos: number, moneda: string): string {
+  const decimales = centavos % 100 ? 2 : 0;
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: moneda,
+    minimumFractionDigits: decimales,
+    maximumFractionDigits: decimales,
+  }).format(centavos / 100);
+}
+
+/** Los costos de inscripción en una línea ("$ 5.000 o US$ 5", como alternativas); "Gratis" si no hay. */
+export function costosEnTexto(costos: Costo[]): string {
+  return costos.length ? costos.map((c) => costo(c.amount_cents, c.currency)).join(' o ') : 'Gratis';
 }
 
 /** Bolsa que se reparte, según de dónde sale la plata. */

@@ -114,11 +114,21 @@ mapa. Además:
   que los compañeros lean el pick del otro antes de revelar (el rival no) y no dejan guardar la civ que ya
   tiene un compañero. `civ_repeat_series` y `map_repeat` valen dentro de una serie (las partidas de un mismo
   cruce entre dos equipos), no en toda la fase.
-- `payment_methods`: `[{ method, name, alias, url }]`, hasta 5. Medio de pago, nombre del titular, alias y
-  link: todos opcionales (cada medio trae al menos uno) y el link, si hay, es http(s); las reglas lo validan.
-  Reemplaza a `payment_links` y al `payment_link` único: un torneo que solo tiene esos se lee igual (un
-  medio por link), al leer se descartan los links que no son http(s) y al guardar la configuración se
-  escribe `payment_methods` y se borran los otros dos (`web/src/logica/pagos.js`).
+- `payment_methods`: `[{ amount_cents, currency, method, name, alias, url }]`, hasta 5. Cada medio cobra lo
+  suyo: costo por jugador (`amount_cents`, entero positivo en centavos, hasta 10.000.000.000) y su `currency`
+  (`ARS`, `USD`, `EUR`, `BRL`, `CLP` o `MXN`), que van juntos o no van; dos medios pueden pedir montos o
+  monedas distintos. Medio de pago, nombre del titular, alias y link: todos opcionales (cada medio trae al
+  menos un campo) y el link, si hay, es http(s); las reglas lo validan. Sin costo en ningún medio, la
+  inscripción es gratis. Reemplaza a `payment_links` y al `payment_link` único: un torneo que solo tiene
+  esos se lee igual (un medio por link), al leer se descartan los links que no son http(s) y al guardar la
+  configuración se escribe `payment_methods` y se borran los otros dos (`web/src/logica/pagos.js`).
+- `entry_fee_cents` es el costo único de las versiones anteriores. Mientras ningún medio traiga costo, vale
+  para todos los medios (o es un medio sin más datos si no hay ninguno), así que esos torneos siguen
+  cobrando lo mismo; al guardar la configuración el costo pasa a cada medio y `entry_fee_cents` queda en 0.
+  `currency` es ahora la moneda de los premios.
+- La bolsa en modo `inscripciones` suma solo lo cobrado en la moneda de los premios (`currency`); lo cobrado
+  en otras monedas se muestra aparte y no se mezcla. El listado no lee las inscripciones: con un solo costo
+  estima la bolsa con la cantidad de pagas, y con varios muestra el porcentaje.
 - Los contadores reemplazan los `COUNT(*)` del listado y de `premiosDe`. Se actualizan con
   `FieldValue.increment` en la misma transacción que cambia la inscripción o el equipo (T16, T17,
   T20). Si alguna vez se desajustan, se recalculan leyendo las subcolecciones.
@@ -128,8 +138,11 @@ mapa. Además:
 
 #### `tournaments/{slug}/registrations/{uid}`
 
-`{ user_id, team_id, kind, status, paid, paid_at, payment_ref, note, join_request, created_at }`, con `paid`
-entero `0/1` como hoy (el detalle lo devuelve como bool). El id del
+`{ user_id, team_id, kind, status, paid, paid_at, payment_ref, paid_method, paid_amount_cents, paid_currency,
+note, join_request, created_at }`, con `paid` entero `0/1` como hoy (el detalle lo devuelve como bool). Al
+marcar el pago el staff elige el medio y se anotan `paid_method`, `paid_amount_cents` y `paid_currency` (los
+tres a `null` al desmarcarlo); solo los escribe el staff. Una inscripción paga sin monto anotado (de antes)
+vale el costo del torneo cuando es uno solo (`pagoDe` en `web/src/logica/pagos.js`). El id del
 documento reemplaza el `UNIQUE (tournament_id, user_id)`. El detalle las lee todas y las ordena por
 `created_at`; el armador filtra en memoria las sueltas (`kind == 'solo'`, sin `team_id`, no
 retiradas, sin pedido de ingreso pendiente).

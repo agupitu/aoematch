@@ -1,7 +1,7 @@
 import type { Civ, GameMap, SerieModo } from '../types';
 import { CivPicker, MapPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
-import { MAX_MEDIOS_DE_PAGO, MEDIOS_SUGERIDOS } from '../logica/pagos.js';
+import { MAX_MEDIOS_DE_PAGO, MEDIOS_SUGERIDOS, MONEDAS, centavosDe } from '../logica/pagos.js';
 import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
 import { VistaPrevia } from './VistaPrevia';
@@ -14,11 +14,21 @@ export type PremioBorrador = {
   extra: string;
 };
 
-/** Un medio de pago en el formulario: todos los campos son opcionales, vacíos si no se cargan. */
-export type PagoMedioBorrador = { method: string; name: string; alias: string; url: string };
+/**
+ * Un medio de pago en el formulario, con su costo (`amount`, tal como se escribe)
+ * y su moneda. Todos los campos son opcionales, vacíos si no se cargan.
+ */
+export type PagoMedioBorrador = {
+  amount: string;
+  currency: string;
+  method: string;
+  name: string;
+  alias: string;
+  url: string;
+};
 
-export function medioVacio(): PagoMedioBorrador {
-  return { method: '', name: '', alias: '', url: '' };
+export function medioVacio(moneda: string = MONEDAS[0]): PagoMedioBorrador {
+  return { amount: '', currency: moneda, method: '', name: '', alias: '', url: '' };
 }
 
 export type Borrador = {
@@ -41,7 +51,7 @@ export type Borrador = {
   civ_bans: number;
   civ_repeat_series: boolean;
   civ_repeat_team: boolean;
-  entry_fee_cents: number;
+  /** Moneda de los premios; cada medio de pago tiene la suya. */
   currency: string;
   payment_methods: PagoMedioBorrador[];
   payment_notes: string;
@@ -77,7 +87,6 @@ export const BORRADOR_INICIAL: Borrador = {
   civ_bans: 0,
   civ_repeat_series: true,
   civ_repeat_team: true,
-  entry_fee_cents: 0,
   currency: 'ARS',
   payment_methods: [medioVacio()],
   payment_notes: '',
@@ -452,25 +461,6 @@ export function TournamentForm({
         {tab === 'inscripcion' && (
           <section className="card p-5">
             <h3 className="title mb-4 text-lg">Inscripción</h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Campo label="Costo" hint="0 = gratis. Es por jugador.">
-                <input
-                  className="field"
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={value.entry_fee_cents / 100}
-                  onChange={(e) => set('entry_fee_cents', Math.round(Number(e.target.value) * 100))}
-                />
-              </Campo>
-              <Campo label="Moneda">
-                <select className="field" value={value.currency} onChange={(e) => set('currency', e.target.value)}>
-                  {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'MXN'].map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </Campo>
-            </div>
 
             <MediosDePago value={value.payment_methods} onChange={(v) => set('payment_methods', v)} />
 
@@ -527,20 +517,26 @@ export function TournamentForm({
 // ----------------------------------------------------------- medios de pago
 
 /**
- * Cómo se puede pagar la inscripción: medio de pago, nombre, alias y link, todos
- * opcionales, y un + para sumar otro con los mismos campos. Las filas vacías no
- * se guardan.
+ * Cómo se puede pagar la inscripción: costo, moneda, medio de pago, nombre, alias
+ * y link, todos opcionales, y un + para sumar otro con los mismos campos. Cada
+ * medio cobra lo suyo, así que dos medios pueden pedir montos o monedas
+ * distintos. Las filas vacías no se guardan.
  */
 function MediosDePago({ value, onChange }: { value: PagoMedioBorrador[]; onChange: (v: PagoMedioBorrador[]) => void }) {
   const editar = (i: number, cambio: Partial<PagoMedioBorrador>) =>
     onChange(value.map((m, j) => (i === j ? { ...m, ...cambio } : m)));
   // Siempre queda una fila: quitar la única la vacía.
   const quitar = (i: number) => onChange(value.length > 1 ? value.filter((_, j) => j !== i) : [medioVacio()]);
+  // Otro medio suele cobrar en la misma moneda que el anterior.
+  const agregar = () => onChange([...value, medioVacio(value[value.length - 1]?.currency)]);
 
   return (
-    <div className="mt-4">
+    <div>
       <h4 className="label">Medios de pago</h4>
-      <p className="hint mb-2 text-xs">Ningún campo es obligatorio: lo que cargues lo ven los jugadores al inscribirse.</p>
+      <p className="hint mb-2 text-xs">
+        Cada medio tiene su costo por jugador y su moneda. Sin costo en ninguno, la inscripción es gratis. Ningún
+        campo es obligatorio: lo que cargues lo ven los jugadores al inscribirse.
+      </p>
       <datalist id="medios-de-pago">
         {MEDIOS_SUGERIDOS.map((m) => (
           <option key={m} value={m} />
@@ -548,55 +544,100 @@ function MediosDePago({ value, onChange }: { value: PagoMedioBorrador[]; onChang
       </datalist>
 
       <div className="space-y-2">
-        {value.map((m, i) => (
-          <div
-            key={i}
-            className="grid items-end gap-3 rounded-lg border border-ink-700 p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.4fr_auto]"
-          >
-            <Campo label="Medio de pago">
-              <input
-                className="field"
-                list="medios-de-pago"
-                value={m.method}
-                placeholder="Mercado Pago"
-                onChange={(e) => editar(i, { method: e.target.value })}
-              />
-            </Campo>
-            <Campo label="Nombre">
-              <input
-                className="field"
-                value={m.name}
-                placeholder="Titular de la cuenta"
-                onChange={(e) => editar(i, { name: e.target.value })}
-              />
-            </Campo>
-            <Campo label="Alias">
-              <input
-                className="field"
-                value={m.alias}
-                placeholder="mi.alias"
-                onChange={(e) => editar(i, { alias: e.target.value })}
-              />
-            </Campo>
-            <Campo label="Link">
-              <input
-                className="field"
-                value={m.url}
-                placeholder="https://…"
-                onChange={(e) => editar(i, { url: e.target.value })}
-              />
-            </Campo>
-            <button
-              type="button"
-              className="btn btn-danger px-2"
-              title={value.length > 1 ? 'Quitar este medio' : 'Vaciar'}
-              aria-label={value.length > 1 ? `Quitar el medio de pago ${i + 1}` : 'Vaciar el medio de pago'}
-              onClick={() => quitar(i)}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {value.map((m, i) => {
+          const costoMalo = Number.isNaN(centavosDe(m.amount));
+          return (
+            <div key={i} className="flex flex-wrap items-start gap-3 rounded-lg border border-ink-700 p-3">
+              <div className="w-28">
+                <Campo label="Costo">
+                  <input
+                    className={`field ${costoMalo ? '!border-blood-500' : ''}`}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={m.amount}
+                    placeholder="Gratis"
+                    aria-label={`Costo del medio de pago ${i + 1}`}
+                    aria-invalid={costoMalo}
+                    onChange={(e) => editar(i, { amount: e.target.value })}
+                  />
+                </Campo>
+              </div>
+              <div className="w-24">
+                <Campo label="Moneda">
+                  <select
+                    className="field"
+                    value={m.currency}
+                    aria-label={`Moneda del medio de pago ${i + 1}`}
+                    onChange={(e) => editar(i, { currency: e.target.value })}
+                  >
+                    {MONEDAS.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </Campo>
+              </div>
+              <div className="min-w-40 flex-1">
+                <Campo label="Medio de pago">
+                  <input
+                    className="field"
+                    list="medios-de-pago"
+                    value={m.method}
+                    placeholder="Mercado Pago"
+                    aria-label={`Medio de pago ${i + 1}`}
+                    onChange={(e) => editar(i, { method: e.target.value })}
+                  />
+                </Campo>
+              </div>
+              <div className="min-w-40 flex-1">
+                <Campo label="Nombre">
+                  <input
+                    className="field"
+                    value={m.name}
+                    placeholder="Titular de la cuenta"
+                    aria-label={`Nombre del medio de pago ${i + 1}`}
+                    onChange={(e) => editar(i, { name: e.target.value })}
+                  />
+                </Campo>
+              </div>
+              <div className="min-w-36 flex-1">
+                <Campo label="Alias">
+                  <input
+                    className="field"
+                    value={m.alias}
+                    placeholder="mi.alias"
+                    aria-label={`Alias del medio de pago ${i + 1}`}
+                    onChange={(e) => editar(i, { alias: e.target.value })}
+                  />
+                </Campo>
+              </div>
+              <div className="min-w-56 flex-[1.4]">
+                <Campo label="Link">
+                  <input
+                    className="field"
+                    value={m.url}
+                    placeholder="https://…"
+                    aria-label={`Link del medio de pago ${i + 1}`}
+                    onChange={(e) => editar(i, { url: e.target.value })}
+                  />
+                </Campo>
+              </div>
+              <button
+                type="button"
+                className="btn btn-danger self-end px-2"
+                title={value.length > 1 ? 'Quitar este medio' : 'Vaciar'}
+                aria-label={value.length > 1 ? `Quitar el medio de pago ${i + 1}` : 'Vaciar el medio de pago'}
+                onClick={() => quitar(i)}
+              >
+                ✕
+              </button>
+              {costoMalo && (
+                <p className="basis-full text-xs text-blood-500">
+                  El costo tiene que ser un número, por ejemplo 5000 o 12,50 (hasta 100.000.000).
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <button
@@ -604,7 +645,7 @@ function MediosDePago({ value, onChange }: { value: PagoMedioBorrador[]; onChang
         className="btn btn-ghost mt-2"
         disabled={value.length >= MAX_MEDIOS_DE_PAGO}
         title={value.length >= MAX_MEDIOS_DE_PAGO ? `Hasta ${MAX_MEDIOS_DE_PAGO} medios de pago` : undefined}
-        onClick={() => onChange([...value, medioVacio()])}
+        onClick={agregar}
       >
         + Agregar otro medio de pago
       </button>
@@ -666,7 +707,7 @@ function Premios({
         porcentaje de la bolsa.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Campo label="Bolsa de premios">
           <select
             className="field"
@@ -676,6 +717,17 @@ function Premios({
             <option value="ninguno">Sin premios en plata</option>
             <option value="fijo">Monto fijo que pone la organización</option>
             <option value="inscripciones">Lo recaudado en inscripciones</option>
+          </select>
+        </Campo>
+
+        <Campo
+          label="Moneda de los premios"
+          hint={value.prize_pool_mode === 'inscripciones' ? 'De lo recaudado solo suma lo cobrado en esta moneda.' : undefined}
+        >
+          <select className="field" value={value.currency} onChange={(e) => set('currency', e.target.value)}>
+            {MONEDAS.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
           </select>
         </Campo>
 
@@ -713,7 +765,7 @@ function Premios({
             label="Bolsa estimada"
             hint={
               value.prize_pool_mode === 'inscripciones'
-                ? `${value.prize_pool_pct}% de ${monto(recaudadoCents, value.currency)} cobrados hasta ahora.`
+                ? `${value.prize_pool_pct}% de ${monto(recaudadoCents, value.currency)} cobrados en ${value.currency} hasta ahora.`
                 : 'Lo que anunciás que se reparte.'
             }
           >

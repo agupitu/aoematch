@@ -34,8 +34,21 @@ export type GameMap = {
   terreno?: string;
 };
 
-/** Un medio para pagar la inscripción (`web/src/logica/pagos.js`); todos los campos son opcionales. */
-export type PagoMedio = { method?: string; name?: string; alias?: string; url?: string };
+/**
+ * Un medio para pagar la inscripción (`web/src/logica/pagos.js`); todos los campos
+ * son opcionales. Cada medio cobra lo suyo: `amount_cents` en su `currency`.
+ */
+export type PagoMedio = {
+  amount_cents?: number;
+  currency?: string;
+  method?: string;
+  name?: string;
+  alias?: string;
+  url?: string;
+};
+
+/** Un costo de inscripción: el monto de un medio y su moneda. */
+export type Costo = { amount_cents: number; currency: string };
 
 export type Member = {
   id: string;
@@ -73,6 +86,10 @@ export type Registration = {
   status: 'pendiente' | 'confirmada' | 'rechazada' | 'retirada';
   paid: boolean;
   paid_at: string | null;
+  /** Lo que anotó el staff al marcarla paga: por qué medio, cuánto y en qué moneda. */
+  paid_method?: string | null;
+  paid_amount_cents?: number | null;
+  paid_currency?: string | null;
   payment_ref: string | null;
   note: string | null;
   join_request?: JoinRequest | null;
@@ -134,7 +151,10 @@ export type Prize = {
 export type PrizePool = {
   mode: string;
   total_cents: number;
+  /** Lo cobrado en la moneda de los premios: es lo único que suma a la bolsa. */
   collected_cents: number;
+  /** Lo cobrado en cada moneda, sin mezclarlas. */
+  collected_by_currency: { currency: string; amount_cents: number }[];
   paid_count: number;
   assigned_cents: number;
   assigned_pct: number;
@@ -177,7 +197,7 @@ export type Tournament = {
   civ_repeat_series: number;
   /** 0 = dos compañeros no pueden elegir la misma civ; ausente o 1 = sí. */
   civ_repeat_team?: number;
-  entry_fee_cents: number;
+  /** Moneda de los premios; el costo y la moneda de la inscripción están en cada medio de pago. */
   currency: string;
   payment_methods: PagoMedio[];
   payment_notes: string | null;

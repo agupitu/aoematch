@@ -89,18 +89,26 @@ async function crearTorneo(slug, campos) {
   return leerTorneo(slug);
 }
 
-/** Equipo con su sala (en torneos por equipos) e inscripciones de sus jugadores. */
-async function crearEquipo(torneo, { name, tag = null, seed, jugadores, paid = 1, paid_at = null }) {
+/**
+ * Equipo con su sala (en torneos por equipos) e inscripciones de sus jugadores.
+ * `pago` es lo que anota el staff al marcar el pago: medio, monto y moneda.
+ */
+async function crearEquipo(torneo, { name, tag = null, seed, jugadores, paid = 1, paid_at = null, pago = {} }) {
   const id = await guardarEquipo({
     tournament_id: torneo.id, name, tag, captain_id: jugadores[0].id, seed,
     members: jugadores.map((u, i) => ({ user_id: u.id, role: i === 0 ? 'capitan' : 'jugador' })),
   });
   if (torneo.team_size > 1) await guardarSalaDeEquipo(id, name, jugadores.map((u) => u.id), torneo);
   for (const u of jugadores) {
-    await guardarInscripcion(torneo.id, u.id, { team_id: id, kind: 'equipo', status: 'confirmada', paid, paid_at });
+    await guardarInscripcion(torneo.id, u.id, { team_id: id, kind: 'equipo', status: 'confirmada', paid, paid_at, ...(paid ? pago : {}) });
   }
   return id;
 }
+
+/** Los pagos de muestra: cada medio cobra su monto en su moneda. */
+const PAGO_MERCADO_PAGO = { paid_method: 'Mercado Pago', paid_amount_cents: 300000, paid_currency: 'ARS' };
+const PAGO_TRANSFERENCIA = { paid_method: 'Transferencia bancaria', paid_amount_cents: 500000, paid_currency: 'ARS' };
+const PAGO_PAYPAL = { paid_method: 'PayPal', paid_amount_cents: 500, paid_currency: 'USD' };
 
 /** Llaves del torneo con la lógica de la web; lo pasa a 'en_curso'. */
 async function armarLlaves(slug) {
@@ -229,11 +237,13 @@ async function sembrarMockup(rnd, organizador) {
     map_repeat: 0,
     civ_bans: 1,
     civ_repeat_series: 0,
-    entry_fee_cents: 300000,
     currency: 'ARS',
     payment_methods: [
-      { method: 'Mercado Pago', name: 'Organización AoE III Draft', alias: 'aoe3draft.mp', url: 'https://link.mercadopago.com.ar/ejemplo' },
-      { method: 'PayPal', url: 'https://www.paypal.com/paypalme/ejemplo' },
+      {
+        method: 'Mercado Pago', amount_cents: 300000, currency: 'ARS', name: 'Organización AoE III Draft', alias: 'aoe3draft.mp',
+        url: 'https://link.mercadopago.com.ar/ejemplo',
+      },
+      { method: 'PayPal', amount_cents: 500, currency: 'USD', url: 'https://www.paypal.com/paypalme/ejemplo' },
     ],
     payment_notes: 'Transferencia o Mercado Pago. Mandá el comprobante por Discord.',
     allow_solo: 0,
@@ -255,7 +265,8 @@ async function sembrarMockup(rnd, organizador) {
   const equipos = [];
   for (const [i, [nombre, tag]] of EQUIPOS_MOCK.entries()) {
     const integrantes = [jugadores[i * 2], jugadores[i * 2 + 1]];
-    const id = await crearEquipo(t, { name: nombre, tag, seed: i + 1, jugadores: integrantes, paid_at: fechaRelativa(-10, 12) });
+    const pago = i % 3 === 2 ? PAGO_PAYPAL : PAGO_MERCADO_PAGO;
+    const id = await crearEquipo(t, { name: nombre, tag, seed: i + 1, jugadores: integrantes, paid_at: fechaRelativa(-10, 12), pago });
     equipos.push({ id, jugadores: integrantes });
   }
   await armarLlaves(t.id);
@@ -353,9 +364,11 @@ export async function sembrarDemo() {
     best_of_final: 5,
     civ_bans: 1,
     civ_repeat_series: 0,
-    entry_fee_cents: 500000,
     currency: 'ARS',
-    payment_methods: [{ method: 'Transferencia bancaria', name: 'Kaiser', alias: 'kaiser.aoe3' }],
+    payment_methods: [
+      { method: 'Transferencia bancaria', amount_cents: 500000, currency: 'ARS', name: 'Kaiser', alias: 'kaiser.aoe3' },
+      { method: 'PayPal', amount_cents: 500, currency: 'USD', url: 'https://www.paypal.com/paypalme/ejemplo' },
+    ],
     allow_solo: 1,
     third_place: 1,
     prize_pool_mode: 'inscripciones',
@@ -367,9 +380,13 @@ export async function sembrarDemo() {
       { label: 'Tercer puesto', kind: 'porcentaje', percent: 10 },
     ]),
   });
-  for (const u of usuarios.slice(1, 16)) {
+  for (const [i, u] of usuarios.slice(1, 16).entries()) {
     const paid = rnd() < 0.6 ? 1 : 0;
-    await guardarInscripcion(t1.id, u.id, { kind: 'solo', status: 'confirmada', paid, paid_at: paid ? new Date().toISOString() : null });
+    // Uno de cada cuatro paga por PayPal, en dólares: no suma a la bolsa, que está en pesos.
+    const pago = i % 4 === 3 ? PAGO_PAYPAL : PAGO_TRANSFERENCIA;
+    await guardarInscripcion(t1.id, u.id, {
+      kind: 'solo', status: 'confirmada', paid, paid_at: paid ? new Date().toISOString() : null, ...(paid ? pago : {}),
+    });
   }
 
   // Equipos del organizador: uno ya con su capitán, uno vacío, y dos pedidos de ingreso por resolver.
@@ -378,7 +395,9 @@ export async function sembrarDemo() {
     members: [{ user_id: usuarios[1].id, role: 'capitan' }],
   });
   await guardarSalaDeEquipo(tercios, 'Los Tercios', [usuarios[1].id], t1);
-  await guardarInscripcion(t1.id, usuarios[1].id, { kind: 'equipo', team_id: tercios, status: 'confirmada', paid: 1, paid_at: new Date().toISOString() });
+  await guardarInscripcion(t1.id, usuarios[1].id, {
+    kind: 'equipo', team_id: tercios, status: 'confirmada', paid: 1, paid_at: new Date().toISOString(), ...PAGO_TRANSFERENCIA,
+  });
   const halcones = await guardarEquipo({ tournament_id: t1.id, name: 'Halcones', staff_made: 1 });
   const pedido = (team_id) => ({ team_id, status: 'pendiente', created_at: new Date().toISOString() });
   await guardarInscripcion(t1.id, usuarios[2].id, { kind: 'solo', status: 'confirmada', join_request: pedido(tercios) });
@@ -394,7 +413,6 @@ export async function sembrarDemo() {
     team_size: 1,
     best_of: 3,
     civ_bans: 0,
-    entry_fee_cents: 0,
     currency: 'ARS',
     allow_solo: 1,
     prize_pool_mode: 'fijo',
@@ -421,7 +439,6 @@ export async function sembrarDemo() {
     group_count: 2,
     group_advance: 2,
     civ_bans: 2,
-    entry_fee_cents: 0,
     allow_solo: 0,
   });
   const CLANES = ['Los Jinetes', 'Hussar Gang', 'Falconetes', 'Mamelucos', 'Doppel Crew', 'Oprichniks'];
