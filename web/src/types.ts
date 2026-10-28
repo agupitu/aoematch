@@ -192,6 +192,8 @@ export type Tournament = {
   prizes: Prize[];
   prize_pool: PrizePool;
   organizer: { id: string; display_name: string };
+  /** Los ids de los mapas del pool, en el orden en que se eligieron. */
+  map_ids?: number[];
   maps: GameMap[];
   civs: Civ[];
   teams: Team[];

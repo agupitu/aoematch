@@ -103,19 +103,16 @@ const normalizar = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase
 
 /**
  * Los mapas que cumplen todos los filtros que vengan: `q` (busca en el nombre,
- * sin tildes ni mayúsculas), `elegidos` (lista de ids: solo esos), `terreno` y
- * `region`. Sin filtros, todos.
+ * sin tildes ni mayúsculas), `terreno` y `region`. Sin filtros, todos.
  * @param {any[]} mapas
- * @param {{ q?: string, elegidos?: number[] | null, terreno?: string, region?: string }} [filtros]
+ * @param {{ q?: string, terreno?: string, region?: string }} [filtros]
  * @returns {any[]}
  */
-export function filtrarMapas(mapas, { q = '', elegidos = null, terreno = '', region = '' } = {}) {
+export function filtrarMapas(mapas, { q = '', terreno = '', region = '' } = {}) {
   const buscado = normalizar(q.trim());
-  const solo = elegidos ? new Set(elegidos) : null;
   return mapas.filter(
     (m) =>
       (!buscado || normalizar(m.name_es).includes(buscado) || normalizar(m.slug).includes(buscado)) &&
-      (!solo || solo.has(m.id)) &&
       (!terreno || m.terreno === terreno) &&
       (!region || m.regiones.includes(region))
   );

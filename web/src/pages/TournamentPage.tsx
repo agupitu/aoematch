@@ -1123,6 +1123,13 @@ function ChatTorneo({ t, puedeEscribir }: { t: Tournament; puedeEscribir: boolea
 
 // ------------------------------------------------------------------ config
 
+/** Ids del pool de mapas como se guardaron, sin los que ya no existen en el catálogo. */
+function ordenDelPool(t: Tournament) {
+  const existentes = new Set(t.maps.map((m) => m.id));
+  const guardados = (t.map_ids ?? []).filter((id) => existentes.has(id));
+  return guardados.length ? guardados : t.maps.map((m) => m.id);
+}
+
 function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
   const [maps, setMaps] = useState<GameMap[]>([]);
   const [civs, setCivs] = useState<Civ[]>([]);
@@ -1177,7 +1184,8 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
         percent: p.percent,
         extra: p.extra ?? '',
       })),
-      map_ids: t.maps.map((m) => m.id),
+      // El pool en el orden en que se eligió (`t.maps` sale en el del catálogo).
+      map_ids: ordenDelPool(t),
       civ_ids: t.civs.map((c) => c.id),
     });
   }, [t]);

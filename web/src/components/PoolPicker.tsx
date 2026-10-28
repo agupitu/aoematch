@@ -46,6 +46,49 @@ function Chips({
 
 const etiquetaDe = (tabla: Record<string, string>, clave?: string) => (clave ? tabla[clave] : undefined);
 
+/** Un mapa: la foto y el nombre. El clic lo agrega al pool (a la izquierda) o lo quita (a la derecha). */
+function TarjetaDeMapa({
+  m,
+  accion,
+  detalle,
+  onClick,
+}: {
+  m: GameMap;
+  accion: 'agregar' | 'quitar';
+  detalle: string;
+  onClick: () => void;
+}) {
+  const quitar = accion === 'quitar';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={detalle ? `${m.name_es} · ${detalle}` : m.name_es}
+      aria-label={`${quitar ? 'Quitar' : 'Agregar'} ${m.name_es} ${quitar ? 'del' : 'al'} pool`}
+      className={`group relative rounded-lg border p-1 text-left transition-colors ${
+        quitar ? 'border-gold-500 bg-gold-500/10 hover:border-blood-500' : 'border-ink-700 hover:border-gold-600'
+      }`}
+    >
+      <img src={m.img} alt="" className="aspect-square w-full rounded object-cover" loading="lazy" />
+      <span className="mt-1 block truncate text-[11px] text-parch-200">{m.name_es}</span>
+      {quitar ? (
+        <span className="absolute top-1.5 right-1.5 grid h-5 w-5 place-items-center rounded-full bg-ink-950/85 text-[11px] text-parch-200 group-hover:bg-blood-500 group-hover:text-parch-100">
+          ✕
+        </span>
+      ) : (
+        <span className="absolute top-1.5 right-1.5 hidden h-5 w-5 place-items-center rounded-full bg-gold-500 text-sm font-bold text-ink-950 group-hover:grid group-focus-visible:grid">
+          +
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Pool de mapas del torneo en dos lados: a la izquierda los mapas disponibles
+ * (con búsqueda y filtros por terreno y región) y a la derecha el pool, en el
+ * orden en que se fueron eligiendo. Un clic pasa un mapa de un lado al otro.
+ */
 export function MapPicker({
   maps,
   value,
@@ -56,116 +99,119 @@ export function MapPicker({
   onChange: (v: number[]) => void;
 }) {
   const [q, setQ] = useState('');
-  const [soloElegidos, setSoloElegidos] = useState(false);
   const [terreno, setTerreno] = useState('');
   const [region, setRegion] = useState('');
 
-  const filtros = { q, elegidos: soloElegidos ? value : null, terreno, region };
-  const filtrados: GameMap[] = useMemo(
-    () => filtrarMapas(maps, { q, elegidos: soloElegidos ? value : null, terreno, region }),
-    [maps, q, soloElegidos, value, terreno, region]
-  );
-  // Cuántos mapas daría cada opción con los otros filtros puestos.
-  const cuantos = (extra: { terreno?: string; region?: string }) => filtrarMapas(maps, { ...filtros, ...extra }).length;
-
   const etiquetasTerreno: Record<string, string> = ETIQUETA_TERRENO;
   const etiquetasRegion: Record<string, string> = ETIQUETA_REGION;
+  const detalleDe = (m: GameMap) =>
+    [etiquetaDe(etiquetasTerreno, m.terreno), (m.regiones ?? []).map((r) => etiquetasRegion[r]).join(' y ')]
+      .filter(Boolean)
+      .join(' · ');
+
+  const porId = useMemo(() => new Map(maps.map((m) => [m.id, m])), [maps]);
+  const elegidos = value.map((id) => porId.get(id)).filter((m): m is GameMap => !!m);
+  const disponibles = useMemo(() => maps.filter((m) => !value.includes(m.id)), [maps, value]);
+
+  const filtros = { q, terreno, region };
+  const visibles: GameMap[] = useMemo(
+    () => filtrarMapas(disponibles, { q, terreno, region }),
+    [disponibles, q, terreno, region]
+  );
+  // Cuántos mapas daría cada opción con los otros filtros puestos.
+  const cuantos = (extra: { terreno?: string; region?: string }) =>
+    filtrarMapas(disponibles, { ...filtros, ...extra }).length;
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <section className="min-w-0">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h4 className="label mb-0">Mapas disponibles</h4>
+          <span className="text-xs text-parch-400">
+            {visibles.length === disponibles.length ? disponibles.length : `${visibles.length} de ${disponibles.length}`}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost ml-auto"
+            disabled={!visibles.length}
+            onClick={() => onChange([...value, ...visibles.map((m) => m.id)])}
+          >
+            Agregar los visibles{visibles.length ? ` (${visibles.length})` : ''}
+          </button>
+        </div>
+
         <input
-          className="field max-w-xs"
+          className="field mb-3 max-w-xs"
           placeholder="Buscar mapa…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <span className="text-sm text-parch-400">
-          {value.length} elegidos · {filtrados.length} a la vista
-        </span>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={!filtrados.length}
-            onClick={() => onChange([...new Set([...value, ...filtrados.map((m) => m.id)])])}
-          >
-            Agregar los visibles
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={!filtrados.length}
-            onClick={() => {
-              const fuera = new Set(filtrados.map((m) => m.id));
-              onChange(value.filter((id) => !fuera.has(id)));
-            }}
-          >
-            Quitar los visibles
-          </button>
-          <button type="button" className="btn btn-ghost" onClick={() => onChange([])}>
-            Limpiar
+        <div className="mb-3 space-y-1.5">
+          <Chips
+            titulo="Terreno"
+            valor={terreno}
+            onChange={setTerreno}
+            opciones={[
+              { id: '', label: 'Todos', n: cuantos({ terreno: '' }) },
+              ...(TERRENOS as string[]).map((t) => ({ id: t, label: etiquetasTerreno[t], n: cuantos({ terreno: t }) })),
+            ]}
+          />
+          <Chips
+            titulo="Región"
+            valor={region}
+            onChange={setRegion}
+            opciones={[
+              { id: '', label: 'Todas', n: cuantos({ region: '' }) },
+              ...(REGIONES as string[]).map((r) => ({ id: r, label: etiquetasRegion[r], n: cuantos({ region: r }) })),
+            ]}
+          />
+        </div>
+
+        <div className="grid max-h-[28rem] min-h-40 grid-cols-[repeat(auto-fill,minmax(92px,1fr))] content-start gap-2 overflow-y-auto rounded-lg border border-ink-700 p-2">
+          {visibles.length === 0 && (
+            <p className="col-span-full p-6 text-center text-sm text-parch-400">
+              {disponibles.length ? 'Ningún mapa disponible coincide con los filtros.' : 'Ya elegiste todos los mapas.'}
+            </p>
+          )}
+          {visibles.map((m) => (
+            <TarjetaDeMapa
+              key={m.id}
+              m={m}
+              accion="agregar"
+              detalle={detalleDe(m)}
+              onClick={() => onChange([...value, m.id])}
+            />
+          ))}
+        </div>
+      </section>
+
+      <aside className="min-w-0 self-start">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h4 className="label mb-0">Pool del torneo</h4>
+          <span className="text-xs text-parch-400">
+            {elegidos.length} {elegidos.length === 1 ? 'mapa' : 'mapas'}
+          </span>
+          <button type="button" className="btn btn-ghost ml-auto" disabled={!elegidos.length} onClick={() => onChange([])}>
+            Quitar todos
           </button>
         </div>
-      </div>
-
-      <div className="mb-3 space-y-1.5">
-        <Chips
-          titulo="Mostrar"
-          valor={soloElegidos ? 'elegidos' : ''}
-          onChange={(v) => setSoloElegidos(v === 'elegidos')}
-          opciones={[
-            { id: '', label: 'Todos' },
-            { id: 'elegidos', label: 'Solo elegidos', n: value.length },
-          ]}
-        />
-        <Chips
-          titulo="Terreno"
-          valor={terreno}
-          onChange={setTerreno}
-          opciones={[
-            { id: '', label: 'Todos', n: cuantos({ terreno: '' }) },
-            ...(TERRENOS as string[]).map((t) => ({ id: t, label: etiquetasTerreno[t], n: cuantos({ terreno: t }) })),
-          ]}
-        />
-        <Chips
-          titulo="Región"
-          valor={region}
-          onChange={setRegion}
-          opciones={[
-            { id: '', label: 'Todas', n: cuantos({ region: '' }) },
-            ...(REGIONES as string[]).map((r) => ({ id: r, label: etiquetasRegion[r], n: cuantos({ region: r }) })),
-          ]}
-        />
-      </div>
-
-      <div className="grid max-h-96 grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2 overflow-y-auto rounded-lg border border-ink-700 p-2">
-        {filtrados.length === 0 && (
-          <p className="col-span-full p-6 text-center text-sm text-parch-400">
-            {soloElegidos && value.length === 0 ? 'Todavía no elegiste ningún mapa.' : 'Ningún mapa coincide con los filtros.'}
-          </p>
-        )}
-        {filtrados.map((m) => {
-          const on = value.includes(m.id);
-          const detalle = [etiquetaDe(etiquetasTerreno, m.terreno), (m.regiones ?? []).map((r) => etiquetasRegion[r]).join(' y ')]
-            .filter(Boolean)
-            .join(' · ');
-          return (
-            <button
-              type="button"
+        <div className="grid max-h-[34rem] min-h-40 grid-cols-[repeat(auto-fill,minmax(92px,1fr))] content-start gap-2 overflow-y-auto rounded-lg border border-gold-600/50 bg-gold-500/5 p-2">
+          {elegidos.length === 0 && (
+            <p className="col-span-full p-6 text-center text-sm text-parch-400">
+              Todavía no elegiste ningún mapa. Hacé clic en uno de la izquierda para sumarlo.
+            </p>
+          )}
+          {elegidos.map((m) => (
+            <TarjetaDeMapa
               key={m.id}
-              onClick={() => onChange(toggle(value, m.id))}
-              title={detalle ? `${m.name_es} · ${detalle}` : m.name_es}
-              className={`rounded-lg border p-1 text-left transition-colors ${
-                on ? 'border-gold-500 bg-gold-500/10' : 'border-ink-700 hover:border-ink-600'
-              }`}
-            >
-              <img src={m.img} alt="" className="aspect-square w-full rounded object-cover" loading="lazy" />
-              <span className="mt-1 block truncate text-[11px] text-parch-200">{m.name_es}</span>
-            </button>
-          );
-        })}
-      </div>
+              m={m}
+              accion="quitar"
+              detalle={detalleDe(m)}
+              onClick={() => onChange(value.filter((id) => id !== m.id))}
+            />
+          ))}
+        </div>
+      </aside>
     </div>
   );
 }

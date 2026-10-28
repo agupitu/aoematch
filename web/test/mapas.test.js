@@ -74,13 +74,6 @@ describe('filtrar mapas', () => {
     assert.ok(!ids(filtrarMapas(todos, { region: 'europa' })).includes('estrecho-de-bering'));
   });
 
-  it('solo los elegidos', () => {
-    const elegidos = [por('pampa').id, por('caribe').id];
-    assert.deepEqual(ids(filtrarMapas(todos, { elegidos })).sort(), ['caribe', 'pampa']);
-    assert.deepEqual(ids(filtrarMapas(todos, { elegidos, terreno: 'agua' })), ['caribe']);
-    assert.deepEqual(filtrarMapas(todos, { elegidos: [] }), []);
-  });
-
   it('la búsqueda ignora tildes y mayúsculas y se suma a los filtros', () => {
     assert.ok(ids(filtrarMapas(todos, { q: 'DECAN' })).includes('decan'));
     assert.deepEqual(ids(filtrarMapas(todos, { q: 'decan', terreno: 'agua' })), []);
