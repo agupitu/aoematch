@@ -26,6 +26,8 @@ import { TournamentForm, medioVacio, type Borrador, type PestaniaForm } from '..
 import { ChatPanel } from '../components/ChatPanel';
 import { useChat, useConectado } from '../live';
 import { usePresencia } from '../presence';
+import { CabeceraTorneo } from '../diseno/CabeceraTorneo';
+import { useDisenoNuevo } from '../diseno/diseno';
 import {
   ETIQUETA_ESTADO, ETIQUETA_FORMATO,
   costo, costosEnTexto, fechaCorta, monto, zonaDelNavegador,
@@ -40,6 +42,7 @@ const PESTANIAS_POR_URL: Pestania[] = ['resumen', 'inscripciones', 'equipos', 'l
 export function TournamentPage() {
   const { slug } = useParams();
   const { user } = useAuth();
+  const nuevo = useDisenoNuevo();
   const [params, setParams] = useSearchParams();
   const pedida = params.get('tab') as Pestania | null;
   const [t, setT] = useState<Tournament | null>(null);
@@ -89,29 +92,34 @@ export function TournamentPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <header className="mb-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <h1 className="title text-3xl">{t.name}</h1>
-              <Badge tone={t.status === 'en_curso' ? 'good' : t.status === 'inscripcion' ? 'gold' : 'neutral'}>
-                {ETIQUETA_ESTADO[t.status] ?? t.status}
-              </Badge>
+    <div className="dn-pagina mx-auto max-w-7xl px-4 py-6">
+      {nuevo ? (
+        <CabeceraTorneo t={t} acciones={<AccionesInscripcion t={t} user={user} onDone={cargar} />} />
+      ) : (
+        <header className="mb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h1 className="title text-3xl">{t.name}</h1>
+                <Badge tone={t.status === 'en_curso' ? 'good' : t.status === 'inscripcion' ? 'gold' : 'neutral'}>
+                  {ETIQUETA_ESTADO[t.status] ?? t.status}
+                </Badge>
+              </div>
+              <p className="text-sm text-parch-400">
+                {ETIQUETA_FORMATO[t.format]} · {t.team_size}v{t.team_size} · {etiquetaDeSerie(t)} · organiza{' '}
+                <span className="text-parch-200">{t.organizer.display_name}</span>
+              </p>
             </div>
-            <p className="text-sm text-parch-400">
-              {ETIQUETA_FORMATO[t.format]} · {t.team_size}v{t.team_size} · {etiquetaDeSerie(t)} · organiza{' '}
-              <span className="text-parch-200">{t.organizer.display_name}</span>
-            </p>
+            <AccionesInscripcion t={t} user={user} onDone={cargar} />
           </div>
-          <AccionesInscripcion t={t} user={user} onDone={cargar} />
-        </div>
-        {t.description && <p className="hint mt-3 max-w-3xl text-sm">{t.description}</p>}
-      </header>
+          {t.description && <p className="hint mt-3 max-w-3xl text-sm">{t.description}</p>}
+        </header>
+      )}
 
       <Tabs value={tab} onChange={cambiarTab} items={tabs} />
 
-      <div className="py-6">
+      {/* La clave hace que el contenido de cada pestaña entre de nuevo al cambiar (diseño nuevo). */}
+      <div key={tab} className="dn-entrada py-6">
         {tab === 'resumen' && <Resumen t={t} />}
         {tab === 'inscripciones' && <Inscripciones t={t} onDone={cargar} />}
         {tab === 'equipos' && <Equipos t={t} onDone={cargar} />}
@@ -293,7 +301,7 @@ function Resumen({ t }: { t: Tournament }) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
-      <div className="space-y-5 lg:col-span-2">
+      <div className="dn-escalonado space-y-5 lg:col-span-2">
         <Premios t={t} />
 
         <section className="card p-5">
@@ -311,7 +319,7 @@ function Resumen({ t }: { t: Tournament }) {
 
         <section className="card p-5">
           <h3 className="title mb-3 text-lg">Pool de mapas ({t.maps.length})</h3>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+          <div className="dn-mapas grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
             {t.maps.map((m) => (
               <figure key={m.id} className="text-center">
                 <img src={m.img} alt="" className="aspect-square w-full rounded-lg border border-ink-700 object-cover" />
@@ -331,7 +339,7 @@ function Resumen({ t }: { t: Tournament }) {
         )}
       </div>
 
-      <aside className="space-y-5">
+      <aside className="dn-escalonado space-y-5">
         <section className="card p-5">
           <h3 className="title mb-3 text-lg">Números</h3>
           <dl className="space-y-2">
@@ -371,10 +379,10 @@ function Premios({ t }: { t: Tournament }) {
   const otras = t.prize_pool.collected_by_currency.filter((c) => c.currency !== t.currency);
 
   return (
-    <section className="card p-5">
+    <section className="dn-premios card p-5">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
         <h3 className="title text-lg">Premios</h3>
-        <span className="font-display text-2xl text-gold-400">{monto(enJuego, t.currency)}</span>
+        <span className="dn-monto font-display text-2xl text-gold-400">{monto(enJuego, t.currency)}</span>
         <span className="text-xs text-parch-400">
           {t.prize_pool_mode === 'inscripciones'
             ? `${t.prize_pool_pct}% de lo recaudado · ${t.prize_pool.paid_count} inscripciones pagas`
@@ -391,6 +399,7 @@ function Premios({ t }: { t: Tournament }) {
           {t.prizes.map((p) => (
             <li
               key={p.id}
+              data-puesto={p.position}
               className="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-ink-700 px-3 py-2"
             >
               <span className="font-display text-gold-400">{p.position}º</span>
@@ -476,7 +485,7 @@ function ComoPagar({ medios, conCosto = false }: { medios: PagoMedio[]; conCosto
 
 function Dato({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
+    <div className="dn-dato flex items-baseline justify-between gap-3 text-sm">
       <dt className="text-parch-400">{k}</dt>
       <dd className="text-right text-parch-100">{v}</dd>
     </div>
@@ -542,7 +551,7 @@ function Inscripciones({ t, onDone }: { t: Tournament; onDone: () => void }) {
           {filas.filter((r) => r.paid).length} de {filas.length}
         </p>
       )}
-      <table className="w-full text-sm">
+      <table className="dn-tabla w-full text-sm">
         <thead className="border-b border-ink-700 text-left text-xs tracking-wide text-parch-400 uppercase">
           <tr>
             <th className="p-3">Jugador</th>
@@ -726,7 +735,7 @@ function Equipos({ t, onDone }: { t: Tournament; onDone: () => void }) {
       {t.teams.length === 0 ? (
         <Empty>Todavía no hay equipos.</Empty>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="dn-escalonado grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {t.teams.map((te) => (
             <TeamCard key={te.id} t={t} team={te} onDone={onDone} />
           ))}
@@ -901,7 +910,7 @@ function TeamCard({ t, team, onDone }: { t: Tournament; team: Team; onDone: () =
   };
 
   return (
-    <div className="card p-4">
+    <div className="dn-equipo card p-4" data-mio={esMio || undefined}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           {editando ? (

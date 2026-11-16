@@ -137,7 +137,7 @@ function Tabla({ filas, titulo }: { filas: StandingRow[]; titulo: string }) {
   return (
     <section className="card overflow-hidden">
       <h4 className="title border-b border-ink-700 px-4 py-2.5 text-sm">{titulo}</h4>
-      <table className="w-full table-fixed text-sm">
+      <table className="dn-posiciones w-full table-fixed text-sm">
         <colgroup>
           <col />
           <col className="w-9" />

@@ -19,7 +19,7 @@ export function PartidasDeLaSerie({ m, partidas }: { m: MatchDetail; partidas: P
   return (
     <section className="card p-4">
       <h3 className="title mb-3 text-base">Partidas de la serie</h3>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="dn-escalonado grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {jugadas.map((g) => (
           <div key={g.id} className="space-y-3 rounded-lg border border-ink-700 p-3">
             <div className="flex items-center justify-between gap-2">

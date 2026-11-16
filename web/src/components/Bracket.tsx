@@ -2,7 +2,11 @@ import { Link } from 'react-router-dom';
 import type { Match } from '../types';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta } from '../lib';
 import { etiquetaDeSerie } from '../logica/series.js';
+import { ConectoresDeLlave } from '../diseno/Conectores';
+import { useDisenoNuevo } from '../diseno/diseno';
 import { IconosVod } from './VodLinks';
+
+// Las clases `dn-*` y los `data-*` solo tienen estilo en el diseño nuevo (diseno/nuevo.css).
 
 function Lado({
   nombre,
@@ -17,7 +21,9 @@ function Lado({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm ${
+      data-ganador={(ganador && !!nombre) || undefined}
+      data-vacio={!nombre || undefined}
+      className={`dn-lado flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm ${
         ganador ? 'text-gold-400' : nombre ? 'text-parch-200' : 'text-ink-600 italic'
       }`}
     >
@@ -36,7 +42,7 @@ export function MatchCard({ m, previa = false }: { m: Match; previa?: boolean })
     const libre = m.status === 'walkover';
     const vacio = libre ? 'libre' : 'por definir';
     return (
-      <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-850">
+      <div data-partido data-previa className="dn-partido overflow-hidden rounded-lg border border-ink-700 bg-ink-850">
         <div className="flex items-center justify-between gap-2 border-b border-ink-700 bg-ink-900 px-2.5 py-1 text-[10px] text-parch-400">
           <span className="min-w-0 flex-1 truncate">{m.label ?? `Ronda ${m.round}`}</span>
           <span>{libre ? 'Pasa directo' : etiquetaDeSerie(m)}</span>
@@ -49,8 +55,14 @@ export function MatchCard({ m, previa = false }: { m: Match; previa?: boolean })
   }
 
   const listo = ['finalizado', 'walkover'].includes(m.status);
+  const esFinal = m.bracket === 'F' || m.label === 'Final';
   return (
-    <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-850 transition-colors hover:border-gold-600">
+    <div
+      data-partido
+      data-listo={listo || undefined}
+      data-final={esFinal || undefined}
+      className="dn-partido overflow-hidden rounded-lg border border-ink-700 bg-ink-850 transition-colors hover:border-gold-600"
+    >
       <div className="flex items-center justify-between gap-2 border-b border-ink-700 bg-ink-900 px-2.5 py-1 text-[10px] text-parch-400">
         <Link to={`/m/${m.id}`} className="min-w-0 flex-1 truncate hover:text-gold-400">
           {m.label ?? `Ronda ${m.round}`}
@@ -70,6 +82,7 @@ export function MatchCard({ m, previa = false }: { m: Match; previa?: boolean })
 }
 
 export function Bracket({ matches, previa = false }: { matches: Match[]; previa?: boolean }) {
+  const nuevo = useDisenoNuevo();
   if (!matches.length) return null;
 
   const porBracket = new Map<string, Match[]>();
@@ -97,12 +110,12 @@ export function Bracket({ matches, previa = false }: { matches: Match[]; previa?
                 {/* Las columnas miden lo mismo y los partidos de cada una se reparten parejo en toda la altura:
                     cada partido queda a mitad de camino de los dos que llegan a él. Los títulos van fuera de ese
                     reparto, en un mismo renglón. */}
-                <div className="flex gap-4">
+                <div className="dn-llave flex gap-4">
                   {rondas.map((r) => {
                     const deRonda = lista.filter((m) => m.round === r).sort((a, b) => a.position - b.position);
                     return (
-                      <div key={r} className="flex min-w-[200px] flex-col">
-                        <p className="mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">
+                      <div key={r} data-ronda className="flex min-w-[200px] flex-col">
+                        <p className="dn-ronda-titulo mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">
                           {deRonda[0]?.label ?? `Ronda ${r}`}
                         </p>
                         <div className="flex flex-1 flex-col justify-around gap-3">
@@ -113,11 +126,12 @@ export function Bracket({ matches, previa = false }: { matches: Match[]; previa?
                       </div>
                     );
                   })}
+                  {nuevo && <ConectoresDeLlave firma={lista.map((m) => `${m.id}:${m.status}`).join('|')} />}
                 </div>
                 {tercer.length > 0 && (
                   <div className="mt-5 flex justify-end">
                     <div className="min-w-[200px]">
-                      <p className="mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">Tercer puesto</p>
+                      <p className="dn-ronda-titulo mb-2 text-center text-[11px] tracking-wide text-parch-400 uppercase">Tercer puesto</p>
                       {tercer.map((m) => (
                         <MatchCard key={m.id} m={m} previa={previa} />
                       ))}

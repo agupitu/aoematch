@@ -5,9 +5,11 @@ import { useAuth } from '../auth';
 import { Badge, Empty, Spinner } from '../components/ui';
 import { costosDe, recaudadoEstimado } from '../logica/pagos.js';
 import { bolsaDe, costosEnTexto, ETIQUETA_ESTADO, ETIQUETA_FORMATO, fechaCorta, monto } from '../lib';
+import { useDisenoNuevo } from '../diseno/diseno';
+import { InicioNuevo } from '../diseno/InicioNuevo';
 import type { Tournament } from '../types';
 
-type Fila = Tournament & { organizer_name: string; inscriptos: number; pagos: number; equipos: number };
+export type Fila = Tournament & { organizer_name: string; inscriptos: number; pagos: number; equipos: number };
 
 const TONO: Record<string, 'gold' | 'good' | 'neutral' | 'info'> = {
   inscripcion: 'gold',
@@ -19,6 +21,7 @@ const TONO: Record<string, 'gold' | 'good' | 'neutral' | 'info'> = {
 
 export function Home() {
   const { user } = useAuth();
+  const nuevo = useDisenoNuevo();
   const [lista, setLista] = useState<Fila[] | null>(null);
 
   useEffect(() => {
@@ -26,6 +29,8 @@ export function Home() {
       .then((l) => setLista(l as unknown as Fila[]))
       .catch(() => setLista([]));
   }, []);
+
+  if (nuevo) return <InicioNuevo user={user} lista={lista} />;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">

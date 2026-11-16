@@ -5,6 +5,8 @@ import { useAuth } from '../auth';
 import { Alerta } from '../components/ui';
 import { auth } from '../firebase';
 import { popupCerrado } from '../lib';
+import { RosaDeLosVientos } from '../diseno/Adornos';
+import { useDisenoNuevo } from '../diseno/diseno';
 
 const MENSAJES: Record<string, string> = {
   error: 'No se pudo completar el ingreso. Probá de nuevo.',
@@ -12,6 +14,7 @@ const MENSAJES: Record<string, string> = {
 
 export function Login() {
   const { login } = useAuth();
+  const nuevo = useDisenoNuevo();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,8 +46,8 @@ export function Login() {
     }
   };
 
-  return (
-    <div className="mx-auto max-w-md px-4 py-12">
+  const contenido = (
+    <>
       <h1 className="title mb-1 text-2xl">Entrar</h1>
       <p className="hint mb-6 text-sm">
         Entrás con tu cuenta de Google. No hay registro ni contraseñas: la primera vez se te crea el
@@ -94,6 +97,21 @@ export function Login() {
             </button>
           </form>
         </details>
+      )}
+    </>
+  );
+
+  return (
+    <div className="mx-auto max-w-md px-4 py-12">
+      {nuevo ? (
+        // Diseño nuevo: el mismo contenido dentro de un cuadro, con el escudo arriba.
+        <div className="dn-acceso card">
+          <RosaDeLosVientos />
+          <img src="/logo.webp" alt="" />
+          {contenido}
+        </div>
+      ) : (
+        contenido
       )}
     </div>
   );
