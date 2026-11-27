@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { crearTorneo } from '../datos/torneos';
 import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
+import { faltaDeMapas } from '../logica/pools-por-fase.js';
 import { useAuth } from '../auth';
 import { Alerta, Spinner } from '../components/ui';
 import {
@@ -55,9 +56,10 @@ export function CreateTournament() {
       setTab('basico');
       return setError('Ponele un nombre al torneo.');
     }
-    if (form.map_ids.length < 1) {
+    const faltan = faltaDeMapas(form);
+    if (faltan) {
       setTab('mapas');
-      return setError('Elegí al menos un mapa.');
+      return setError(faltan);
     }
     if (form.civ_ids.length < form.team_size * 2) {
       setTab('civs');

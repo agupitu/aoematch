@@ -212,8 +212,12 @@ export type Tournament = {
   prizes: Prize[];
   prize_pool: PrizePool;
   organizer: { id: string; display_name: string };
-  /** Los ids de los mapas del pool, en el orden en que se eligieron. */
+  /** Los ids de los mapas del pool, en el orden en que se eligieron. Con pool por fase, es el pool base. */
   map_ids?: number[];
+  /** Un pool para todo el torneo o uno por fase (`web/src/logica/pools-por-fase.js`). */
+  map_pool_mode?: 'unico' | 'por_fase';
+  /** Con pool por fase: ids de mapas por clave de fase ('final', 'grupos'...). */
+  map_pools?: Record<string, number[]>;
   maps: GameMap[];
   civs: Civ[];
   teams: Team[];

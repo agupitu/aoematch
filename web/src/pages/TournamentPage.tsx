@@ -10,7 +10,8 @@ import {
 } from '../datos/equipos';
 import { type PagoElegido, inscribirse, marcarInscripcion, retirarse, sacarMiembro } from '../datos/inscripciones';
 import { MAX_NOMBRE_EQUIPO, pedidosPendientes } from '../logica/equipos.js';
-import { civs as catalogoCivs, maps as catalogoMapas } from '../logica/catalogo.js';
+import { civs as catalogoCivs, mapaPorId, maps as catalogoMapas } from '../logica/catalogo.js';
+import { FASES_DE_MAPAS, faltaDeMapas, fasesDelFormato, usaPoolPorFase } from '../logica/pools-por-fase.js';
 import { costosDe, montoEscrito, opcionesDePago } from '../logica/pagos.js';
 import { etiquetaDeSerie } from '../logica/series.js';
 import { useAuth } from '../auth';
@@ -317,17 +318,7 @@ function Resumen({ t }: { t: Tournament }) {
           </dl>
         </section>
 
-        <section className="card p-5">
-          <h3 className="title mb-3 text-lg">Pool de mapas ({t.maps.length})</h3>
-          <div className="dn-mapas grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
-            {t.maps.map((m) => (
-              <figure key={m.id} className="text-center">
-                <img src={m.img} alt="" className="aspect-square w-full rounded-lg border border-ink-700 object-cover" />
-                <figcaption className="mt-1 truncate text-[11px] text-parch-400">{m.name_es}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </section>
+        <PoolDeMapas t={t} />
 
         <CivsHabilitadas pool={t.civs} />
 
@@ -369,6 +360,59 @@ function Resumen({ t }: { t: Tournament }) {
         )}
       </aside>
     </div>
+  );
+}
+
+/** Grilla de minimapas con su nombre. */
+function Mapas({ ids }: { ids: number[] }) {
+  const mapas = ids.map((id) => mapaPorId(id) as GameMap | null).filter((m): m is GameMap => !!m);
+  return (
+    <div className="dn-mapas grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+      {mapas.map((m) => (
+        <figure key={m.id} className="text-center">
+          <img src={m.img} alt="" className="aspect-square w-full rounded-lg border border-ink-700 object-cover" />
+          <figcaption className="mt-1 truncate text-[11px] text-parch-400">{m.name_es}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
+/** El pool de mapas: uno solo, o el base y el de cada fase que tiene mapas propios. */
+function PoolDeMapas({ t }: { t: Tournament }) {
+  const base = t.maps.map((m) => m.id);
+  if (!usaPoolPorFase(t)) {
+    return (
+      <section className="card p-5">
+        <h3 className="title mb-3 text-lg">Pool de mapas ({base.length})</h3>
+        <Mapas ids={base} />
+      </section>
+    );
+  }
+  const fases = FASES_DE_MAPAS.filter((f) => (fasesDelFormato(t) as string[]).includes(f.id));
+  const propias = fases.filter((f) => (t.map_pools?.[f.id] ?? []).length);
+  const conBase = fases.filter((f) => !(t.map_pools?.[f.id] ?? []).length);
+  return (
+    <section className="card space-y-5 p-5">
+      <h3 className="title text-lg">Pool de mapas por fase</h3>
+      {propias.map((f) => (
+        <div key={f.id}>
+          <h4 className="label">
+            {f.label} ({t.map_pools![f.id].length})
+          </h4>
+          <Mapas ids={t.map_pools![f.id]} />
+        </div>
+      ))}
+      {conBase.length > 0 && base.length > 0 && (
+        <div>
+          <h4 className="label">
+            {propias.length ? 'Resto de las fases' : 'Todas las fases'} ({base.length})
+          </h4>
+          {propias.length > 0 && <p className="hint mb-2 text-xs">{conBase.map((f) => f.label).join(' · ')}</p>}
+          <Mapas ids={base} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1214,6 +1258,8 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
       })),
       // El pool en el orden en que se eligió (`t.maps` sale en el del catálogo).
       map_ids: ordenDelPool(t),
+      map_pool_mode: t.map_pool_mode === 'por_fase' ? 'por_fase' : 'unico',
+      map_pools: t.map_pools ?? {},
       civ_ids: t.civs.map((c) => c.id),
     });
   }, [t]);
@@ -1222,6 +1268,11 @@ function Config({ t, onDone }: { t: Tournament; onDone: () => void }) {
 
   const guardar = async () => {
     setError('');
+    const faltan = faltaDeMapas(form);
+    if (faltan) {
+      setTabForm('mapas');
+      return setError(faltan);
+    }
     try {
       await actualizarTorneo(t, {
         ...form,
