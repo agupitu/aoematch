@@ -165,6 +165,7 @@ service cloud.firestore {
         && enteroEntre(d.get('civ_bans', 0), 0, 3)
         && enteroEntre(d.get('best_of', 1), 1, 9)
         && d.get('series_mode', 'mejor_de') in ['mejor_de', 'fijas']
+        && d.get('map_pool_mode', 'unico') in ['unico', 'por_fase']
         && pagoMediosValidos(d.get('payment_methods', []));
     }
 

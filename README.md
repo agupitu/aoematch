@@ -76,6 +76,12 @@ pasa todos los que quedan a la vista y "Quitar todos" vacía el pool. Un mapa pu
 estar en más de una región (el Estrecho de Bering, en América y en Asia). La
 clasificación es aproximada y está en `web/src/logica/mapas-info.js`.
 
+**Pool por fase.** El organizador elige un pool para todo el torneo o uno por
+fase (grupos, primeras rondas, octavos, cuartos, semifinal, cuadro de
+perdedores, tercer puesto, final, según el formato). La fase de cada partido sale
+del nombre de su ronda; la que no tiene mapas propios usa el pool base. Liga y
+suizo son una sola fase. Está en `web/src/logica/pools-por-fase.js`.
+
 **Repeticiones del draft.** Hay tres opciones: repetir civ en el mismo equipo,
 repetir civ contra el mismo rival y repetir mapa contra el mismo rival (estas dos
 valen dentro de una serie, no en toda la fase). Sin repetir en el equipo, los

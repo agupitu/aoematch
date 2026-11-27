@@ -7,6 +7,8 @@ import { civsPermitidas, turnoDeBan } from '../logica/draft.js';
 import type { MatchDetail } from '../types';
 import { Avatar, Badge } from './ui';
 
+// Las clases `dn-*` y los `data-*` solo tienen estilo en el diseño nuevo (diseno/nuevo.css).
+
 /**
  * Draft de la partida actual (plan Spark): mapa del que perdió la anterior,
  * bans de civ si el torneo los tiene y pick ciego de cada jugador. Sin reloj.
@@ -119,7 +121,7 @@ export function DraftBoard({
   return (
     <div className="card flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       {mapa && (
-        <div className="flex items-center gap-4 border-b border-ink-700 bg-ink-900 px-4 py-3">
+        <div className="dn-draft-mapa flex items-center gap-4 border-b border-ink-700 bg-ink-900 px-4 py-3">
           <img src={mapa.img} alt="" className="h-24 w-24 shrink-0 rounded-lg object-cover sm:h-32 sm:w-32" />
           <div className="min-w-0">
             <p className="text-xs tracking-wide text-parch-400 uppercase">Mapa</p>
@@ -151,7 +153,7 @@ export function DraftBoard({
         </div>
       </div>
 
-      <div className={`px-4 py-2 text-sm ${tonoTurno}`}>
+      <div data-me-toca={meToca || undefined} className={`dn-turno px-4 py-2 text-sm ${tonoTurno}`}>
         {aviso}
         {meToca && ' — te toca'}
       </div>
@@ -164,7 +166,7 @@ export function DraftBoard({
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="mb-5 grid grid-cols-2 gap-3">
           {equipos.map((teamId) => (
-            <div key={teamId} className="rounded-lg border border-ink-700 p-3">
+            <div key={teamId} className="dn-plantel rounded-lg border border-ink-700 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold text-parch-100">{nombres[teamId]}</span>
                 {miEquipo === teamId && <Badge tone="gold">Tu equipo</Badge>}
@@ -178,7 +180,7 @@ export function DraftBoard({
                       <Avatar src={j.avatar_url} name={j.display_name} size={22} />
                       <span className="min-w-0 flex-1 truncate text-parch-200">{j.display_name}</span>
                       {civ ? (
-                        <span className="flex items-center gap-1.5 text-xs text-gold-400">
+                        <span className="dn-civ-elegida flex items-center gap-1.5 text-xs text-gold-400">
                           <img src={civ.flag} alt="" className="h-4 w-6 rounded-[2px] object-cover" />
                           {civ.name_es}
                         </span>
@@ -202,7 +204,7 @@ export function DraftBoard({
               const mp = mapaPorId(id);
               if (!mp) return null;
               const elegido = draft.map_id === id;
-              const clase = `relative overflow-hidden rounded-lg border p-1 text-left ${
+              const clase = `dn-ficha-mapa relative overflow-hidden rounded-lg border p-1 text-left ${
                 elegido
                   ? 'border-gold-500 ring-2 ring-gold-500/40'
                   : draft.map_id
@@ -223,12 +225,13 @@ export function DraftBoard({
                   disabled={ocupado}
                   onClick={() => hacer(() => elegirMapaDelDraft(m.id, draft.game_no, miEquipo!, id))}
                   title={mp.name_es}
+                  data-elegido={elegido || undefined}
                   className={clase}
                 >
                   {cuerpo}
                 </button>
               ) : (
-                <div key={id} className={clase} title={mp.name_es}>
+                <div key={id} data-elegido={elegido || undefined} className={clase} title={mp.name_es}>
                   {cuerpo}
                 </div>
               );
@@ -247,7 +250,7 @@ export function DraftBoard({
                 return (
                   <li
                     key={`${id}-${i}`}
-                    className={`flex items-center gap-2 rounded-lg border px-2 py-1 text-xs ${
+                    className={`dn-ban flex items-center gap-2 rounded-lg border px-2 py-1 text-xs ${
                       teamId === m.team_a_id ? 'border-gold-600/50 text-gold-400' : 'border-moss-500/50 text-moss-500'
                     }`}
                   >
@@ -270,7 +273,8 @@ export function DraftBoard({
               const baneada = baneadas.has(id);
               const delCompanero = !baneada && puedoElegir && deCompaneros.has(id);
               const clickeable = !ocupado && ((puedoBanear && !baneada) || (puedoElegir && permitidas.has(id)));
-              const clase = `relative flex min-w-0 flex-col items-center gap-1 rounded-lg border p-2 ${
+              const estado = baneada ? 'baneada' : delCompanero ? 'companero' : mio === id ? 'mia' : undefined;
+              const clase = `dn-ficha-civ relative flex min-w-0 flex-col items-center gap-1 rounded-lg border p-2 ${
                 baneada
                   ? 'border-ink-800 opacity-30'
                   : delCompanero
@@ -298,12 +302,13 @@ export function DraftBoard({
                         : elegirCiv(draft, m.id, uid!, id, companeros)
                     )
                   }
+                  data-estado={estado}
                   className={clase}
                 >
                   {cuerpo}
                 </button>
               ) : (
-                <div key={id} className={clase}>
+                <div key={id} data-estado={estado} className={clase}>
                   {cuerpo}
                 </div>
               );

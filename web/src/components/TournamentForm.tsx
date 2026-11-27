@@ -1,10 +1,12 @@
 import type { Civ, GameMap, SerieModo } from '../types';
-import { CivPicker, MapPicker } from './PoolPicker';
+import { CivPicker } from './PoolPicker';
 import { bolsaDe, ETIQUETA_FORMATO, monto } from '../lib';
 import { MAX_MEDIOS_DE_PAGO, MEDIOS_SUGERIDOS, MONEDAS, centavosDe } from '../logica/pagos.js';
 import { etiquetaDeSerie, opcionesDeSerie } from '../logica/series.js';
 import { Tabs } from './ui';
 import { VistaPrevia } from './VistaPrevia';
+import { PoolsDeMapas } from './PoolsDeMapas';
+import { todosLosMapas } from '../logica/pools-por-fase.js';
 
 export type PremioBorrador = {
   label: string;
@@ -64,6 +66,9 @@ export type Borrador = {
   prize_notes: string;
   prizes: PremioBorrador[];
   map_ids: number[];
+  /** 'unico': un pool para todo el torneo; 'por_fase': cada fase puede tener el suyo. */
+  map_pool_mode: 'unico' | 'por_fase';
+  map_pools: Record<string, number[]>;
   civ_ids: number[];
 };
 
@@ -99,6 +104,8 @@ export const BORRADOR_INICIAL: Borrador = {
   prize_notes: '',
   prizes: [],
   map_ids: [],
+  map_pool_mode: 'unico',
+  map_pools: {},
   civ_ids: [],
 };
 
@@ -202,7 +209,7 @@ export function TournamentForm({
     { id: 'draft', label: 'Draft' },
     { id: 'inscripcion', label: 'Inscripción' },
     { id: 'premios', label: 'Premios', count: value.prizes.length || undefined },
-    { id: 'mapas', label: 'Mapas', count: value.map_ids.length },
+    { id: 'mapas', label: 'Mapas', count: todosLosMapas(value).length },
     { id: 'civs', label: 'Civilizaciones', count: value.civ_ids.length },
   ];
 
@@ -402,7 +409,14 @@ export function TournamentForm({
             </ul>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo label="Primer mapa" hint="Al azar, o uno fijo del pool.">
+              <Campo
+                label="Primer mapa"
+                hint={
+                  value.map_pool_mode === 'por_fase'
+                    ? 'Al azar, o uno fijo. En una fase cuyo pool no lo tenga, sale al azar de ese pool.'
+                    : 'Al azar, o uno fijo del pool.'
+                }
+              >
                 <select
                   className="field"
                   value={value.first_map_id ?? ''}
@@ -410,7 +424,7 @@ export function TournamentForm({
                 >
                   <option value="">Al azar</option>
                   {maps
-                    .filter((m) => value.map_ids.includes(m.id))
+                    .filter((m) => todosLosMapas(value).includes(m.id))
                     .map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name_es}
@@ -499,7 +513,7 @@ export function TournamentForm({
           <section className="card p-5">
             <h3 className="title mb-1 text-lg">Pool de mapas</h3>
             <p className="hint mb-4 text-sm">Los mapas que van a estar disponibles en el draft.</p>
-            <MapPicker maps={maps} value={value.map_ids} onChange={(v) => set('map_ids', v)} />
+            <PoolsDeMapas value={value} onChange={onChange} maps={maps} />
           </section>
         )}
 

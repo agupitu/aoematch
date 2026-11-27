@@ -79,7 +79,8 @@ export function ChatPanel({
           </span>
           <span
             title={conectado ? 'Conectado' : 'Reconectando…'}
-            className={`h-2 w-2 rounded-full ${conectado ? 'bg-moss-500' : 'bg-blood-500'}`}
+            data-conectado={conectado}
+            className={`dn-conexion h-2 w-2 rounded-full ${conectado ? 'bg-moss-500' : 'bg-blood-500'}`}
           />
         </div>
       </div>
@@ -94,7 +95,7 @@ export function ChatPanel({
               {m.body}
             </p>
           ) : (
-            <div key={m.id} className="flex gap-2">
+            <div key={m.id} className="dn-msg flex gap-2">
               <Avatar src={m.user?.avatar_url} name={m.user?.display_name ?? '??'} size={26} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">

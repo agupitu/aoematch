@@ -18,6 +18,7 @@ import { poolCivs, poolMapas } from '../logica/draft.js';
 import { tablaDesde, terminado } from '../logica/llaves.js';
 import { limpiarMediosDePago, mediosConCosto, recaudadoEn, recaudadoPorMoneda } from '../logica/pagos.js';
 import { MODOS_DE_SERIE } from '../logica/series.js';
+import { MODOS_DE_POOL, poolsLimpios } from '../logica/pools-por-fase.js';
 import type { Tournament } from '../types';
 import { type Doc, ahora, conMensaje, consultar, leer, ordenarPor } from './base';
 import { mapaDeUsuarios } from './usuarios';
@@ -64,7 +65,7 @@ const CAMPOS_EDITABLES = [
   'max_teams', 'best_of', 'best_of_final', 'series_mode', 'group_count', 'group_advance', 'swiss_rounds',
   'third_place', 'map_repeat', 'first_map_id', 'civ_bans', 'civ_repeat_series', 'civ_repeat_team',
   'currency', 'payment_notes', 'allow_solo', 'reg_opens_at', 'reg_closes_at',
-  'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes',
+  'starts_at', 'prize_pool_mode', 'prize_pool_cents', 'prize_pool_pct', 'prize_notes', 'map_pool_mode',
 ];
 
 const CAMPOS_NUMERICOS = [
@@ -93,12 +94,14 @@ export function camposDe(body: Record<string, unknown>) {
   }
   if (cambios.name === null) delete cambios.name;
   if (cambios.series_mode !== undefined && !MODOS_DE_SERIE.includes(cambios.series_mode as string)) delete cambios.series_mode;
+  if (cambios.map_pool_mode !== undefined && !MODOS_DE_POOL.includes(cambios.map_pool_mode as string)) delete cambios.map_pool_mode;
   if (cambios.name !== undefined) cambios.name = String(cambios.name).slice(0, 120);
   if (typeof cambios.civ_bans === 'number') cambios.civ_bans = Math.max(0, Math.min(3, Math.round(cambios.civ_bans)));
 
   if (Array.isArray(body.prizes)) cambios.prizes = premiosLimpios(body.prizes);
   if (Array.isArray(body.payment_methods)) cambios.payment_methods = limpiarMediosDePago(body.payment_methods);
   if (Array.isArray(body.map_ids)) cambios.map_ids = idsLimpios(body.map_ids);
+  if (body.map_pools !== undefined) cambios.map_pools = poolsLimpios(body.map_pools);
   if (Array.isArray(body.civ_ids)) cambios.civ_ids = idsLimpios(body.civ_ids);
   return cambios;
 }
@@ -139,6 +142,7 @@ const POR_DEFECTO = {
   civ_bans: 0, civ_repeat_series: 1, civ_repeat_team: 1, entry_fee_cents: 0, currency: 'ARS', payment_methods: [], payment_notes: null,
   allow_solo: 1, reg_opens_at: null, reg_closes_at: null, starts_at: null, prize_pool_mode: 'ninguno',
   prize_pool_cents: 0, prize_pool_pct: 100, prize_notes: null, admin_ids: [], map_ids: [], civ_ids: [], prizes: [],
+  map_pool_mode: 'unico', map_pools: {},
 };
 
 /** Crea el torneo con quien lo crea de organizador. El slug es el id: si está tomado, -2, -3... */

@@ -20,15 +20,19 @@
 // repiten las reglas: lo de acá es para avisar en pantalla antes de escribir.
 
 import { civs as catalogoCivs, maps as catalogoMapas } from './catalogo.js';
+import { mapasDelPartido } from './pools-por-fase.js';
 
 /** Máximo de jugadores por equipo: las reglas revisan hasta 8 picks por draft. */
 export const MAX_POR_EQUIPO = 4;
 
 // ------------------------------------------------------------------- pools
 
-/** Mapas del torneo, en el orden del catálogo (por nombre). */
-export function poolMapas(torneo) {
-  const ids = new Set(torneo.map_ids ?? []);
+/**
+ * Mapas del torneo, en el orden del catálogo (por nombre). Con `partido`, los
+ * de su fase si el torneo tiene un pool por fase (`pools-por-fase.js`).
+ */
+export function poolMapas(torneo, partido = null) {
+  const ids = new Set(mapasDelPartido(torneo, partido));
   return catalogoMapas().filter((m) => ids.has(m.id));
 }
 
@@ -54,9 +58,10 @@ export function hash(texto) {
 
 /**
  * Draft de la partida `gameNo` de un partido.
- *   torneo   doc del torneo (`map_ids`, `civ_ids`, `first_map_id`, `map_repeat`,
+ *   torneo   doc del torneo (`map_ids`, `map_pool_mode`, `map_pools`, `civ_ids`, `first_map_id`, `map_repeat`,
  *            `civ_bans`, `civ_repeat_series`, `civ_repeat_team`, `team_size`)
- *   partido  doc del partido con su `id` (`team_a_id`, `team_b_id`, `games`)
+ *   partido  doc del partido con su `id` (`team_a_id`, `team_b_id`, `games`, y `label` y
+ *            `group_id` para saber su fase)
  *   equipos  { a, b }: docs de los dos equipos (`captain_id`, `member_ids`)
  * Juegan los primeros `team_size` de cada equipo, capitán primero.
  */
@@ -70,8 +75,8 @@ export function planDeDraft(torneo, partido, equipos, gameNo = 1) {
     throw new Error('La partida anterior todavía no tiene ganador.');
   }
 
-  const mapas = poolMapas(torneo);
-  if (!mapas.length) throw new Error('El torneo no tiene mapas.');
+  const mapas = poolMapas(torneo, partido);
+  if (!mapas.length) throw new Error('El torneo no tiene mapas para esta fase.');
   const usados = new Set(previas.map((g) => g.map_id).filter((id) => id != null));
   const disponibles = torneo.map_repeat ? mapas : mapas.filter((m) => !usados.has(m.id));
   if (!disponibles.length) throw new Error('No quedan mapas sin jugar en la serie.');

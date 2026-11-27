@@ -14,11 +14,14 @@ import { useChat, useConectado, useLive } from '../live';
 import { usePresencia } from '../presence';
 import { ETIQUETA_ESTADO_PARTIDO, fechaCorta, zonaDelNavegador } from '../lib';
 import { etiquetaDeSerie } from '../logica/series.js';
+import { useDisenoNuevo } from '../diseno/diseno';
+import { Marcador } from '../diseno/Marcador';
 import type { MatchDetail, Ventana } from '../types';
 
 export function MatchRoom() {
   const { id } = useParams();
   const { user } = useAuth();
+  const nuevo = useDisenoNuevo();
   const navigate = useNavigate();
   const { key: claveDeUbicacion } = useLocation();
   const [m, setM] = useState<MatchDetail | null>(null);
@@ -82,42 +85,57 @@ export function MatchRoom() {
       : []),
   ];
 
-  return (
-    <div className="mx-auto max-w-[110rem] px-4 py-5">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link
-            to={`/t/${m.tournament.slug}`}
-            // Si se llegó desde otra pantalla de la app, se vuelve a ella (Llaves, Horarios...) y no al resumen.
-            onClick={(e) => {
-              if (claveDeUbicacion === 'default') return;
-              e.preventDefault();
-              navigate(-1);
-            }}
-            className="text-xs text-parch-400 hover:text-gold-400"
-          >
-            ← {m.tournament.name}
-          </Link>
-          <h1 className="title mt-1 flex flex-wrap items-center gap-3 text-2xl">
-            <span className={m.winner_team_id === m.team_a_id ? 'text-gold-400' : ''}>{nombres.a}</span>
-            <span className="tabular-nums text-parch-400">
-              {m.score_a} – {m.score_b}
-            </span>
-            <span className={m.winner_team_id === m.team_b_id ? 'text-gold-400' : ''}>{nombres.b}</span>
-          </h1>
-          <p className="mt-1 text-sm text-parch-400">
-            {m.label ?? `Ronda ${m.round}`} · {etiquetaDeSerie(m)} · {ETIQUETA_ESTADO_PARTIDO[m.status] ?? m.status}
-            {m.scheduled_at && ` · ${fechaCorta(m.scheduled_at, user?.timezone)}`}
-          </p>
-        </div>
+  // Las tres piezas de la cabecera, iguales en los dos diseños; cambia cómo se acomodan.
+  const volver = (
+    <Link
+      to={`/t/${m.tournament.slug}`}
+      // Si se llegó desde otra pantalla de la app, se vuelve a ella (Llaves, Horarios...) y no al resumen.
+      onClick={(e) => {
+        if (claveDeUbicacion === 'default') return;
+        e.preventDefault();
+        navigate(-1);
+      }}
+      className="text-xs text-parch-400 hover:text-gold-400"
+    >
+      ← {m.tournament.name}
+    </Link>
+  );
+  const detalle = (
+    <>
+      {m.label ?? `Ronda ${m.round}`} · {etiquetaDeSerie(m)} · {ETIQUETA_ESTADO_PARTIDO[m.status] ?? m.status}
+      {m.scheduled_at && ` · ${fechaCorta(m.scheduled_at, user?.timezone)}`}
+    </>
+  );
+  const acciones = (
+    <div className="flex flex-wrap items-center gap-2">
+      {m.me.team_id && <Badge tone="gold">Jugás este partido</Badge>}
+      {m.me.is_staff && <Badge>Organizador</Badge>}
+      <Agendar m={m} onDone={cargar} />
+      {m.me.is_staff && <Reportar m={m} reveladas={reveladas} onDone={cargar} />}
+    </div>
+  );
 
-        <div className="flex flex-wrap items-center gap-2">
-          {m.me.team_id && <Badge tone="gold">Jugás este partido</Badge>}
-          {m.me.is_staff && <Badge>Organizador</Badge>}
-          <Agendar m={m} onDone={cargar} />
-          {m.me.is_staff && <Reportar m={m} reveladas={reveladas} onDone={cargar} />}
-        </div>
-      </header>
+  return (
+    <div className="dn-pagina mx-auto max-w-[110rem] px-4 py-5">
+      {nuevo ? (
+        <Marcador m={m} nombres={nombres} volver={volver} detalle={detalle} acciones={acciones} />
+      ) : (
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            {volver}
+            <h1 className="title mt-1 flex flex-wrap items-center gap-3 text-2xl">
+              <span className={m.winner_team_id === m.team_a_id ? 'text-gold-400' : ''}>{nombres.a}</span>
+              <span className="tabular-nums text-parch-400">
+                {m.score_a} – {m.score_b}
+              </span>
+              <span className={m.winner_team_id === m.team_b_id ? 'text-gold-400' : ''}>{nombres.b}</span>
+            </h1>
+            <p className="mt-1 text-sm text-parch-400">{detalle}</p>
+          </div>
+
+          {acciones}
+        </header>
+      )}
 
       {(m.vod_links?.length || m.me.is_staff || m.games.some((g) => g.replay_url)) && (
         <section className="mb-4 space-y-2">

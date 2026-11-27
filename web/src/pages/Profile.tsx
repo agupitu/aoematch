@@ -59,7 +59,7 @@ export function Profile() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+    <div className="dn-pagina mx-auto max-w-5xl space-y-6 px-4 py-8">
       <div className="flex items-center gap-4">
         <Avatar src={user.avatar_url} name={user.display_name} size={56} />
         <div>

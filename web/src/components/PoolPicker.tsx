@@ -93,10 +93,13 @@ export function MapPicker({
   maps,
   value,
   onChange,
+  titulo = 'Pool del torneo',
 }: {
   maps: GameMap[];
   value: number[];
   onChange: (v: number[]) => void;
+  /** Título del lado del pool (con pool por fase, el de la fase). */
+  titulo?: string;
 }) {
   const [q, setQ] = useState('');
   const [terreno, setTerreno] = useState('');
@@ -187,7 +190,7 @@ export function MapPicker({
 
       <aside className="min-w-0 self-start">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h4 className="label mb-0">Pool del torneo</h4>
+          <h4 className="label mb-0">{titulo}</h4>
           <span className="text-xs text-parch-400">
             {elegidos.length} {elegidos.length === 1 ? 'mapa' : 'mapas'}
           </span>
